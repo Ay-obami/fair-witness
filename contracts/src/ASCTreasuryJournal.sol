@@ -300,14 +300,15 @@ contract ASCTreasuryJournal is Ownable {
         return (diff * BPS_DENOMINATOR) / base;
     }
 
-    /// @dev DESIGN NOTE: decoding a price out of an arbitrary `encodedTransaction` blob is
-    ///      genuinely source-contract-specific — there is no universal way to do this. This
-    ///      implementation assumes a fixed, documented calldata layout emitted by our own
-    ///      toy Sepolia price-observation contract (see /contracts/src/mocks/ and
-    ///      DEVLOG.md "Design decision: fixed price-observation ABI"). A production
-    ///      version integrating with an arbitrary real DEX's swap event would need a
-    ///      per-source-contract decoder, which is explicitly out of scope for the hackathon
-    ///      timeline.
+    /// @dev PLACEHOLDER — see DEVLOG.md "Scope-changing finding: encodedTransaction is
+    ///      not a simple custom payload" (session 3). The real Attestcoin encodedTransaction
+    ///      is a full raw-EVM-transaction-envelope encoding (via the SDK's `abiEncode(tx,
+    ///      receipt)`), decodable on-chain only through the companion EvmV1Decoder
+    ///      functions, not a simple `abi.decode`. This function assumes a simplified,
+    ///      self-controlled payload shape for local testing only and WILL NOT correctly
+    ///      decode a real Attestcoin proof's encodedTransaction as-is. Real integration
+    ///      work required before live deployment — see DEVLOG for the two implementation
+    ///      options considered.
     function _decodePriceObservation(bytes calldata encodedTransaction)
         internal
         pure

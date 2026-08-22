@@ -88,7 +88,66 @@ arbitrary real DEX's swap event would need a per-source-contract decoder — exp
 out of scope here, and noted in the contract's own comments so it isn't mistaken for a
 general-purpose decoder later.
 
-### Decision: BASE_ASSET is Creditcoin-side capital, not literally bridged Sepolia USDC
+### Finding: `@gluwa/usc-sdk` is a real, published npm package — pulled its actual source
+Session 3 had npm registry access, so rather than keep guessing at the SDK's shape, I
+downloaded `@gluwa/usc-sdk@0.18.0` directly (`npm pack`) and read its real TypeScript
+source and ABIs. Two significant findings, one reassuring and one that changes scope:
+
+**Good news:** `src/interfaces/INativeQueryVerifier.sol`'s reconstruction (from session 1)
+matches the real precompile almost exactly — same struct names (`MerkleProof`,
+`MerkleProofEntry`, `ContinuityProof`), same `verify`/`verifyAndEmit` function names, same
+overload pattern for single-vs-batch. The real block prover precompile address is
+`0x0000000000000000000000000000000000000FD2`, confirming the earlier docs research. The
+`ChainInfo` precompile is a **separate** address, `0x...0FD3` — worth not conflating the
+two when someone later wires up `getSupportedChains()`.
+
+**Real API surface (agent runner will use these directly, not hypothetical wrappers):**
+- `proofProvider.service.ProofBuilder(chainKey, builderUrl)` — `.getProof(transactionHash)`
+  (keyed by **tx hash**, not blockHeight/txIndex as earlier pseudocode assumed — corrected
+  in the agent runner code), `.getBatchProof(hashes[])`, and its own
+  `.waitUntilHeightAttested(chainKey, targetHeight, ...)` which polls the *proof builder
+  service's* cache — separate from `chainInfo.PrecompileChainInfoProvider`'s own
+  same-named method, which checks the on-chain precompile directly. These can disagree
+  (proof-builder-cache lag vs on-chain truth) — the agent runner should treat the proof
+  builder's version as "can I fetch a proof yet" and the ChainInfo precompile's version as
+  "is it actually attested on-chain," and not assume they're interchangeable.
+- `blockProver.PrecompileBlockProver(rpcProvider)` — `.verifySingle(...)` (read-only
+  `staticCall`) and `.verifyAndEmitSingle(signer, ...)` (real tx, returns
+  `ContractTransactionResponse`).
+- `chainInfo.PrecompileChainInfoProvider(rpcProvider)` — `.getSupportedChains()`,
+  `.getSupportedChainByKey(chainKey)`. **This answers the earlier open question** from the
+  design doc about Solana/non-EVM support: the SDK's `ChainInfo` type includes a
+  `chainEncoding` field per chain, implying multiple encodings are modeled, but the only
+  encoder shipped in this SDK version is `encoding/abi/v1.ts` (EVM-style). Whether a
+  Solana-compatible encoding exists is still not confirmed from the package alone — the
+  PRD's "call `getSupportedChains()` against the live testnet on day one" step is still the
+  right move, this just narrows what to look for.
+
+**Scope-changing finding: `encodedTransaction` is not a simple custom payload.**
+`encoding.abi.abiEncode(tx, receipt)` takes real ethers.js `TransactionResponse` +
+`TransactionReceipt` objects and produces a full raw-transaction-envelope encoding,
+decodable on-chain via a companion `EvmV1Decoder` ABI
+(`decodeCommonTxFields`, `decodeReceiptFields`, `decodeTransactionType0/1/2`, found in
+`utils/evmV1DecoderAbi.json`) — **not** the simple `abi.encode(uint256 price, uint8
+status)` payload `ASCTreasuryJournal._decodePriceObservation` currently assumes. Extracting
+a specific field (like a price) from that envelope for a given source contract is what the
+SDK's `QueryBuilder` (`.setAbiProvider()`, `.eventBuilder()`,
+`.addFunctionSignature()`/`.addFunctionArgument()`) is for.
+
+**Consequence, stated plainly:** `_decodePriceObservation` in `ASCTreasuryJournal.sol` is
+a **placeholder that will not work against a real Attestcoin proof** as currently written.
+Fixing it means either (a) writing an on-chain decoder that calls into the real
+`EvmV1Decoder` functions and extracts the right calldata/event offset for our specific toy
+price contract, mirroring whatever `QueryBuilder` computes off-chain, or (b) a narrower
+hackathon-scoped shortcut: use `QueryBuilder` off-chain to pre-compute exactly which byte
+offsets in the encoded transaction hold the price, and hardcode a minimal on-chain slice
+matching that fixed layout for our own toy contract only (not general-purpose, but
+honest and correctly scoped for a demo against a contract we control). This is now the
+single largest piece of real integration work left, ahead of anything in the agent runner
+or frontend, and should be tackled in week 1 alongside the gas/latency benchmarking, using
+a real Sepolia testnet transaction end-to-end before building anything else on top of it.
+
+
 Surfaced while writing `script/Deploy.s.sol`, worth stating explicitly since it's easy to
 misread: the treasury's `BASE_ASSET` is capital that already lives on Creditcoin (however
 it got there — a separate, non-Attestcoin bridge/on-ramp, out of scope for this project).
