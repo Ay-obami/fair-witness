@@ -15,9 +15,9 @@ import {IDexRouter} from "./interfaces/IDexRouter.sol";
 ///    proofs off-chain, then submits them here.
 ///  - This contract holds ALL treasury funds and is the ONLY place that can move them.
 ///    There is deliberately no owner-only withdraw / admin escape hatch that bypasses
-///    `executeArbitrage`. `sweepStuckTokens` is the one intentional exception, and it is
-///    scoped narrowly (see its own docs) precisely so it cannot be used to route around
-///    the journal for the trading pair this contract actually manages.
+///    `executeArbitrage` (see the "Deliberately NOT included" note at the bottom of this
+///    file) — that is what makes the journal's completeness claim true, not just a
+///    design intention.
 ///  - Every successful execution is written to an append-only journal keyed by a
 ///    two-layer hash (factKey + actionKey) so that (a) a crashed-and-retried agent run is
 ///    idempotent, and (b) a reviewer can reconstruct exactly why funds moved.
@@ -68,6 +68,12 @@ contract ASCTreasuryJournal is Ownable {
     IDexRouter public immutable DEX_ROUTER;
     IERC20 public immutable BASE_ASSET; // e.g. USDC — the asset actually held/traded
     address public immutable QUOTE_ASSET; // the paired asset on the Creditcoin-side DEX
+    // The toy source-chain contract on Sepolia whose `observePrice` transactions this
+    // contract will accept as arbitrage facts. Binding it here (not just in the agent's
+    // config) means a proof can never be about any OTHER contract's calldata — see
+    // `_decodePriceObservation` for why this matters once real Attestcoin envelopes are
+    // decodable.
+    address public immutable PRICE_CONTRACT;
 
     // ---------------------------------------------------------------------
     // Rigid, hard-coded business logic bounds
@@ -130,14 +136,22 @@ contract ASCTreasuryJournal is Ownable {
     error EpochRateLimitExceeded();
     error SlippageExceeded();
     error TradeSizeExceedsMax();
+    error MalformedEncodedTransaction();
+    error WrongObservationSource();
 
-    constructor(address verifier_, address dexRouter_, address baseAsset_, address quoteAsset_, address initialOwner_)
-        Ownable(initialOwner_)
-    {
+    constructor(
+        address verifier_,
+        address dexRouter_,
+        address baseAsset_,
+        address quoteAsset_,
+        address priceContract_,
+        address initialOwner_
+    ) Ownable(initialOwner_) {
         VERIFIER = INativeQueryVerifier(verifier_);
         DEX_ROUTER = IDexRouter(dexRouter_);
         BASE_ASSET = IERC20(baseAsset_);
         QUOTE_ASSET = quoteAsset_;
+        PRICE_CONTRACT = priceContract_;
     }
 
     // ---------------------------------------------------------------------
@@ -300,26 +314,65 @@ contract ASCTreasuryJournal is Ownable {
         return (diff * BPS_DENOMINATOR) / base;
     }
 
-    /// @dev PLACEHOLDER — see DEVLOG.md "Scope-changing finding: encodedTransaction is
-    ///      not a simple custom payload" (session 3). The real Attestcoin encodedTransaction
-    ///      is a full raw-EVM-transaction-envelope encoding (via the SDK's `abiEncode(tx,
-    ///      receipt)`), decodable on-chain only through the companion EvmV1Decoder
-    ///      functions, not a simple `abi.decode`. This function assumes a simplified,
-    ///      self-controlled payload shape for local testing only and WILL NOT correctly
-    ///      decode a real Attestcoin proof's encodedTransaction as-is. Real integration
-    ///      work required before live deployment — see DEVLOG for the two implementation
-    ///      options considered.
+    /// @dev Decodes the `price` out of a real Attestcoin `encodedTransaction` payload,
+    ///      and whether the underlying source-chain transaction succeeded.
+    ///
+    ///      The payload is the raw EVM-transaction-envelope encoding produced by the
+    ///      `gluwa/usc-sdk` npm package's `encoding.abi.abiEncode(tx, receipt)` (confirmed
+    ///      against the SDK's actual source; see DEVLOG.md session 3): an ABI encoding of
+    ///      `(uint8 txType, bytes[] chunks)` where each chunk is itself independently
+    ///      ABI-encoded. Chunk 0 is ALWAYS the common transaction fields tuple
+    ///      `(uint64 nonce, uint64 gasLimit, address from, bool toIsNull, address to,
+    ///      uint256 value, bytes data)` — identical across tx types 0-4 in `v1.ts` — and
+    ///      the last chunk is ALWAYS the receipt fields tuple
+    ///      `(uint8 receiptStatus, uint64 receiptGasUsed, LogEntry[] receiptLogs,
+    ///      bytes receiptLogsBloom)`. No external EvmV1Decoder library call is required:
+    ///      we decode the two chunks we care about directly, which is cheaper and keeps
+    ///      the decode dependency-free.
+    ///
+    ///      Two additional checks make the decoded fact meaningful rather than a random
+    ///      slice of a proven transaction: the transaction must have been sent TO the
+    ///      contract's own `PRICE_CONTRACT` (so a proof of *some other* contract's
+    ///      calldata can never pass), and the receipt must report status 1 (so a proof of
+    ///      a *reverted* transaction is rejected even though it was honestly attested).
+    ///      The price itself is the `uint256` argument of `PRICE_CONTRACT`'s
+    ///      `observePrice(uint256)` call — a fixed calldata layout (4-byte selector +
+    ///      one ABI word), which is what makes a simple `abi.decode(data[4:])` valid for
+    ///      our own toy contract. This is deliberately scoped to that controlled source
+    ///      contract, not a general-purpose decoder — see DEVLOG.md.
     function _decodePriceObservation(bytes calldata encodedTransaction)
         internal
-        pure
+        view
         returns (uint256 price, bool success)
     {
-        // Expected layout: abi.encode(uint256 price, uint8 status) as the tx's calldata
-        // payload (after a 4-byte selector we skip). status == 1 means "succeeded".
-        require(encodedTransaction.length >= 4 + 64, "malformed price observation");
-        uint8 status;
-        (price, status) = abi.decode(encodedTransaction[4:], (uint256, uint8));
-        success = (status == 1);
+        (uint8 txType, bytes[] memory chunks) = abi.decode(encodedTransaction, (uint8, bytes[]));
+
+        // The SDK's v1 encoder only defines layouts for tx types 0-4, and every real
+        // encoding has at least 3 chunks (common, type-specific, receipt). Anything else
+        // is not a valid Attestcoin transaction payload — reject it rather than decode
+        // garbage (the real precompile would never verify such a payload anyway).
+        if (txType > 4 || chunks.length < 3) revert MalformedEncodedTransaction();
+
+        // Chunk 0 = common transaction fields, identical across all tx types.
+        (, , , bool toIsNull, address to, , bytes memory data) =
+            abi.decode(chunks[0], (uint64, uint64, address, bool, address, uint256, bytes));
+
+        if (toIsNull || to != PRICE_CONTRACT) revert WrongObservationSource();
+
+        // Last chunk = receipt fields. Only the first two head words matter (status is
+        // EIP-658 success/failure); the log entries + bloom tail can be left undecoded.
+        (uint8 receiptStatus,) = abi.decode(chunks[chunks.length - 1], (uint8, uint64));
+
+        // PRICE_CONTRACT's `observePrice(uint256)` calldata is exactly one selector + one
+        // 32-byte word. Anything else is a malformed observation call. The price is the
+        // 32 bytes immediately after the 4-byte selector — read them via assembly because
+        // Solidity's `data[4:]` slice syntax only applies to calldata arrays, and the
+        // decoded `data` lives in memory here.
+        if (data.length != 4 + 32) revert MalformedEncodedTransaction();
+        assembly {
+            price := mload(add(data, 36))
+        }
+        success = (receiptStatus == 1);
     }
 
     function _quoteCreditcoinDexPrice() internal view returns (uint256) {

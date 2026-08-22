@@ -23,6 +23,11 @@
         "internalType": "address"
       },
       {
+        "name": "priceContract_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "initialOwner_",
         "type": "address",
         "internalType": "address"
@@ -143,6 +148,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PRICE_CONTRACT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -739,6 +757,11 @@
   },
   {
     "type": "error",
+    "name": "MalformedEncodedTransaction",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotRegisteredAgent",
     "inputs": []
   },
@@ -798,6 +821,11 @@
   {
     "type": "error",
     "name": "UnderlyingTxNotSuccessful",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongObservationSource",
     "inputs": []
   }
 ]

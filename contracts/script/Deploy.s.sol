@@ -22,6 +22,9 @@ import {ASCTreasuryJournal} from "../src/ASCTreasuryJournal.sol";
 ///                                Sepolia-side USDC only informs the agent's off-chain
 ///                                price observation, it is never held by this contract)
 ///        QUOTE_ASSET_ADDRESS  - the paired token on PenguinSwap
+///        PRICE_CONTRACT_ADDRESS - the toy Sepolia price-observation contract whose
+///                                `observePrice` transactions are the arbitrage facts.
+///                                Must match what the agent's watcher polls.
 ///        OWNER_ADDRESS        - who can register/deregister agents (use a multisig for
 ///                                anything beyond a demo)
 ///        PRIVATE_KEY          - deployer key (NEVER the agent's submit key — see
@@ -32,18 +35,20 @@ contract Deploy is Script {
         address dexRouter = vm.envAddress("DEX_ROUTER_ADDRESS");
         address baseAsset = vm.envAddress("BASE_ASSET_ADDRESS");
         address quoteAsset = vm.envAddress("QUOTE_ASSET_ADDRESS");
+        address priceContract = vm.envAddress("PRICE_CONTRACT_ADDRESS");
         address owner = vm.envAddress("OWNER_ADDRESS");
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
 
         console.log("Deploying ASCTreasuryJournal with:");
-        console.log("  verifier   :", verifier);
-        console.log("  dexRouter  :", dexRouter);
-        console.log("  baseAsset  :", baseAsset);
-        console.log("  quoteAsset :", quoteAsset);
-        console.log("  owner      :", owner);
+        console.log("  verifier        :", verifier);
+        console.log("  dexRouter       :", dexRouter);
+        console.log("  baseAsset       :", baseAsset);
+        console.log("  quoteAsset      :", quoteAsset);
+        console.log("  priceContract   :", priceContract);
+        console.log("  owner           :", owner);
 
         vm.startBroadcast(deployerKey);
-        treasury = new ASCTreasuryJournal(verifier, dexRouter, baseAsset, quoteAsset, owner);
+        treasury = new ASCTreasuryJournal(verifier, dexRouter, baseAsset, quoteAsset, priceContract, owner);
         vm.stopBroadcast();
 
         console.log("Deployed ASCTreasuryJournal at:", address(treasury));

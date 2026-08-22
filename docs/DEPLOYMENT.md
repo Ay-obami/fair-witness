@@ -6,15 +6,18 @@ the copy-paste path for doing the actual live deployment from a normal machine. 
 `DEVLOG.md`'s open risks section first — two things below are flagged as unconfirmed and
 should be checked before relying on them.
 
-## Before you start: the one blocking item
+## Before you start: the formerly-blocking item is now resolved
 
-**Contract-side price decoding is a placeholder and will not work against a real
-Attestcoin proof yet.** See `DEVLOG.md`, "Scope-changing finding: encodedTransaction is
-not a simple custom payload." `ASCTreasuryJournal._decodePriceObservation` needs to be
-rewritten against the real `EvmV1Decoder` functions (or a hardcoded byte-offset slice
-computed via the SDK's `QueryBuilder` for our specific `PriceObservation.sol` contract)
-before step 4 below (a live end-to-end run) will actually succeed. Steps 1–3 do not
-depend on this and can proceed regardless.
+The **contract-side price decoding** gap (the single item that previously blocked a live
+end-to-end run) has been fixed in this build phase. `ASCTreasuryJournal._decodePriceObservation`
+now decodes the real Attestcoin `encodedTransaction` envelope (`abi.encode(uint8 txType,
+bytes[] chunks)`, as produced by the `gluwa/usc-sdk` — see the CONFIRMED note in DEVLOG),
+checks the underlying tx was sent to `PRICE_CONTRACT`, and reads its `receiptStatus` for the
+success/failure bit. The Foundry suite now builds proof payloads using that real encoding,
+so the on-chain decoder is tested against the exact format a live proof carries.
+
+Two things below are still flagged as **unconfirmed** and must be checked first (Step 1):
+the real precompile's verify surface at `0x0FD2`, and PenguinSwap's real router ABI.
 
 ## Step 1 — Confirm the unconfirmed things
 
@@ -66,6 +69,8 @@ export DEX_ROUTER_ADDRESS=...   # real PenguinSwap router, confirmed in Step 1
 export BASE_ASSET_ADDRESS=...   # Creditcoin-side capital the treasury actually holds (see DEVLOG's
                                  # "BASE_ASSET is Creditcoin-side capital" design note — NOT Sepolia USDC directly)
 export QUOTE_ASSET_ADDRESS=...  # the paired token on PenguinSwap
+export PRICE_CONTRACT_ADDRESS=... # the toy Sepolia PriceObservation contract from Step 2 — the
+                                # only contract whose observePrice transactions the treasury will accept
 export OWNER_ADDRESS=...        # a multisig, ideally, for anything beyond a demo
 export PRIVATE_KEY=...          # deployer key, NEVER the agent's submit key
 
