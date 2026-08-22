@@ -88,9 +88,19 @@ arbitrary real DEX's swap event would need a per-source-contract decoder — exp
 out of scope here, and noted in the contract's own comments so it isn't mistaken for a
 general-purpose decoder later.
 
----
+### Decision: BASE_ASSET is Creditcoin-side capital, not literally bridged Sepolia USDC
+Surfaced while writing `script/Deploy.s.sol`, worth stating explicitly since it's easy to
+misread: the treasury's `BASE_ASSET` is capital that already lives on Creditcoin (however
+it got there — a separate, non-Attestcoin bridge/on-ramp, out of scope for this project).
+The Sepolia USDC price the agent observes is used purely as an **external price signal**
+to compute the arbitrage condition against PenguinSwap's on-Creditcoin quote — Attestcoin
+never moves the USDC itself, consistent with its one-directional, read-only nature. If
+this project's submission docs describe the flow, this distinction should be stated
+explicitly: "we verify a fact about a price observed on Sepolia; we trade Creditcoin-side
+capital in response" — not "we bridge USDC from Sepolia," which Attestcoin cannot do and
+this contract does not attempt.
 
-## Pitfalls encountered
+
 
 1. **Foundry's solc auto-download blocked in this sandbox** — see Environment notes above.
 2. **Natspec comment parser chokes on a literal `@gluwa/usc-sdk`** in a `///` doc comment
