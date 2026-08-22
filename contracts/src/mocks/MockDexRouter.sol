@@ -33,11 +33,7 @@ contract MockDexRouter is IDexRouter {
         reserveB += amountB;
     }
 
-    function getAmountOut(uint256 amountIn, address[] calldata path)
-        external
-        view
-        returns (uint256 amountOut)
-    {
+    function getAmountOut(uint256 amountIn, address[] calldata path) external view returns (uint256 amountOut) {
         require(path.length == 2, "unsupported path");
         (uint256 reserveIn, uint256 reserveOut) = _reservesFor(path[0], path[1]);
         amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
@@ -84,11 +80,7 @@ contract MockDexRouter is IDexRouter {
         revert("unsupported pair");
     }
 
-    function _getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
-        internal
-        pure
-        returns (uint256)
-    {
+    function _getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
         require(amountIn > 0, "insufficient input amount");
         require(reserveIn > 0 && reserveOut > 0, "insufficient liquidity");
         // 0.3% fee, standard Uniswap V2 constant
