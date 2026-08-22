@@ -27,10 +27,13 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 ## Status
 
 Contracts, agent runner, and frontend are all built and independently tested
-(11 Foundry tests + 16 vitest tests, all passing) without live network access. One code
-change is still needed before a real testnet run works end-to-end (on-chain price
-decoding against the real Attestcoin `encodedTransaction` format) — see `DEVLOG.md` for
-exactly what's open and `docs/DEPLOYMENT.md` for the full deployment path.
+(14 Foundry tests + 16 vitest tests, all passing). The on-chain price decoder now handles
+the **real** Attestcoin `encodedTransaction` envelope (the `abi.encode(uint8, bytes[])`
+format produced by the `@gluwa/usc-sdk`), so no code change remains between this repo and
+a live end-to-end run — the remaining work is the **live testnet deployment** itself
+(funded keys, real RPCs, a Gemini key), which is credential-gated, not code-gated. See
+`DEVLOG.md` for the full journey (including the session-6 decode fix and its tests) and
+`docs/DEPLOYMENT.md` for the 7-step deployment path.
 
 ```bash
 # Contracts

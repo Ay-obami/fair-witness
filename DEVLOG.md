@@ -8,44 +8,46 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 5 (deployment docs — build complete for this sandbox's scope)
+**Last updated:** Build session 6 (real `encodedTransaction` decode fixed on-chain + test
+suite updated to build real-envelope proofs, 14/14 Foundry green; live testnet deployment
+is the next step and requires real credentials)
 
 | Component | Status |
 |---|---|
 | Contracts — interfaces | ✅ Done |
 | Contracts — `ASCTreasuryJournal.sol` core | ✅ Done |
 | Contracts — mocks (verifier, DEX, ERC20) | ✅ Done |
-| Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 11/11 passing (8 required + 3 bonus) |
-| Contracts — deploy scripts | ✅ Done |
+| Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 14/14 passing (8 required + 6 bonus, see session 6) |
+| Contracts — deploy scripts | ✅ Done — now takes `PRICE_CONTRACT_ADDRESS` |
 | Contracts — toy Sepolia `PriceObservation.sol` | ✅ Done |
+| **Contracts — real `encodedTransaction` decode** | ✅ **Resolved in code** — `_decodePriceObservation` now decodes the real `abi.encode(uint8, bytes[])` envelope (see session 6). Live validation against a real Sepolia proof still pending (step 1–2 of deployment). |
 | Agent runner (TypeScript) | ✅ Done — full poll→decide→prove→submit loop + replay CLI |
 | Agent runner unit tests | ✅ Done — 16/16 passing, incl. cross-language hash parity vs `cast` |
 | Frontend (React + Tailwind replay viewer) | ✅ Done — demo mode (mock data) + live mode, builds clean |
-| `docs/DEPLOYMENT.md` | ✅ Done — 7-step copy-paste guide for a machine with real RPC/API access |
-| Live testnet deployment | ⬜ **Cannot be done from this sandbox** — no RPC/API access. Follow `docs/DEPLOYMENT.md` from a normal machine. |
-| **Top open risk:** on-chain price decoding vs real `encodedTransaction` envelope | ⬜ Unresolved — blocks step 4 of deployment. See session-3 SDK research entry. |
+| `docs/DEPLOYMENT.md` | ✅ Done — 7-step guide, updated for the new constructor arg |
+| Live testnet deployment | ⬜ **In progress** — requires real RPC URLs, deployer + agent keys with testnet gas, and a Gemini API key. See session 6 for exactly what's needed. |
 
-**Everything that could be built, tested, and verified without live network access is
-done.** 27 automated tests total (11 Foundry, 16 vitest), all passing. Two structural
-integration risks remain open and are documented, not hidden: the real
-`encodedTransaction` decoding (blocking), and PenguinSwap's unconfirmed real ABI
-(probably fine, needs a 10-minute check). Both have a clear, actionable next step in
-`docs/DEPLOYMENT.md`.
+**Automated tests:** 30 total (14 Foundry, 16 vitest), all passing. One structural
+integration risk remains open and is documented, not hidden: PenguinSwap's unconfirmed
+real router ABI (10-minute check in deployment step 1). The precompile ABI at `0x0FD2`
+is also still unconfirmed against the real network and is the other step-1 check.
 
 ---
 
-## Environment notes (sandbox-specific — irrelevant on a normal dev machine)
+## Environment notes
 
-- This build environment's network is allowlisted to package registries + GitHub only.
-  No general RPC access, no Attestcoin/Creditcoin endpoints, no Gemini API, no Circle
-  faucet. Everything here is built and tested locally/mocked; live deployment happens
-  from your machine using the scripts and docs this repo ships with.
-- **Pitfall: Foundry's default solc auto-download was blocked** (`binaries.soliditylang.org`
-  not reachable from this sandbox). Worked around by downloading `solc-static-linux`
-  v0.8.24 directly from the `ethereum/solidity` GitHub release assets (that host **is**
-  allowlisted) and pinning `foundry.toml`'s `solc` field to the local binary path. This
-  pin is sandbox-specific — remove it on a normal machine, or leave it, it still works if
-  the binary is present.
+The original build environment (sessions 1-5) had an allowlisted network (package
+registries + GitHub only) with this consequence:
+
+- No general RPC access, no Attestcoin/Creditcoin endpoints, no Gemini API, no Circle
+  faucet. Everything in those sessions was built and tested locally/mocked; live
+  deployment was always meant to happen from a normal machine using the scripts and docs
+  this repo ships with.
+- **Pitfall (original sandbox only): Foundry's default solc auto-download was blocked**
+  (`binaries.soliditylang.org` not reachable). Worked around by pinning `foundry.toml`'s
+  `solc` to a manually-downloaded binary. **Session 6 ran on a normal dev machine**, so
+  that pin was removed (commit `84ab86c`) and forge now auto-manages solc 0.8.24; the pin
+  note below is preserved for historical context.
 
 ---
 
@@ -158,6 +160,54 @@ single largest piece of real integration work left, ahead of anything in the age
 or frontend, and should be tackled in week 1 alongside the gas/latency benchmarking, using
 a real Sepolia testnet transaction end-to-end before building anything else on top of it.
 
+
+### Session 6 — the decode gap is now closed in code (real-envelope decoding, no offsets)
+
+This build session ran on a normal dev machine with unrestricted network (GitHub + npm
+registries), unlike the original sandbox — which also let me remove the solc path pin from
+`foundry.toml` (see Environment notes update below). I re-pulled `@gluwa/usc-sdk@0.18.0` and
+re-read `src/encoding/abi/v1.ts` and `src/utils/evmV1DecoderAbi.json` as ground truth, then
+implemented the on-chain decoder. This is the resolution of the session-3 "Scope-changing
+finding" above; it supersedes the "placeholder will not work" warnings in the old code.
+
+**What `abiEncode(tx, receipt)` actually produces (confirmed, not assumed):** an ABI
+encoding of `(uint8 txType, bytes[] chunks)` where each chunk is itself independently
+ABI-encoded, i.e. `abi.decode`-able — it is NOT a fixed-offset blob that needs the
+`EvmV1Decoder` library or byte-offset math to parse. The layouts that matter:
+- chunk[0] is ALWAYS the common tx fields `(uint64 nonce, uint64 gasLimit, address from,
+  bool toIsNull, address to, uint256 value, bytes data)` — identical for tx types 0-4.
+- the LAST chunk is ALWAYS the receipt fields `(uint8 receiptStatus, uint64 receiptGasUsed,
+  LogEntry[] logs, bytes logsBloom)` — `receiptStatus` is EIP-658 success/failure.
+- the middle chunk(s) are type-specific (gas fields, access list, signature) and are never
+  read by this decoder.
+
+**Implementation (option (a) from session 3, minus the external dependency):**
+`_decodePriceObservation` now does `abi.decode(encodedTransaction, (uint8, bytes[]))`,
+decodes chunk[0] for `toIsNull`/`to`/`data` and the last chunk for `receiptStatus`, rejects
+malformed inputs (`MalformedEncodedTransaction`) and proofs about any contract other than
+the newly-added `PRICE_CONTRACT` immutable (`WrongObservationSource`), and reads the price
+as the 32 bytes after the 4-byte `observePrice(uint256)` selector via a tiny inline
+`mload` (Solidity's `data[4:]` slice syntax only applies to calldata arrays). Success is
+`receiptStatus == 1` — an honestly-attested but REVERTED source tx is rejected by design.
+
+**Why the new `PRICE_CONTRACT` immutable:** previously the decoder trusted any calldata
+that happened to look like a price; with the real envelope decodable, binding the proof's
+`to` field to the treasury's own source contract makes the system self-describing and
+closes the "proof about someone else's contract" hole. Constructor gains a
+`priceContract_` arg (deploy script env `PRICE_CONTRACT_ADDRESS`).
+
+**Test-suite change (the other half of this task):** `TestBase.sol`'s proof helpers no
+longer build the simplified mock payload. They now build the real envelope byte-for-byte
+per v1.ts (chunk 0 common fields, chunk 1 for tx types 0/1/2, chunk 2 receipt), so the
+on-chain decoder is exercised against the exact shape a live Attestcoin proof carries.
+Added three tests: type-0 (legacy) envelope executes; verified proof to the wrong contract
+reverts `WrongObservationSource`; verified proof of a reverted source tx reverts
+`UnderlyingTxNotSuccessful`. Foundry suite: 14/14 passing (was 11/11).
+
+**Honest limits:** this proves the decoder against the real-format encoding structurally,
+not against a genuine live Sepolia proof + real precompile verification — that is exactly
+deployment steps 1-2, which need live RPC access and a funded deployer key. Also updated
+the agent's checked-in `abi/ASCTreasuryJournal.json` to match the new bytecode.
 
 Surfaced while writing `script/Deploy.s.sol`, worth stating explicitly since it's easy to
 misread: the treasury's `BASE_ASSET` is capital that already lives on Creditcoin (however
@@ -329,10 +379,18 @@ it's the one place a UI bug could silently hide a real problem.
 - [x] Frontend — demo mode + live mode, builds clean
 - [x] `docs/DEPLOYMENT.md` — 7-step guide, including the reasoning-store-serving gap
       called out explicitly rather than left implicit
-- [ ] **Resolve on-chain price decoding against the real `encodedTransaction` envelope**
-      — the one item that requires code changes, not just infrastructure/config, before
-      a live run works end-to-end. See "Scope-changing finding" above and
-      `docs/DEPLOYMENT.md`'s "Before you start" section.
+- [x] **Resolve on-chain price decoding against the real `encodedTransaction` envelope** —
+      done in session 6: `_decodePriceObservation` now decodes the real
+      `abi.encode(uint8, bytes[])` envelope and the test fixture builds real-shaped proofs
+      (see the session-6 entry above). (What was previously the sole blocking *code* item
+      is now closed; live validation of the decoder against a real Sepolia proof is part
+      of deployment steps 1-2 below.)
+- [ ] **Live testnet deployment** (deployment steps 1-7 in `docs/DEPLOYMENT.md`) — needs
+      real credentials: a Sepolia RPC, a Creditcoin testnet RPC,
+      `CREDITCOIN_PROOF_BUILDER_URL`, a deployer key funded with testnet gas on both
+      chains, a fresh zero-balance agent submit key, and a Gemini API key. Deployed
+      contract + frontend live URL + one deliberate adversarial rejection demonstrated.
+      Blocked on credentials, not on code.
 
 ## Closing note for whoever picks this up next
 
