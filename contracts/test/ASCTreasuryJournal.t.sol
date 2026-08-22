@@ -307,4 +307,67 @@ contract ASCTreasuryJournalTest is TestBase {
         vm.expectRevert(ASCTreasuryJournal.NotRegisteredAgent.selector);
         treasury.executeArbitrage(src, confirm, nonce, keccak256("unauthorized test"));
     }
+
+    // -------------------------------------------------------------------
+    // Bonus: the real encodedTransaction envelope supports legacy (type 0) transactions
+    // too, not just EIP-1559 — proves _decodePriceObservation walks the envelope by
+    // structure, not by hardcoded offsets for one tx type.
+    // -------------------------------------------------------------------
+
+    function test_ExecutesWithLegacyType0SourceProof() public {
+        uint256 srcPrice = 1_005_000;
+        uint256 confPrice = 1_010_000;
+
+        ASCTreasuryJournal.ProofData memory src = _buildProof(
+            2_000_000, 0, srcPrice, true, address(priceSource), 0, true
+        );
+        ASCTreasuryJournal.ProofData memory confirm = buildVerifiedProof(2_000_003, 0, confPrice, true);
+
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        vm.prank(agent);
+        bytes32 actionKey = treasury.executeArbitrage(src, confirm, nonce, keccak256("legacy type0"));
+
+        assertTrue(treasury.executedActions(actionKey), "type-0 encoded proof should decode and execute");
+        assertEq(treasury.journalLength(), 1, "journal should record the execution");
+    }
+
+    // -------------------------------------------------------------------
+    // Bonus: a verified proof whose underlying tx was sent to a DIFFERENT contract
+    // (not PRICE_CONTRACT) must be rejected at decode time, not acted on. This is the
+    // tightened source-binding guarantee from _decodePriceObservation.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnProofFromWrongSourceContract() public {
+        address somewhereElse = makeAddr("someOtherContract");
+        ASCTreasuryJournal.ProofData memory src =
+            buildVerifiedProofTo(3_000_000, 0, 1_005_000, true, somewhereElse);
+        ASCTreasuryJournal.ProofData memory confirm = buildVerifiedProof(3_000_003, 0, 1_010_000, true);
+
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, 1_005_000, 1_010_000);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.WrongObservationSource.selector);
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("wrong source contract"));
+    }
+
+    // -------------------------------------------------------------------
+    // Bonus: a proof of a REVERTED underlying source transaction (receipt status 0) must
+    // be rejected even though it is honestly attested — Attestcoin proves inclusion, not
+    // success, so the decode must check the receipt's EIP-658 status itself.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnRevertedUnderlyingSourceTx() public {
+        ASCTreasuryJournal.ProofData memory src = buildVerifiedProof(5_000_000, 0, 1_005_000, false);
+        ASCTreasuryJournal.ProofData memory confirm = buildVerifiedProof(5_000_003, 0, 1_010_000, true);
+
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, 1_005_000, 1_010_000);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.UnderlyingTxNotSuccessful.selector);
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("reverted underlying tx"));
+    }
 }
