@@ -26,14 +26,21 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 
 ## Status
 
-See `DEVLOG.md` for the current build status and what's left.
-
-## Quick start (contracts)
+Contracts, agent runner, and frontend are all built and independently tested
+(11 Foundry tests + 16 vitest tests, all passing) without live network access. One code
+change is still needed before a real testnet run works end-to-end (on-chain price
+decoding against the real Attestcoin `encodedTransaction` format) — see `DEVLOG.md` for
+exactly what's open and `docs/DEPLOYMENT.md` for the full deployment path.
 
 ```bash
-cd contracts
-forge build
-forge test -vv
+# Contracts
+cd contracts && ./install-deps.sh && forge test
+
+# Agent runner (unit tests only — needs no live network)
+cd agent && npm install && npm test
+
+# Frontend (demo mode — no live network needed)
+cd frontend && npm install && npm run dev
 ```
 
 ## Documentation

@@ -1,0 +1,134 @@
+# Deployment Guide
+
+Everything in this repo was built and tested in a sandboxed environment with **no live
+RPC or external API access** (see `DEVLOG.md`'s "Environment notes"). This document is
+the copy-paste path for doing the actual live deployment from a normal machine. Read
+`DEVLOG.md`'s open risks section first — two things below are flagged as unconfirmed and
+should be checked before relying on them.
+
+## Before you start: the one blocking item
+
+**Contract-side price decoding is a placeholder and will not work against a real
+Attestcoin proof yet.** See `DEVLOG.md`, "Scope-changing finding: encodedTransaction is
+not a simple custom payload." `ASCTreasuryJournal._decodePriceObservation` needs to be
+rewritten against the real `EvmV1Decoder` functions (or a hardcoded byte-offset slice
+computed via the SDK's `QueryBuilder` for our specific `PriceObservation.sol` contract)
+before step 4 below (a live end-to-end run) will actually succeed. Steps 1–3 do not
+depend on this and can proceed regardless.
+
+## Step 1 — Confirm the unconfirmed things
+
+```bash
+cd agent
+npm install
+```
+
+Write a tiny throwaway script (or use `npx tsx`) to call, against the real Creditcoin
+testnet RPC:
+
+```ts
+import { chainInfo } from "@gluwa/usc-sdk";
+import { ethers } from "ethers";
+
+const provider = new ethers.JsonRpcProvider(process.env.CREDITCOIN_RPC_URL);
+const provider2 = new chainInfo.PrecompileChainInfoProvider(provider as never);
+console.log(await provider2.getSupportedChains());
+```
+
+Confirm:
+- Sepolia is actually in the returned list, and note its exact `chainKey`.
+- Whether any non-EVM chain (relevant if you ever revisit a Solana-sourced idea) appears.
+
+Separately, confirm PenguinSwap's real router address and ABI on Creditcoin testnet
+matches `contracts/src/interfaces/IDexRouter.sol`'s assumed
+`getAmountOut`/`swapExactTokensForTokens` surface (see `DEVLOG.md` pitfall #4). If it
+doesn't match, update that interface (and `MockDexRouter`'s test double, if the real
+ABI's semantics differ enough to matter for the test suite) before deploying against it.
+
+## Step 2 — Deploy the toy Sepolia source contract
+
+```bash
+cd contracts
+source contracts/install-deps.sh   # if not already run
+forge create src/source-chain/PriceObservation.sol:PriceObservation \
+  --rpc-url $SEPOLIA_RPC_URL --private-key $DEPLOYER_KEY --broadcast
+```
+
+Note the deployed address — this is `PRICE_CONTRACT_ADDRESS` for the agent's `.env`.
+
+## Step 3 — Deploy ASCTreasuryJournal on Creditcoin testnet
+
+Fill in the env vars documented at the top of `contracts/script/Deploy.s.sol`:
+
+```bash
+export VERIFIER_ADDRESS=0x0000000000000000000000000000000000000FD2   # confirm against real network
+export DEX_ROUTER_ADDRESS=...   # real PenguinSwap router, confirmed in Step 1
+export BASE_ASSET_ADDRESS=...   # Creditcoin-side capital the treasury actually holds (see DEVLOG's
+                                 # "BASE_ASSET is Creditcoin-side capital" design note — NOT Sepolia USDC directly)
+export QUOTE_ASSET_ADDRESS=...  # the paired token on PenguinSwap
+export OWNER_ADDRESS=...        # a multisig, ideally, for anything beyond a demo
+export PRIVATE_KEY=...          # deployer key, NEVER the agent's submit key
+
+forge script script/Deploy.s.sol:Deploy --rpc-url $CREDITCOIN_RPC_URL --broadcast
+```
+
+Then, manually (not automated by the script, deliberately — see the script's own
+printed next-steps):
+1. `treasury.registerAgent(<agent submit address>)` as the owner.
+2. Fund the treasury directly with `BASE_ASSET` — it holds its own capital.
+3. **Confirm the agent submit key holds zero `BASE_ASSET`/`QUOTE_ASSET` balance and zero
+   approvals to anything.** This is the custody-separation claim from `DESIGN.md` — it's
+   only true if you actually check it, not by construction of the code alone.
+
+## Step 4 — Configure and run the agent
+
+Copy `agent/.env.example` to `agent/.env` and fill in every value — `TREASURY_ADDRESS`
+and `PRICE_CONTRACT_ADDRESS` from Steps 2–3, a real `GEMINI_API_KEY` (free tier via
+[Google AI Studio](https://aistudio.google.com/), no card required), and a **freshly
+generated, zero-balance** `AGENT_SUBMIT_PRIVATE_KEY` — funded with only enough
+Creditcoin-testnet gas token to pay for transactions, nothing else.
+
+```bash
+cd agent
+npm run dev
+```
+
+Watch the logs. Expected rejections (stale, narrow, rate-limited, replayed) are the
+system working correctly, not bugs — see `index.ts`'s inline comment on this.
+
+## Step 5 — Serve the reasoning store to the frontend
+
+`agent/src/reasoningStore.ts` writes to a local `.reasoning-store/` directory on
+whatever machine runs the agent. The frontend's live mode
+(`frontend/src/lib/contractReader.ts`) expects to fetch
+`{VITE_REASONING_API_URL}/{decisionHash}.json` over HTTP — **this repo does not include
+a server for that directory.** The fastest paths, in order of effort:
+- Simplest: run `npx serve .reasoning-store` (or any static file server) alongside the
+  agent, and point `VITE_REASONING_API_URL` at it. Fine for a demo, not for production
+  (no auth, no persistence guarantees).
+- Better: have `reasoningStore.ts` additionally `put` to a small hosted KV (Cloudflare
+  KV, a Supabase table, etc.) instead of/alongside the local file, and point the
+  frontend there.
+- Most aligned with the "tamper-evident" framing: publish to IPFS and use a public
+  gateway URL — the content-addressing itself becomes an extra integrity check on top
+  of the on-chain hash commitment, though this adds latency and a new dependency.
+
+None of these are implemented in this repo — pick one based on how much time is left
+before the deadline.
+
+## Step 6 — Deploy the frontend
+
+```bash
+cd frontend
+cp .env.example .env   # set VITE_DEMO_MODE=false and fill in the rest per Step 5
+npm run build
+```
+
+`dist/` is a static site — any static host works (Vercel, Netlify, GitHub Pages, etc.).
+
+## Step 7 — Rehearse the adversarial demo
+
+Per the PRD's week-4 plan: deliberately submit a stale, too-narrow, or duplicate proof
+live and show the contract cleanly rejecting it. This is a stronger demo moment than
+only showing the happy path — it's the actual evidence the rigid bounds work, not just a
+claim in the README.

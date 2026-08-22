@@ -8,7 +8,7 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 4 (frontend complete)
+**Last updated:** Build session 5 (deployment docs — build complete for this sandbox's scope)
 
 | Component | Status |
 |---|---|
@@ -21,8 +21,16 @@ for the original architecture write-up.
 | Agent runner (TypeScript) | ✅ Done — full poll→decide→prove→submit loop + replay CLI |
 | Agent runner unit tests | ✅ Done — 16/16 passing, incl. cross-language hash parity vs `cast` |
 | Frontend (React + Tailwind replay viewer) | ✅ Done — demo mode (mock data) + live mode, builds clean |
-| Live testnet deployment | ⬜ Not started — requires real RPC/API access outside this sandbox |
-| **Top open risk:** on-chain price decoding vs real `encodedTransaction` envelope | ⬜ Unresolved — see session-3 SDK research entry |
+| `docs/DEPLOYMENT.md` | ✅ Done — 7-step copy-paste guide for a machine with real RPC/API access |
+| Live testnet deployment | ⬜ **Cannot be done from this sandbox** — no RPC/API access. Follow `docs/DEPLOYMENT.md` from a normal machine. |
+| **Top open risk:** on-chain price decoding vs real `encodedTransaction` envelope | ⬜ Unresolved — blocks step 4 of deployment. See session-3 SDK research entry. |
+
+**Everything that could be built, tested, and verified without live network access is
+done.** 27 automated tests total (11 Foundry, 16 vitest), all passing. Two structural
+integration risks remain open and are documented, not hidden: the real
+`encodedTransaction` decoding (blocking), and PenguinSwap's unconfirmed real ABI
+(probably fine, needs a 10-minute check). Both have a clear, actionable next step in
+`docs/DEPLOYMENT.md`.
 
 ---
 
@@ -319,10 +327,21 @@ it's the one place a UI bug could silently hide a real problem.
 - [x] Agent runner (TypeScript) — full loop, real SDK integration, replay CLI
 - [x] Agent runner unit tests
 - [x] Frontend — demo mode + live mode, builds clean
+- [x] `docs/DEPLOYMENT.md` — 7-step guide, including the reasoning-store-serving gap
+      called out explicitly rather than left implicit
 - [ ] **Resolve on-chain price decoding against the real `encodedTransaction` envelope**
-      — highest-priority remaining item, see "Scope-changing finding" above
-- [ ] `docs/DEPLOYMENT.md` — copy-paste deployment steps for a machine with real
-      Sepolia/Creditcoin RPC + Gemini API access, including how to actually serve
-      `reasoningStore.ts`'s payloads to the frontend (currently a documented gap, not a
-      solved one)
-- [ ] Final DEVLOG pass once all of the above lands
+      — the one item that requires code changes, not just infrastructure/config, before
+      a live run works end-to-end. See "Scope-changing finding" above and
+      `docs/DEPLOYMENT.md`'s "Before you start" section.
+
+## Closing note for whoever picks this up next
+
+This was built end-to-end (contracts → agent → frontend → deployment docs) in a
+sandbox with no live network access, verifying every non-obvious claim against real
+sources rather than guessing: the SDK's actual npm package, `forge`/`cast` as
+ground-truth for Solidity math, and an actual production build + smoke test for the
+frontend. Every real gap found along the way is logged above with what was tried, what's
+still open, and where to pick it up — not smoothed over. The single highest-value next
+session is resolving the `encodedTransaction` decoding gap using a real Sepolia
+transaction, per `docs/DEPLOYMENT.md` step 1; everything else in this repo is ready to
+build on top of that once it's solved.
