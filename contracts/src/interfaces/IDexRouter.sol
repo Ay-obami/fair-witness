@@ -12,10 +12,7 @@ pragma solidity ^0.8.24;
 ///      seam to double check and swap in week 1 of the real build, per the PRD, against
 ///      PenguinSwap's real, deployed router address and ABI on Creditcoin testnet.
 interface IDexRouter {
-    function getAmountOut(uint256 amountIn, address[] calldata path)
-        external
-        view
-        returns (uint256 amountOut);
+    function getAmountOut(uint256 amountIn, address[] calldata path) external view returns (uint256 amountOut);
 
     function swapExactTokensForTokens(
         uint256 amountIn,

@@ -131,13 +131,9 @@ contract ASCTreasuryJournal is Ownable {
     error SlippageExceeded();
     error TradeSizeExceedsMax();
 
-    constructor(
-        address verifier_,
-        address dexRouter_,
-        address baseAsset_,
-        address quoteAsset_,
-        address initialOwner_
-    ) Ownable(initialOwner_) {
+    constructor(address verifier_, address dexRouter_, address baseAsset_, address quoteAsset_, address initialOwner_)
+        Ownable(initialOwner_)
+    {
         VERIFIER = INativeQueryVerifier(verifier_);
         DEX_ROUTER = IDexRouter(dexRouter_);
         BASE_ASSET = IERC20(baseAsset_);
@@ -283,9 +279,8 @@ contract ASCTreasuryJournal is Ownable {
         uint256 minOut = quotedOut - (quotedOut * maxSlippageBps) / BPS_DENOMINATOR;
 
         BASE_ASSET.forceApprove(address(DEX_ROUTER), amountIn);
-        uint256[] memory amounts = DEX_ROUTER.swapExactTokensForTokens(
-            amountIn, minOut, path, address(this), block.timestamp
-        );
+        uint256[] memory amounts =
+            DEX_ROUTER.swapExactTokensForTokens(amountIn, minOut, path, address(this), block.timestamp);
         amountOut = amounts[amounts.length - 1];
         if (amountOut < minOut) revert SlippageExceeded();
     }

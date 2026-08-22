@@ -8,15 +8,15 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 1 (contracts phase)
+**Last updated:** Build session 2 (contracts test suite complete)
 
 | Component | Status |
 |---|---|
 | Contracts — interfaces | ✅ Done |
 | Contracts — `ASCTreasuryJournal.sol` core | ✅ Done |
 | Contracts — mocks (verifier, DEX, ERC20) | ✅ Done |
-| Contracts — acceptance tests (8 from PRD §10) | 🔜 Next |
-| Contracts — deploy scripts | ⬜ Not started |
+| Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 11/11 passing (8 required + 3 bonus) |
+| Contracts — deploy scripts | 🔜 Next |
 | Agent runner (TypeScript) | ⬜ Not started |
 | Frontend (React + Tailwind replay viewer) | ⬜ Not started |
 | Live testnet deployment | ⬜ Not started — requires real RPC/API access outside this sandbox |
@@ -109,9 +109,44 @@ general-purpose decoder later.
 
 ---
 
+## Test suite (contracts)
+
+11 tests, all passing (`forge test`): the 8 required acceptance criteria from PRD §10,
+plus 3 bonus tests (unverified-proof rejection, unregistered-caller rejection, and the
+happy-path execution the others build on).
+
+Mapping to PRD §10:
+1. `test_NoOtherFunctionCanMoveFunds` → #1 (custody invariant, probes for escape hatches)
+2. `testFuzz_AgentNeverHoldsFunds` → #2 (fuzzed over 1–6 sequential executions)
+3. `test_RevertOnExactReplay` → #3
+4. `test_RevertOnDeterministicNonceRetryAfterSimulatedCrash` → #4
+5. `test_RevertOnExcessiveDrift` → #5
+6. `test_RevertOnNarrowArbitrageWindow` → #6
+7. `test_RevertOnEpochRateLimitExceeded` → #7
+8. `test_JournalDecisionHashMatchesOffchainReasoning` → #8
+
+**Gas numbers from this sandbox's mock verifier** (`forge test --gas-report`):
+`executeArbitrage` averages ~423k gas (range ~30k on early-revert paths up to ~461k on a
+full successful execution with two mock `verifyAndEmit` calls + a DEX swap). **This
+number is not trustworthy for the real system** — the mock verifier's `verifyAndEmit` is
+a single storage read, while the real Attestcoin precompile does actual Merkle +
+continuity proof verification, which the docs describe as gas-optimized native execution
+but with no published benchmark found during research. Treat ~423k as a floor, not an
+estimate, and get the real number in week 1 against actual testnet proofs before
+finalizing `MAX_ACTIONS_PER_EPOCH` or worrying about per-tx cost.
+
+**Test design note:** criterion #1 (custody invariant) is tested by probing for common
+"escape hatch" function selectors (`withdraw`, `sweep`, `emergencyWithdraw`, etc.) via
+low-level calls and confirming none resolve — this is a reasonable proxy given the
+contract's small, fully-reviewed function surface, but it is not an exhaustive
+call-surface fuzzing tool. If the contract grows in a later iteration, this test should
+be revisited rather than assumed to still cover the full surface.
+
+---
+
 ## What's left (tracking against the PRD)
 
-- [ ] Foundry acceptance tests — the 8 tests from PRD §10 (custody invariant, replay
+- [x] Foundry acceptance tests — the 8 tests from PRD §10 (custody invariant, replay
       safety incl. simulated crash/retry, drift/width rejection, rate limiting, journal
       hash-match)
 - [ ] Foundry deploy script (`script/Deploy.s.sol`) with clear placeholders for real
