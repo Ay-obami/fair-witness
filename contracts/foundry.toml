@@ -6,10 +6,11 @@ optimizer = true
 optimizer_runs = 200
 via_ir = true
 fs_permissions = [{ access = "read", path = "./" }]
-# Pinned to a manually-downloaded solc binary — see DEVLOG.md "Pitfall: solc auto-download
-# blocked in sandbox". A real dev machine with normal network access does not need this
-# override; forge will auto-manage solc versions as usual.
-solc = "/root/.solc/solc-0.8.24"
+# NOTE: the previous build session pinned `solc` to a manually-downloaded binary
+# (/root/.solc/solc-0.8.24) because that sandbox could not reach binaries.soliditylang.org.
+# That path does not exist on this machine and the network here is unrestricted, so the
+# pin is removed and forge auto-manages the solc version (see DEVLOG.md).
+solc = "0.8.24"
 
 remappings = [
     "forge-std/=lib/forge-std/src/",
