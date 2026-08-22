@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Forensic-ledger palette: near-black slate, one verification accent (teal),
+     one alert accent (amber) for rejections — deliberately not a generic
+     indigo/purple SaaS palette. See DEVLOG.md for the design rationale. */
+  --color-ledger-950: #0a0e0f;
+  --color-ledger-900: #0f1517;
+  --color-ledger-800: #161e21;
+  --color-ledger-700: #212b2f;
+  --color-ledger-600: #34434a;
+  --color-ledger-400: #6b7f87;
+  --color-ledger-200: #b9c6ca;
+  --color-ledger-100: #dde5e7;
+  --color-verified-500: #2dd4a7;
+  --color-verified-400: #5ee6c2;
+  --color-alert-500: #e8a33d;
+  --color-alert-400: #f0bb66;
+}
+
+body {
+  background-color: var(--color-ledger-950);
+  color: var(--color-ledger-100);
+  font-family: var(--font-sans);
+}
+
+.font-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

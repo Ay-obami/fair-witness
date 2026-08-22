@@ -8,7 +8,7 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 3 (agent runner complete)
+**Last updated:** Build session 4 (frontend complete)
 
 | Component | Status |
 |---|---|
@@ -20,8 +20,9 @@ for the original architecture write-up.
 | Contracts — toy Sepolia `PriceObservation.sol` | ✅ Done |
 | Agent runner (TypeScript) | ✅ Done — full poll→decide→prove→submit loop + replay CLI |
 | Agent runner unit tests | ✅ Done — 16/16 passing, incl. cross-language hash parity vs `cast` |
-| Frontend (React + Tailwind replay viewer) | 🔜 Next |
+| Frontend (React + Tailwind replay viewer) | ✅ Done — demo mode (mock data) + live mode, builds clean |
 | Live testnet deployment | ⬜ Not started — requires real RPC/API access outside this sandbox |
+| **Top open risk:** on-chain price decoding vs real `encodedTransaction` envelope | ⬜ Unresolved — see session-3 SDK research entry |
 
 ---
 
@@ -268,6 +269,47 @@ before attempting a real testnet run.
 
 ---
 
+## Frontend — what was built
+
+React + Vite + Tailwind v4 (via `@tailwindcss/vite`, no separate config file needed).
+Deliberately not a generic indigo/purple SaaS palette — a dark "forensic ledger"
+aesthetic (near-black slate, monospace data, one teal "verified" accent, one amber
+"alert" accent), matching the audit-tool nature of the actual product.
+
+- `lib/types.ts` — mirrors the on-chain `JournalEntry` struct and the agent's
+  `ReasoningPayload` type exactly. Note: had to convert `ActionType` from a TS `enum` to
+  a `const` object + union type — Vite's template ships `erasableSyntaxOnly: true` in
+  `tsconfig.app.json`, which rejects real TS enums since they compile to runtime code
+  rather than being purely erasable. `agent/src/keys.ts` uses a real `enum` for the same
+  concept without issue since its `tsconfig.json` doesn't set that flag — worth knowing
+  the two tsconfigs in this repo don't accept identical syntax.
+- `lib/mockData.ts` — three illustrative sample entries, not fetched from anywhere: a
+  clean verified execution, a **deliberately tampered** reasoning payload (proves the
+  mismatch detector actually catches something, not just always green), and a
+  decisionHash with no retrievable reasoning (proves the UI shows an honest
+  "unverifiable" state instead of guessing).
+- `lib/contractReader.ts` — the live counterpart, reads a real journal entry via `ethers`
+  and performs the same re-hash check. Flagged inline: `VITE_REASONING_API_URL` has to
+  point at something that can actually serve the agent's local
+  `agent/src/reasoningStore.ts` file-based payloads over HTTP — that gap is left
+  explicitly open rather than papered over, tracked in `docs/DEPLOYMENT.md`.
+- `lib/dataProvider.ts` — single switch point between mock and live data, controlled by
+  `VITE_DEMO_MODE`.
+- `components/`: `SearchBar` (with demo-mode quick-pick chips), `ReplayCard` (the three
+  fact/decision/action sections), `VerdictBadge`, `DataRow`.
+
+**Verification performed:** `tsc -b` clean, `npm run build` clean (453KB JS / 13KB CSS
+gzipped to ~156KB/3.5KB), and a smoke test serving the production build via
+`vite preview` + `curl` confirming the HTML/CSS assets actually serve with 200s. No
+automated component tests were added for the frontend — given the remaining time budget,
+priority went to the higher-risk contract/agent logic (which has real correctness
+properties to verify) over UI rendering (which is comparatively low-risk and
+visually self-evident when run). If time allows later, the mismatch-detection path
+(`VerdictBadge` given `status={false}`) is the one component worth a real test, since
+it's the one place a UI bug could silently hide a real problem.
+
+---
+
 ## What's left (tracking against the PRD)
 
 - [x] Foundry acceptance tests — the 8 tests from PRD §10 (custody invariant, replay
@@ -276,10 +318,11 @@ before attempting a real testnet run.
 - [x] Foundry deploy script
 - [x] Agent runner (TypeScript) — full loop, real SDK integration, replay CLI
 - [x] Agent runner unit tests
+- [x] Frontend — demo mode + live mode, builds clean
 - [ ] **Resolve on-chain price decoding against the real `encodedTransaction` envelope**
       — highest-priority remaining item, see "Scope-changing finding" above
-- [ ] Frontend: React + Tailwind replay viewer, reading journal entries and reconstructing
-      the fact → decision → action chain, with the on-chain/off-chain hash-match check
 - [ ] `docs/DEPLOYMENT.md` — copy-paste deployment steps for a machine with real
-      Sepolia/Creditcoin RPC + Gemini API access
+      Sepolia/Creditcoin RPC + Gemini API access, including how to actually serve
+      `reasoningStore.ts`'s payloads to the frontend (currently a documented gap, not a
+      solved one)
 - [ ] Final DEVLOG pass once all of the above lands
