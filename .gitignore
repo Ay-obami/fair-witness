@@ -2,6 +2,7 @@
 contracts/cache/
 contracts/out/
 contracts/broadcast/
+contracts/lib/
 
 # Node
 node_modules/
@@ -9,6 +10,7 @@ agent/dist/
 frontend/dist/
 frontend/node_modules/
 agent/node_modules/
+agent/.reasoning-store/
 *.log
 
 # Env
