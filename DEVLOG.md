@@ -8,7 +8,7 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 2 (contracts test suite complete)
+**Last updated:** Build session 3 (agent runner complete)
 
 | Component | Status |
 |---|---|
@@ -16,9 +16,11 @@ for the original architecture write-up.
 | Contracts — `ASCTreasuryJournal.sol` core | ✅ Done |
 | Contracts — mocks (verifier, DEX, ERC20) | ✅ Done |
 | Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 11/11 passing (8 required + 3 bonus) |
-| Contracts — deploy scripts | 🔜 Next |
-| Agent runner (TypeScript) | ⬜ Not started |
-| Frontend (React + Tailwind replay viewer) | ⬜ Not started |
+| Contracts — deploy scripts | ✅ Done |
+| Contracts — toy Sepolia `PriceObservation.sol` | ✅ Done |
+| Agent runner (TypeScript) | ✅ Done — full poll→decide→prove→submit loop + replay CLI |
+| Agent runner unit tests | ✅ Done — 16/16 passing, incl. cross-language hash parity vs `cast` |
+| Frontend (React + Tailwind replay viewer) | 🔜 Next |
 | Live testnet deployment | ⬜ Not started — requires real RPC/API access outside this sandbox |
 
 ---
@@ -175,6 +177,20 @@ this contract does not attempt.
    `swapExactTokensForTokens` surface, which is the common pattern but not confirmed
    against PenguinSwap's actual deployed contract (no network access to check from this
    sandbox). Flagged in the interface file; must be confirmed in week 1.
+5. **`ethers` type-identity mismatch between our install and `usc-sdk`'s bundled types**
+   — TypeScript rejected passing our `ethers.JsonRpcProvider` into
+   `PrecompileBlockProver`/`PrecompileChainInfoProvider` constructors, even though only
+   one `ethers` package is actually installed (`find node_modules -name ethers` confirms
+   this). Root cause: TypeScript treats classes with private fields as nominally typed,
+   so the SDK's bundled `.d.ts` (compiled against `ethers@^6.15.0`'s private-field brand)
+   structurally differs from our installed `6.17.0`'s brand even though they're
+   behaviorally identical at runtime. Worked around with an explicit
+   `as unknown as ConstructorParameters<...>[0]` cast at the two call sites, documented
+   inline. Worth re-checking whether this still reproduces if `usc-sdk` or `ethers`
+   versions are bumped later.
+6. **Test fixture used malformed Ethereum addresses** — `ethers` v6 rejected them
+   outright as invalid. Fixed by generating real addresses via
+   `ethers.Wallet.createRandom().address` instead of hand-typing placeholder hex.
 
 ---
 
@@ -213,17 +229,55 @@ be revisited rather than assumed to still cover the full surface.
 
 ---
 
+## Agent runner (TypeScript) — what was built
+
+- `config.ts` — env var loader with fail-fast validation.
+- `keys.ts` — deterministic `factKey`/`decisionNonce`/`actionKey` derivation, written to
+  mirror `ASCTreasuryJournal.sol`'s on-chain math field-for-field.
+- `sepoliaWatcher.ts` — read-only Sepolia event polling. No wallet, no private key.
+- `attestcoinClient.ts` — thin wrapper around the real, confirmed `@gluwa/usc-sdk`
+  exports (`proofProvider.service.ProofBuilder`, `blockProver.PrecompileBlockProver`,
+  `chainInfo.PrecompileChainInfoProvider`).
+- `decisionEngine.ts` — Gemini (`@google/genai`) decision layer, `temperature: 0` +
+  fixed `seed` + local cache for determinism (PRD §7).
+- `reasoningStore.ts` — file-based KV for off-chain reasoning, keyed by `decisionHash`.
+- `dexPriceReader.ts` — read-only PenguinSwap/router price quoting + `bpsGap` helper.
+- `submitter.ts` — the only module that ever calls `executeArbitrage`; includes the
+  pre-flight (gas-saving, not safety-critical) replay check.
+- `index.ts` — the actual poll → decide → prove → submit loop, tying everything together.
+- `replay.ts` — CLI: `npm run replay -- <actionKey>` reconstructs the full chain and
+  prints the on-chain/off-chain hash-match check.
+
+**Test suite (16/16 passing, `npx vitest run`):** covers `keys.ts` determinism —
+including a cross-language ground-truth check computed independently via Foundry's
+`cast keccak(abi-encode(...))`, asserting the TypeScript implementation produces
+byte-for-byte identical output to the Solidity math it's meant to mirror, which is about
+as strong a confidence check as is possible without a live chain — the reasoning store's
+tamper-evidence property (`verifyHash` catching a modified payload), and the `bpsGap`
+math against the exact fixture values used in the Foundry suite. No live network or real
+LLM calls required, matching the PRD's "no live network needed" requirement for this
+test tier.
+
+**Known limitation carried over, not yet resolved:** `attestcoinClient.buildProof()`
+returns the real SDK's `encodedTransaction` (`txBytes`) untouched, but
+`ASCTreasuryJournal._decodePriceObservation` still can't correctly parse that real
+envelope (see the session-3 SDK research entry above) — the agent runner is honestly
+built end-to-end, but the full pipeline won't work against a live proof until that
+contract-side decoding gap is closed. This is the single most important thing to tackle
+before attempting a real testnet run.
+
+---
+
 ## What's left (tracking against the PRD)
 
 - [x] Foundry acceptance tests — the 8 tests from PRD §10 (custody invariant, replay
       safety incl. simulated crash/retry, drift/width rejection, rate limiting, journal
       hash-match)
-- [ ] Foundry deploy script (`script/Deploy.s.sol`) with clear placeholders for real
-      Sepolia/Creditcoin-testnet addresses
-- [ ] Agent runner (TypeScript): chain watcher, Gemini decision client (temp=0 +
-      factKey-keyed cache, per PRD §7), `ProofBuilder` integration point, deterministic
-      nonce derivation, submitter, pre-flight replay check
-- [ ] Agent runner unit tests (mocked LLM + mocked chain reads — no live network needed)
+- [x] Foundry deploy script
+- [x] Agent runner (TypeScript) — full loop, real SDK integration, replay CLI
+- [x] Agent runner unit tests
+- [ ] **Resolve on-chain price decoding against the real `encodedTransaction` envelope**
+      — highest-priority remaining item, see "Scope-changing finding" above
 - [ ] Frontend: React + Tailwind replay viewer, reading journal entries and reconstructing
       the fact → decision → action chain, with the on-chain/off-chain hash-match check
 - [ ] `docs/DEPLOYMENT.md` — copy-paste deployment steps for a machine with real

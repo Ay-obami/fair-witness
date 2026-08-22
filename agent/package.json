@@ -1,0 +1,27 @@
+{
+  "name": "attested-arbitrage-agent",
+  "version": "1.0.0",
+  "description": "Custody-free arbitrage agent runner: watches Sepolia, gets an LLM act/don't-act decision, generates Attestcoin proofs, submits to ASCTreasuryJournal. Holds no funds.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "replay": "tsx src/replay.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@google/genai": "^2.18.0",
+    "@gluwa/usc-sdk": "^0.18.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}
