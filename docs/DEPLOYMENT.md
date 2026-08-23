@@ -1,5 +1,11 @@
 # Deployment Guide
 
+> **DEPLOYMENT RECORD:** this guide was executed end-to-end on 2026-08-23. Live addresses,
+> transaction hashes, the adversarial-demo result, and every pitfall hit along the way are
+> recorded in `DEVLOG.md` → "Session 7". The demo runs against a seeded constant-product
+> pair instead of PenguinSwap (no USDC/WCTC pool existed on testnet — PRD §12 fallback);
+> see that entry for real-V3 integration notes.
+
 Everything in this repo was built and tested in a sandboxed environment with **no live
 RPC or external API access** (see `DEVLOG.md`'s "Environment notes"). This document is
 the copy-paste path for doing the actual live deployment from a normal machine. Read
