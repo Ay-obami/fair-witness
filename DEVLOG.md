@@ -487,14 +487,22 @@ Attestcoin inclusion + rigid bounds, not from access control); quick-tunnel host
 unreliable on this network so GitHub Pages is used instead; the agent keeps cycling live,
 so later executions beyond the two listed above are expected.
 
-## Closing note for whoever picks this up next
+## Closing note
 
-This was built end-to-end (contracts → agent → frontend → deployment docs) in a
-sandbox with no live network access, verifying every non-obvious claim against real
-sources rather than guessing: the SDK's actual npm package, `forge`/`cast` as
-ground-truth for Solidity math, and an actual production build + smoke test for the
-frontend. Every real gap found along the way is logged above with what was tried, what's
-still open, and where to pick it up — not smoothed over. The single highest-value next
-session is resolving the `encodedTransaction` decoding gap using a real Sepolia
-transaction, per `docs/DEPLOYMENT.md` step 1; everything else in this repo is ready to
-build on top of that once it's solved.
+Fair Witness is **live end-to-end on public testnets** — this log began with contracts
+built in an offline sandbox and ends with real Attestcoin-proven Sepolia transactions
+executing against a deployed treasury on Creditcoin testnet, a replay CLI that
+reconstructs those executions with genuine hash matches, a live adversarial replay
+rejection (`ActionAlreadyExecuted`), and a publicly reachable replay viewer at
+https://ay-obami.github.io/asc-arbitrage-journal-demo/. Every claim above was verified
+against block explorers and on-chain reads rather than assumed from exit codes.
+
+What remains, honestly, is productionization rather than proof:
+- Replace the demo's seeded constant-product pair with a real PenguinSwap V3 integration
+  (Universal Router `exactInputSingle` + QuoterV2 quoting — concrete notes in session 7).
+- Longer-horizon operational hardening if the agent is left running: key management for
+  the owner (multisig), monitoring/alerting on the agent loop, and rate-limit tuning
+  against sustained free-tier Gemini availability.
+- The source-side price feed remains our own permissionless toy contract by design; any
+  production version needs a trust story for *who* reports prices that goes beyond
+  Attestcoin's inclusion proofs.
