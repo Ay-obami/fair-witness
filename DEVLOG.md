@@ -474,7 +474,7 @@ real treasury via its embedded env values.
 4. *Observation txs intermittently Out-of-gas* — Sepolia base-fee moves between ethers'
    estimate and inclusion left some `observePrice` txs mined-but-reverted (confirmed via
    Blockscout receipts showing "Out of gas", calldata intact); fixed with an explicit
-   generous gasLimit in `scripts/fire-observations.js` (commit `b4a1382`).
+   generous gasLimit in `scripts/fire-observations.js` (commit `88bae65`).
 5. *`forge script` does not work on Creditcoin testnet* — fails with
    "`prevrandao` not set" header validation regardless of --legacy; deployments were done
    with an ethers.js script instead (`contracts/script/deploy-creditcoin.js`). Plain
