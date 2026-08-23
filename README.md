@@ -32,7 +32,8 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 **LIVE on both testnets.** Contracts, agent runner, and frontend are all deployed and
 running against real networks:
 
-- **Live demo (replay viewer, live mode):** https://ay-obami.github.io/asc-arbitrage-journal-demo/
+- **Live demo on Vercel (primary):** https://fair-witness.vercel.app/
+- **Live demo on GitHub Pages (mirror):** https://ay-obami.github.io/asc-arbitrage-journal-demo/
 - **Treasury on Creditcoin testnet:** `0x78C986079Ee1C8701a56EeD7303Ac2301403E1dD`
 - **Price source on Sepolia:** `0x23433fcA0f35CC5e801b6888293B2B11017900c7`
 
