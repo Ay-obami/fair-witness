@@ -1,15 +1,23 @@
 // Deploy full stack to Creditcoin testnet
-// Run: node deploy-creditcoin.js
+// Usage: DEPLOYER_PK=<hex key> node deploy-creditcoin.js
+// NOTE: never hardcode keys here — this file is committed to git.
 const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
-const CC_RPC = "https://rpc.cc3-testnet.creditcoin.network";
-const DEPLOYER_PK = "REDACTED_USE_DEPLOYER_PK_ENV";
+const CC_RPC = process.env.CC_RPC ?? "https://rpc.cc3-testnet.creditcoin.network";
+const DEPLOYER_PK = requireEnv("DEPLOYER_PK");
 const VERIFIER = "0x0000000000000000000000000000000000000FD2";
-const PRICE_CONTRACT = "0x23433fcA0f35CC5e801b6888293B2B11017900c7";
-const OWNER = "0xF40003d36567478489BcCF1a1fEd094f87EeC9a5";
-const AGENT = "0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2";
+// Sepolia-side toy price contract whose observePrice() calls are the arbitrage facts
+const PRICE_CONTRACT = requireEnv("PRICE_CONTRACT");
+const OWNER = requireEnv("OWNER_ADDRESS");
+const AGENT = requireEnv("AGENT_ADDRESS");
+
+function requireEnv(name) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
+}
 
 const basePath = "/home/ayobami/Downloads/attested-arbitrage-journal/contracts";
 
