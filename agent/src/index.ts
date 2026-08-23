@@ -56,6 +56,14 @@ async function main() {
 
     log(`Candidate: src=${observation.price} dest=${destPrice} gap=${gap}bps — building source proof`);
 
+    // The source tx's block must clear Sepolia's reorg-protection window AND be attested
+    // before the proof builder can serve a proof for it — otherwise getProof() 404s with
+    // "BlockNotOnSourceChain" (retriable) and this candidate would be silently dropped,
+    // since pollLatest() advances its scan cursor regardless. Wait for attestation first;
+    // same pattern the confirmation proof below already uses.
+    log(`Waiting for source block ${observation.blockHeight} to be attested...`);
+    await attestcoin.waitUntilReady(observation.blockHeight);
+
     const sourceProof = await attestcoin.buildProof(observation.transactionHash);
     const fact = factKey(sourceProof.chainKey, sourceProof.blockHeight, sourceProof.transactionIndex);
 
