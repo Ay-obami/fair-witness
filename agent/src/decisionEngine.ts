@@ -77,23 +77,41 @@ Observed gap vs destination: ${input.gapBps} bps
 
 Should the contract be recommended to act on this?`;
 
-    const response = await this.client.models.generateContent({
-      model: config.geminiModel,
-      contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 0,
-        seed: 42,
-        responseMimeType: "application/json",
-        responseSchema,
-      },
-    });
+    // Transient Google-side failures (503 UNAVAILABLE under load, 429 rate limit) are
+    // common on the free tier and would otherwise silently drop an otherwise-complete
+    // candidate after both attestations were already paid for. Retry a few times with
+    // short backoff before giving up; only genuine API errors propagate.
+    const maxAttempts = 4;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await this.client.models.generateContent({
+          model: config.geminiModel,
+          contents: prompt,
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            temperature: 0,
+            seed: 42,
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
 
-    const text = response.text;
-    if (!text) throw new Error("Gemini returned no text output");
+        const text = response.text;
+        if (!text) throw new Error("Gemini returned no text output");
 
-    const parsed = JSON.parse(text) as Decision;
-    this.cache.set(key, parsed);
-    return parsed;
+        const parsed = JSON.parse(text) as Decision;
+        this.cache.set(key, parsed);
+        return parsed;
+      } catch (err) {
+        lastError = err;
+        const msg = String(err);
+        const transient = msg.includes("503") || msg.includes("429") || msg.includes("UNAVAILABLE");
+        if (!transient || attempt === maxAttempts) throw err;
+        console.log(`[decisionEngine] Gemini transient error (attempt ${attempt}/${maxAttempts}), retrying: ${msg.slice(0, 200)}`);
+        await new Promise((res) => setTimeout(res, attempt * 5000));
+      }
+    }
+    throw lastError;
   }
 }
