@@ -1,4 +1,7 @@
-# PRD: Attested Custody-Free Arbitrage Journal
+# PRD: Fair Witness
+
+*(an attested custody-free arbitrage journal)*
+
 **BUIDL CTC 2026 Fall — Creditcoin AI Track**
 
 ---

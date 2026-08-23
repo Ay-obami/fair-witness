@@ -1,4 +1,7 @@
-# Attested Custody-Free Arbitrage Journal
+# Fair Witness
+
+An attested custody-free arbitrage journal — BUIDL CTC 2026 Fall (Creditcoin AI track)
+submission.
 
 BUIDL CTC 2026 Fall — Creditcoin AI Track submission.
 

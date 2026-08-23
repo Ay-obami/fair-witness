@@ -28,7 +28,7 @@ async function main() {
     return;
   }
 
-  console.log("=== Attested Custody-Free Arbitrage Journal — Replay ===\n");
+  console.log("=== Fair Witness — Replay ===\n");
   console.log(`actionKey:   ${key}`);
   console.log(`factKey:     ${entry.factKey}`);
   console.log(`  -> independently verifiable on the Sepolia explorer for the source tx`);
