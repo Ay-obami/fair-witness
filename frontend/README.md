@@ -1,7 +1,7 @@
-# Replay & Audit Viewer
+# Fair Witness — Replay & Audit Viewer
 
-React + Tailwind frontend for the Attested Custody-Free Arbitrage Journal. Given an
-`actionKey`, reconstructs the full attestation -> decision -> action chain and
+React + Tailwind frontend for Fair Witness, an attested custody-free arbitrage journal.
+Given an `actionKey`, reconstructs the full attestation -> decision -> action chain and
 independently re-hashes the retrieved off-chain reasoning to confirm it matches the
 on-chain `decisionHash` commitment - the concrete "prove the reasoning wasn't edited
 after the fact" moment described in `docs/DESIGN.md`.

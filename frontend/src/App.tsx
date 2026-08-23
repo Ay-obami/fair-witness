@@ -35,7 +35,7 @@ export default function App() {
       <div className="mx-auto max-w-2xl px-6 py-12">
         <header className="mb-8">
           <p className="mb-1 text-xs uppercase tracking-widest text-verified-400">
-            Attested Custody-Free Arbitrage Journal
+            Fair Witness
           </p>
           <h1 className="text-2xl font-semibold text-ledger-100">Replay & Audit Viewer</h1>
           <p className="mt-2 text-sm leading-relaxed text-ledger-400">
