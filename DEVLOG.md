@@ -8,29 +8,28 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 6 (real `encodedTransaction` decode fixed on-chain + test
-suite updated to build real-envelope proofs, 14/14 Foundry green; live testnet deployment
-is the next step and requires real credentials)
+**Last updated:** Build session 7 — **LIVE on both testnets.** Two real Attestcoin-proven
+executions on Creditcoin testnet, replay CLI verified with hash match, adversarial replay
+rejected live, frontend + reasoning store on GitHub Pages.
 
 | Component | Status |
 |---|---|
-| Contracts — interfaces | ✅ Done |
-| Contracts — `ASCTreasuryJournal.sol` core | ✅ Done |
-| Contracts — mocks (verifier, DEX, ERC20) | ✅ Done |
-| Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 14/14 passing (8 required + 6 bonus, see session 6) |
-| Contracts — deploy scripts | ✅ Done — now takes `PRICE_CONTRACT_ADDRESS` |
-| Contracts — toy Sepolia `PriceObservation.sol` | ✅ Done |
-| **Contracts — real `encodedTransaction` decode** | ✅ **Resolved in code** — `_decodePriceObservation` now decodes the real `abi.encode(uint8, bytes[])` envelope (see session 6). Live validation against a real Sepolia proof still pending (step 1–2 of deployment). |
-| Agent runner (TypeScript) | ✅ Done — full poll→decide→prove→submit loop + replay CLI |
-| Agent runner unit tests | ✅ Done — 16/16 passing, incl. cross-language hash parity vs `cast` |
-| Frontend (React + Tailwind replay viewer) | ✅ Done — demo mode (mock data) + live mode, builds clean |
-| `docs/DEPLOYMENT.md` | ✅ Done — 7-step guide, updated for the new constructor arg |
-| Live testnet deployment | ⬜ **In progress** — requires real RPC URLs, deployer + agent keys with testnet gas, and a Gemini API key. See session 6 for exactly what's needed. |
+| Contracts — interfaces | ✅ Done — `INativeQueryVerifier` **confirmed correct against the SDK's real precompile ABI** (session 7) |
+| Contracts — `ASCTreasuryJournal.sol` core | ✅ Done — deployed & executing live |
+| Contracts — mocks (verifier, DEX, ERC20) | ✅ Done — mock DEX is also the live demo DEX (see session 7 PenguinSwap finding) |
+| Contracts — acceptance tests (8 from PRD §10) | ✅ Done — 14/14 passing (8 required + 6 bonus) |
+| Contracts — deploy scripts | ✅ Done — `Deploy.s.sol` (forge script; note: broken on Creditcoin, see session 7 pitfall 5) + `deploy-creditcoin.js` (used for the real deployment) |
+| Contracts — toy Sepolia `PriceObservation.sol` | ✅ Done — **live on Sepolia** `0x2343…00c7` |
+| Contracts — real `encodedTransaction` decode | ✅ Done — **validated against a genuine live proof** (session 7: real txBytes match the implemented format) |
+| Agent runner (TypeScript) | ✅ Done — **ran live end-to-end**: poll → attest → prove → LLM → submit → executed |
+| Agent runner unit tests | ✅ Done — 16/16 passing |
+| Frontend (React + Tailwind replay viewer) | ✅ Done — **live on GitHub Pages**, live mode reading real chain data |
+| `docs/DEPLOYMENT.md` | ✅ Done — all 7 steps executed for real in session 7 |
+| Live testnet deployment | ✅ **DONE** — addresses + tx hashes in the session-7 entry below |
 
-**Automated tests:** 30 total (14 Foundry, 16 vitest), all passing. One structural
-integration risk remains open and is documented, not hidden: PenguinSwap's unconfirmed
-real router ABI (10-minute check in deployment step 1). The precompile ABI at `0x0FD2`
-is also still unconfirmed against the real network and is the other step-1 check.
+**Automated tests:** 30 total (14 Foundry, 16 vitest), all passing. Remaining open item
+(production-grade only): real PenguinSwap V3 integration to replace the demo's seeded
+constant-product pair — documented with concrete integration notes in session 7.
 
 ---
 
@@ -385,12 +384,108 @@ it's the one place a UI bug could silently hide a real problem.
       (see the session-6 entry above). (What was previously the sole blocking *code* item
       is now closed; live validation of the decoder against a real Sepolia proof is part
       of deployment steps 1-2 below.)
-- [ ] **Live testnet deployment** (deployment steps 1-7 in `docs/DEPLOYMENT.md`) — needs
-      real credentials: a Sepolia RPC, a Creditcoin testnet RPC,
-      `CREDITCOIN_PROOF_BUILDER_URL`, a deployer key funded with testnet gas on both
-      chains, a fresh zero-balance agent submit key, and a Gemini API key. Deployed
-      contract + frontend live URL + one deliberate adversarial rejection demonstrated.
-      Blocked on credentials, not on code.
+- [x] **Live testnet deployment** (deployment steps 1-7 in `docs/DEPLOYMENT.md`) — DONE
+      in session 7. Real Sepolia transaction proven via Attestcoin, executed on the
+      deployed treasury on Creditcoin testnet; replay CLI reconstructs it end-to-end with
+      a genuine hash match; an exact-calldata replay attack was demonstrated live and
+      rejected with `ActionAlreadyExecuted`; frontend + reasoning store are live on GitHub
+      Pages. See the session-7 entry for every address and tx hash.
+
+### Session 7 — LIVE on Sepolia + Creditcoin testnet (the whole thing actually ran)
+
+This session executed `docs/DEPLOYMENT.md` end-to-end with real credentials. Every claim
+below was verified independently (block explorer, on-chain reads), not assumed from
+exit codes.
+
+**Step-1 confirmations against live networks (all previously-unconfirmed items resolved):**
+- `getSupportedChains()` on Creditcoin testnet returns exactly two chains:
+  **chainKey=1 = Sepolia (chainId 11155111, chainEncoding=1)** and chainKey=3 = Ethereum
+  mainnet. The agent's `SOURCE_CHAIN_KEY=1` was correct. chainEncoding 1 is the ABI-v1
+  encoding — the exact format the session-6 decoder implements, confirmed live.
+- Precompiles at `0x0FD2`/`0x0FD3` are live (empty code as expected for precompiles; the
+  ChainInfo one answers queries).
+- **The reconstructed `INativeQueryVerifier` is CONFIRMED CORRECT**: the SDK's packaged
+  `block_prover.json` declares single-proof `verify(uint64,uint64,bytes,tuple,tuple)` /
+  `verifyAndEmit(...)` with tuple structs `(root bytes32, siblings (bytes32,bool)[])` and
+  `(lowerEndpointDigest bytes32, roots bytes32[])` — byte-for-byte what this repo guessed.
+  The "single highest-risk unknown" from earlier sessions is closed.
+- **PenguinSwap reality check (changed the plan):** PenguinSwap on Creditcoin testnet is a
+  Uniswap-V3-family deployment (Positions-NFT, SwapRouter = Universal Router with
+  `swapExactTokensForTokens(uint256,uint256,address[],address)` — no deadline param, NO
+  `getAmountOut`; pricing lives in QuoterV2). Critically, the V3 factory has **no
+  USDC/WCTC pool at any fee tier**, so there was no real liquidity to trade against.
+  Per PRD §12's sanctioned fallback, the demo trades against a deployed constant-product
+  pair (the already-tested MockDexRouter) instead. Real-integration notes for production:
+  adapt `IDexRouter` to the Universal Router's 4-param swap + QuoterV2 quoting.
+
+**Deployed addresses (Creditcoin testnet, chainId 102031):**
+
+| Contract | Address |
+|---|---|
+| baseAsset (USDC-like, 6dp) | `0x0bFA6eF009f8739c727b292849029608bd6b115A` |
+| quoteAsset (MQT, 6dp) | `0x6A97b1913Bca9d17A57cAae1F6b5C1885bE1DAA1` |
+| MockDexRouter (seeded 1M:1M) | `0x8D40f9D47886f21223357874e1a99a22DD4f9E5e` |
+| **ASCTreasuryJournal** | **`0x78C986079Ee1C8701a56EeD7303Ac2301403E1dD`** |
+| Verifier precompile | `0x0000000000000000000000000000000000000FD2` |
+
+Source side (Sepolia): toy `PriceObservation` at
+`0x23433fcA0f35CC5e801b6888293B2B11017900c7`
+(tx `0x2fa1507c5a3c99c71c85c9e79e43ef99f9511f56a79d4b16cac8bc0177981734`).
+
+Agent submit key: `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`. **Custody separation was
+verified live, twice: zero USDC / zero MQT / zero allowances BEFORE going live, and again
+after two successful executions moved treasury funds.**
+
+**Live executions (real Attestcoin-proven Sepolia txs → treasury execution):**
+1. actionKey `0x5e2ce2608dc59700b771ce9682d14633045e3d403ddc581f65b783ebc0fbdf0b`,
+   tx `0x9173c2dfb57a62153ee5556d2c4318c123ba8a59f1686dd2257f738e60ecc7bb`
+2. actionKey `0x51f8be425fbf5be6deba4cc0a9b3fb6ef62d12d90721d06173f175395b8ead1c`,
+   tx `0xef59182181ef6de4584595e3ad4d75e5bba41d96c2cd5bd15f25d6e408285cee`
+
+Both visible on Creditcoin Blockscout (status success, method selector `0xc296ff5e` =
+executeArbitrage). Treasury went 1000 → 995.94 USDC, receiving MQT each time. `npm run
+replay -- <actionKey>` reconstructs both end-to-end with **✅ HASH MATCH** against the
+off-chain reasoning payloads. The first proof's live `txBytes` literally begins
+`0x…02 0x…40` — `abi.encode(uint8(2), bytes[])`, confirming the decoder's format against
+a genuine proof.
+
+**Adversarial demo (step 7):** the EXACT calldata of execution #1 was replayed from the
+same agent key (`scripts/adversarial-replay.js`). Result: mined-but-reverted, raw revert
+data `0x6d41cd6c` → decoded **`ActionAlreadyExecuted`**. Replay-safety demonstrated live,
+matching the Foundry tests.
+
+**Frontend + reasoning store:** live at
+**https://ay-obami.github.io/asc-arbitrage-journal-demo/** (GitHub Pages, branch
+`gh-pages`, built with relative base; reasoning payloads under `/reasoning/<hash>.json`
+on the same origin — stable URL, CORS-clean, no tunnel dependency). Live mode reads the
+real treasury via its embedded env values.
+
+**Live-found pitfalls (all fixed in visible fix-up commits):**
+1. *Agent dropped candidates before attestation* — `getProof()` 404s while the source
+   block is inside Sepolia's reorg window and `pollLatest()` never revisits → added
+   `waitUntilReady(sourceBlock)` before the source proof (commit `0dbc363`).
+2. *Gemini model rejected for newly-issued keys* — `gemini-2.5-flash` returns
+   "no longer available to new users" (and the error's suggested `gemini-3.6-flash`
+   doesn't exist); `.env` now uses the stable `gemini-flash-latest` alias. Also added a
+   bounded retry for transient 503/429 in `decisionEngine.ts` after a fully-paid-for
+   candidate died on a free-tier 503 (commit `b5a2e53`).
+3. *ProofBuilder axios timeout too tight* — raised to 30s after a prover latency spike
+   killed a cycle (`attestcoinClient.ts`).
+4. *Observation txs intermittently Out-of-gas* — Sepolia base-fee moves between ethers'
+   estimate and inclusion left some `observePrice` txs mined-but-reverted (confirmed via
+   Blockscout receipts showing "Out of gas", calldata intact); fixed with an explicit
+   generous gasLimit in `scripts/fire-observations.js` (commit `b4a1382`).
+5. *`forge script` does not work on Creditcoin testnet* — fails with
+   "`prevrandao` not set" header validation regardless of --legacy; deployments were done
+   with an ethers.js script instead (`contracts/script/deploy-creditcoin.js`). Plain
+   `forge create` works fine on Sepolia.
+
+**Honest limits of the live demo:** the destination DEX is the project's own seeded
+constant-product pair (PRD §12 fallback), not PenguinSwap — see the Step-1 finding above;
+prices are self-reported into our own toy source contract (by design — trust comes from
+Attestcoin inclusion + rigid bounds, not from access control); quick-tunnel hosting proved
+unreliable on this network so GitHub Pages is used instead; the agent keeps cycling live,
+so later executions beyond the two listed above are expected.
 
 ## Closing note for whoever picks this up next
 

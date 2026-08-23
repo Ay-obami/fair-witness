@@ -26,14 +26,23 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 
 ## Status
 
-Contracts, agent runner, and frontend are all built and independently tested
-(14 Foundry tests + 16 vitest tests, all passing). The on-chain price decoder now handles
-the **real** Attestcoin `encodedTransaction` envelope (the `abi.encode(uint8, bytes[])`
-format produced by the `@gluwa/usc-sdk`), so no code change remains between this repo and
-a live end-to-end run — the remaining work is the **live testnet deployment** itself
-(funded keys, real RPCs, a Gemini key), which is credential-gated, not code-gated. See
-`DEVLOG.md` for the full journey (including the session-6 decode fix and its tests) and
-`docs/DEPLOYMENT.md` for the 7-step deployment path.
+**LIVE on both testnets.** Contracts, agent runner, and frontend are all deployed and
+running against real networks:
+
+- **Live demo (replay viewer, live mode):** https://ay-obami.github.io/asc-arbitrage-journal-demo/
+- **Treasury on Creditcoin testnet:** `0x78C986079Ee1C8701a56EeD7303Ac2301403E1dD`
+- **Price source on Sepolia:** `0x23433fcA0f35CC5e801b6888293B2B11017900c7`
+
+Real Attestcoin-proven Sepolia transactions have triggered real executions on the
+Creditcoin treasury; `npm run replay -- <actionKey>` reconstructs them end-to-end with a
+genuine hash match against published off-chain reasoning; and an exact-calldata replay
+attack was demonstrated live and rejected with `ActionAlreadyExecuted`. Full addresses,
+tx hashes, and the honest list of what's mocked vs. real are in `DEVLOG.md` (session 7)
+and `docs/DEPLOYMENT.md`.
+
+Automated tests: 14 Foundry + 16 vitest, all passing. The on-chain price decoder handles
+the **real** Attestcoin `encodedTransaction` envelope (`abi.encode(uint8, bytes[])` from
+the `@gluwa/usc-sdk`) and was validated against genuine live proof payloads.
 
 ```bash
 # Contracts
