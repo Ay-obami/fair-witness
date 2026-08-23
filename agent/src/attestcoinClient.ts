@@ -34,7 +34,7 @@ export class AttestcoinClient {
     // (confirmed via `find node_modules`); this is TypeScript treating the SDK's
     // bundled `.d.ts` private-field brands as a structurally different type than our
     // installed copy, not a real runtime incompatibility.
-    this.proofBuilder = new proofProvider.service.ProofBuilder(config.sourceChainKey, config.proofBuilderUrl);
+    this.proofBuilder = new proofProvider.service.ProofBuilder(config.sourceChainKey, config.proofBuilderUrl, 30000);
     this.blockProver = new blockProverNs.PrecompileBlockProver(this.creditcoinProvider as unknown as ConstructorParameters<typeof blockProverNs.PrecompileBlockProver>[0]);
     this.chainInfoProvider = new chainInfoNs.PrecompileChainInfoProvider(this.creditcoinProvider as unknown as ConstructorParameters<typeof chainInfoNs.PrecompileChainInfoProvider>[0]);
   }
