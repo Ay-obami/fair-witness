@@ -66,7 +66,8 @@ abstract contract TestBase is Test {
             address(usdc),
             address(quote),
             address(priceSource),
-            owner
+            owner,
+            defaultGuardrails()
         );
 
         vm.prank(owner);
@@ -83,6 +84,21 @@ abstract contract TestBase is Test {
 
         // Fund the treasury directly — it holds its own capital, never the agent.
         usdc.mint(address(treasury), 1_000e6);
+    }
+
+    /// @dev The guardrail set the rest of the test-suite fixture assumes — the V1
+    ///      constant values preserved byte-for-byte as the default demo profile. Factory
+    ///      tests override this with deliberately different per-user sets.
+    function defaultGuardrails() internal pure returns (ASCTreasuryJournal.Guardrails memory g) {
+        g = ASCTreasuryJournal.Guardrails({
+            maxTradeSize: 5e6, // 5 USDC @ 6 decimals
+            maxSlippageBps: 150, // 1.5%
+            minArbWidthBps: 80,
+            maxDriftBps: 100,
+            maxConfirmGapBlocks: 20,
+            maxActionsPerEpoch: 6,
+            epochLength: 1 days
+        });
     }
 
     /// @dev Current DEX quote for 1 USDC in quote-token terms, 6-decimal fixed point.

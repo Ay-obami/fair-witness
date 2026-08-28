@@ -17,6 +17,10 @@ agent/.reasoning-store/
 .env
 .env.local
 **/.env
+**/.*.env
+
+# Stage tenant wallets (worthless testnet keys, still never commit)
+contracts/script/.stage-*
 
 # OS
 .DS_Store
