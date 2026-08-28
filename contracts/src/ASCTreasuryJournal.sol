@@ -76,21 +76,37 @@ contract ASCTreasuryJournal is Ownable {
     address public immutable PRICE_CONTRACT;
 
     // ---------------------------------------------------------------------
-    // Rigid, hard-coded business logic bounds
+    // Per-instance rigid business logic bounds (V2 multi-tenant pivot)
     // ---------------------------------------------------------------------
-    // These are NOT owner-adjustable at runtime by design — "rigid" is the whole point of
-    // the custody-separation argument (see DEVLOG.md "Design decision: bounds are
-    // immutable, not owner-settable"). Reasonable starting values for a demo; the PRD
-    // requires re-deriving MIN_ARB_WIDTH_BPS and MAX_CONFIRM_GAP_BLOCKS from real measured
-    // attestation latency before any live deployment.
+    // V1 hard-coded these as `constant`s shared by a single platform-owned treasury. V2
+    // bakes each tenant's chosen guardrails into THEIR OWN deployment as constructor-set
+    // `immutable`s (see docs/ARCHITECTURE_V2.md §3.2), so the "even the owner can't loosen
+    // this later" guarantee — the core custody-separation argument — holds per tenant.
+    // These are still NOT adjustable at runtime by design, for exactly the same reason as
+    // V1; the REASONABLE-STARTING-VALUES note from the PRD also still applies (re-derive
+    // MIN_ARB_WIDTH_BPS / MAX_CONFIRM_GAP_BLOCKS from measured attestation latency before
+    // any live deployment).
 
-    uint256 public constant MAX_TRADE_SIZE = 5e6; // 5 USDC @ 6 decimals — demo-scaled
-    uint256 public constant MAX_SLIPPAGE_BPS = 150; // 1.5%
-    uint256 public constant MIN_ARB_WIDTH_BPS = 80; // must exceed attestation-lag noise floor
-    uint256 public constant MAX_DRIFT_BPS = 100; // src vs confirm proof price drift
-    uint256 public constant MAX_CONFIRM_GAP_BLOCKS = 20;
-    uint256 public constant MAX_ACTIONS_PER_EPOCH = 6;
-    uint256 public constant EPOCH_LENGTH = 1 days;
+    /// @notice The full set of rigid, immutable bounds baked into a treasury instance at
+    ///         construction time. One struct so the factory's deploy call and the on-chain
+    ///         event stay readable; each field still lands in its own `immutable` slot.
+    struct Guardrails {
+        uint256 maxTradeSize;      // per-trade capital cap (asset decimals)
+        uint256 maxSlippageBps;    // max tolerated quote slippage, basis points
+        uint256 minArbWidthBps;    // width floor — must exceed attestation-lag noise floor
+        uint256 maxDriftBps;       // max drift between source and confirm proof prices
+        uint256 maxConfirmGapBlocks; // how stale the confirm proof may be
+        uint256 maxActionsPerEpoch; // rate limit — caps blast radius per epoch
+        uint256 epochLength;       // rate-limit window (seconds)
+    }
+
+    uint256 public immutable MAX_TRADE_SIZE;
+    uint256 public immutable MAX_SLIPPAGE_BPS;
+    uint256 public immutable MIN_ARB_WIDTH_BPS;
+    uint256 public immutable MAX_DRIFT_BPS;
+    uint256 public immutable MAX_CONFIRM_GAP_BLOCKS;
+    uint256 public immutable MAX_ACTIONS_PER_EPOCH;
+    uint256 public immutable EPOCH_LENGTH;
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
     // ---------------------------------------------------------------------
@@ -138,6 +154,7 @@ contract ASCTreasuryJournal is Ownable {
     error TradeSizeExceedsMax();
     error MalformedEncodedTransaction();
     error WrongObservationSource();
+    error InvalidGuardrails();
 
     constructor(
         address verifier_,
@@ -145,13 +162,41 @@ contract ASCTreasuryJournal is Ownable {
         address baseAsset_,
         address quoteAsset_,
         address priceContract_,
-        address initialOwner_
+        address initialOwner_,
+        Guardrails memory guardrails_
     ) Ownable(initialOwner_) {
         VERIFIER = INativeQueryVerifier(verifier_);
         DEX_ROUTER = IDexRouter(dexRouter_);
         BASE_ASSET = IERC20(baseAsset_);
         QUOTE_ASSET = quoteAsset_;
         PRICE_CONTRACT = priceContract_;
+
+        // An instance must NEVER be able to exist with nonsensical bounds — that would make
+        // the "rigid, pre-committed" guarantee vacuous (and a zero MIN_ARB_WIDTH_BPS would
+        // divide by zero in `_boundedTradeSize`). This is a hard construction-time gate, so
+        // even a treasury deployed *outside* the factory (directly) is validated.
+        validateGuardrails(guardrails_);
+
+        MAX_TRADE_SIZE = guardrails_.maxTradeSize;
+        MAX_SLIPPAGE_BPS = guardrails_.maxSlippageBps;
+        MIN_ARB_WIDTH_BPS = guardrails_.minArbWidthBps;
+        MAX_DRIFT_BPS = guardrails_.maxDriftBps;
+        MAX_CONFIRM_GAP_BLOCKS = guardrails_.maxConfirmGapBlocks;
+        MAX_ACTIONS_PER_EPOCH = guardrails_.maxActionsPerEpoch;
+        EPOCH_LENGTH = guardrails_.epochLength;
+    }
+
+    /// @notice The single source of truth for what counts as a valid guardrail set. Called
+    ///         by this constructor; also callable by the factory as a pre-flight so an
+    ///         invalid account wastes no deploy gas.
+    function validateGuardrails(Guardrails memory g) public pure {
+        if (g.maxTradeSize == 0) revert InvalidGuardrails();
+        if (g.maxSlippageBps == 0 || g.maxSlippageBps > BPS_DENOMINATOR) revert InvalidGuardrails();
+        if (g.minArbWidthBps == 0 || g.minArbWidthBps > BPS_DENOMINATOR) revert InvalidGuardrails();
+        if (g.maxDriftBps == 0 || g.maxDriftBps > BPS_DENOMINATOR) revert InvalidGuardrails();
+        if (g.maxConfirmGapBlocks == 0) revert InvalidGuardrails();
+        if (g.maxActionsPerEpoch == 0) revert InvalidGuardrails();
+        if (g.epochLength == 0) revert InvalidGuardrails();
     }
 
     // ---------------------------------------------------------------------
@@ -263,7 +308,7 @@ contract ASCTreasuryJournal is Ownable {
     // Internal: bound checks & trade sizing
     // ---------------------------------------------------------------------
 
-    function _boundedTradeSize(uint256 arbWidthBps) internal pure returns (uint256) {
+    function _boundedTradeSize(uint256 arbWidthBps) internal view returns (uint256) {
         // Simple linear scaling: wider (more confident) arb windows can use more of the
         // cap, narrow-but-valid windows use less. This is a deliberately simple, auditable
         // rule — not a yield-optimizing curve — matching the "rigid, not clever" design
