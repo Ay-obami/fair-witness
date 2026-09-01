@@ -664,3 +664,40 @@ the factory still has no tenant registry (enumeration stays via `TreasuryDeploye
 indexing — now less urgent since the agent takes an explicit registry file); the
 Supabase-backed login-gated per-user dashboard is the remaining big Stage-4 piece and
 needs external service provisioning.
+
+### Session 8 (cont.) — Stage 4b: on-chain tenant enumeration + dashboard discovery
+
+Closed the tenant-enumeration gap the architecture correctly leaves open (the factory is
+deliberately registry-free — a tenant list would be mutable shared state, forbidden).
+
+**`contracts/script/index-tenants.js`** — scans the factory's `TreasuryDeployed` event log
+(the on-chain record of the tenancy) and emits an agent-compatible registry
+(`{label, treasuryAddress, owner}`) plus an enriched console table (owner + all seven
+immutable guardrails as emitted in the event). The verification that matters: **run
+against the live factory, it found exactly the two Stage-1 instances, with owners and
+correct per-tenant guardrails, purely from events** — no reliance on the deploy script's
+exit code.
+
+**Full multi-tenant pipeline now exists and is proven:**
+```
+factory.TreasuryDeployed events
+   → index-tenants.js (no mutable shared state added — events only)
+   → tenants.json
+   → agent: TENANTS_FILE bootstrap (smoke-verified against the scanned file:
+      both runtimes build with correct guardrails)
+   → dashboard: public/tenants.json chips (live read of guardrails per instance)
+```
+
+**Frontend discovery** (`tenantDiscovery.ts` + `public/tenants.json` + TenantPanel):
+the dashboard fetches the committed index at same-origin and lists those instances as
+switcher chips labeled "From on-chain index". Strict validation: rows are
+checksum-normalized and dropped (counted) if malformed; a missing file degrades
+gracefully to paste-an-address. Honesty rule enforced in code and comments: the index
+carries **identity only** — guardrails are always read live from the instance, so a stale
+index can mislead about *who* exists but never about *which bounds* are in force.
+`dist/tenants.json` verified present in the production build. `tsc` clean, oxlint 0/0.
+
+**What remains for a real Stage 4/5 rollout** (unchanged, external provisioning needed):
+Supabase login-gated per-user dashboard (auth ↔ contract-address mapping), the
+reasoning-payload instance-context change (done only when the demo no longer needs to
+verify pre-pivot entries), and redeploying the GitHub Pages viewer.
