@@ -7,6 +7,8 @@ import { ReasoningStore } from "./reasoningStore.js";
 import { TreasurySubmitter } from "./submitter.js";
 import { DexPriceReader, bpsGap } from "./dexPriceReader.js";
 import { factKey, deterministicNonce, actionKey } from "./keys.js";
+import { readTreasuryGuardrails } from "./treasuryGuardrails.js";
+import { resolveTreasuryAddress } from "./treasuryGuardrails.js";
 
 const log = (msg: string) => console.log(`[${new Date().toISOString()}] ${msg}`);
 
@@ -20,12 +22,25 @@ async function main() {
   const submitter = new TreasurySubmitter(attestcoin.signer);
 
   const creditcoinProvider = new ethers.JsonRpcProvider(config.creditcoinRpcUrl);
+  
+  // Resolve the treasury address (either direct or via factory)
+  const treasuryAddress = await resolveTreasuryAddress(process.env.TENANT_ID);
+  log(`Target treasury address: ${treasuryAddress}${process.env.TENANT_ID ? ` (tenant: ${process.env.TENANT_ID})` : ''}`);
+  
+  // Update submitter with the resolved treasury address
+  submitter.setTreasuryAddress(treasuryAddress);
+  
+  // Read immutable guardrails from the target treasury
+  log("Reading immutable guardrails from treasury...");
+  const guardrails = await readTreasuryGuardrails(creditcoinProvider, treasuryAddress);
+  log(`Guardrails loaded: maxTradeSize=${guardrails.maxTradeSize}, maxSlippage=${guardrails.maxSlippageBps}bps, minArbWidth=${guardrails.minArbWidthBps}bps, maxDrift=${guardrails.maxDriftBps}bps, maxActionsPerEpoch=${guardrails.maxActionsPerEpoch}, epochLength=${guardrails.epochLength}s`);
+  
   // NOTE: DEX_ROUTER_ADDRESS / BASE_ASSET / QUOTE_ASSET are read from the deployed
   // treasury contract's own immutables at startup, rather than duplicated in agent env
   // vars, so the agent can never drift out of sync with what the contract actually
   // trades. See docs/DEPLOYMENT.md for the one-time setup this assumes.
   const treasuryReadOnly = new ethers.Contract(
-    config.treasuryAddress,
+    treasuryAddress,
     ["function DEX_ROUTER() view returns (address)", "function BASE_ASSET() view returns (address)", "function QUOTE_ASSET() view returns (address)"],
     creditcoinProvider
   );
@@ -97,6 +112,7 @@ async function main() {
       confPrice: confirmObservation.price,
       destPrice: destPriceNow,
       gapBps: finalGap,
+      guardrails,
     });
 
     log(`LLM decision: act=${decision.act} — "${decision.rationale}"`);

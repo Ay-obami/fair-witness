@@ -12,7 +12,8 @@ export const config = {
 
   creditcoinRpcUrl: requireEnv("CREDITCOIN_RPC_URL"),
   proofBuilderUrl: requireEnv("CREDITCOIN_PROOF_BUILDER_URL"),
-  treasuryAddress: requireEnv("TREASURY_ADDRESS"),
+  treasuryAddress: process.env.TREASURY_ADDRESS || "", // Optional when using FACTORY_ADDRESS + TENANT_ID
+  factoryAddress: process.env.FACTORY_ADDRESS, // Optional: enables multi-tenant factory support
   agentSubmitPrivateKey: requireEnv("AGENT_SUBMIT_PRIVATE_KEY"),
 
   sourceChainKey: Number(process.env.SOURCE_CHAIN_KEY ?? "1"),
