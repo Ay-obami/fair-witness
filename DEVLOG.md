@@ -608,3 +608,59 @@ What remains, honestly, is productionization rather than proof:
 off-chain indexer over `TreasuryDeployed` events) so tenants can be enumerated; per-tenant
 agent deployment story (one agent process per instance today); and re-deploying the GitHub
 Pages viewer with the new env vars.
+
+### Session 8 (cont.) — Stage 4a: the multi-tenant agent service is live-ready
+
+The architecture's §3.1 "Multi-tenant agent service" — one process polling every active
+tenant's instance, "submits proofs per user against THAT user's contract only" — is built
+and smoke-verified against the live Stage-1 deployments.
+
+**The split that makes it correct** (and cheap):
+- **Fact-scoped, done ONCE per cycle**: source poll → attestation waits → both Attestcoin
+  proofs. A proof proves a SOURCE-CHAIN fact; it is not tenant-specific, so building it
+  once and reusing it across tenants is the whole cost win of multi-tenancy — the
+  expensive path (prover round trips) doesn't scale with tenant count.
+- **Tenant-scoped, per instance**: fresh destination price read (a prior tenant's
+  execution MOVES the shared pool's price — a cycle-wide quote would give later tenants a
+  stale view), per-instance replay pre-flight, per-tenant LLM decision calibrated to THAT
+  tenant's immutable guardrails, per-tenant reasoning payload, submission to THAT
+  instance only. Sequential per-tenant evaluation with error isolation: one tenant's
+  failure can't abort the others.
+- The pre-flight width filter must be set to the **loosest tenant's floor** when running
+  multi-tenant (documented in `.env.example`): a gap Tenant B (120bps floor) would reject
+  may still be actionable for Tenant A (80bps floor) — the filter is a gas-saver and must
+  never be tighter than the loosest tenant.
+- Per-tenant runtimes read **everything from the instance's own immutables** (guardrails
+  AND DEX/assets), so the agent can never drift from what a given instance trades.
+
+**Tenant registry**: `TENANTS_FILE` JSON (`agent/tenants.json` — the two Stage-1
+instances; addresses are public chain data). `parseTenantsJson` fails loudly on bad
+labels/addresses/duplicates with the offending entry named. Single-tenant mode
+(`TREASURY_ADDRESS`) is unchanged — the V1 runbook still works as-is. 8 new vitest cases;
+24/24 passing.
+
+**Tenant lifecycle completed on-chain (register → fund):**
+1. *Register* — per-instance allowlist, so EACH owner ran `registerAgent(agent)` on THEIR
+   own instance (new `registerAgentPerTenant.ts` refuses to run with a key that isn't
+   that instance's owner):
+   - Tenant A: tx `0x874f0d34c5afe8efd858c4619dc01c93bcbfc6ee5826af5eb27e57e9ba38b9e6`
+     (block 5413310, owner `0xd1D4…1C77`)
+   - Tenant B: tx `0x102c0d17be0d2d95143073fbf496430d45e02af5b24f27198c43c28f1eeb5383`
+     (block 5413311, owner `0xa3fC…3a90`)
+2. *Fund* — each owner minted (the testnet USDC has a public `mint`; no minter-gate
+   probe needed) and deposited 1,000 USDC into their OWN instance via plain ERC20
+   transfer (`fundPerTenant.ts`, idempotent, BASE_ASSET read from the instance):
+   - Both instances verified holding `1000000000` (1,000 USDC @ 6dp) on-chain.
+   - Honest scale note: with `maxTradeSize` 5e6/10e6, per-trade size is 5/10 USDC — the
+     1,000 USDC float is ~100–200× headroom, matching V1's demo economics.
+3. *Startup smoke* (`smokeMultiTenant.ts`): registry loads, both runtimes build with the
+   correct per-tenant guardrails, live DEX price reads work (996,969 — the pool has
+   drifted from 1:1 since session 7's executions), registration clean on both.
+
+**Deliberately not done here** (Stage 4b candidates): reasoning payloads don't carry the
+instance address (the hash-commitment protocol in agent + frontend is intentionally
+untouched mid-demo; adding a field needs a synchronized frontend re-serialization update);
+the factory still has no tenant registry (enumeration stays via `TreasuryDeployed` event
+indexing — now less urgent since the agent takes an explicit registry file); the
+Supabase-backed login-gated per-user dashboard is the remaining big Stage-4 piece and
+needs external service provisioning.
