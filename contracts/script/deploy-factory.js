@@ -21,10 +21,11 @@ const path = require("path");
 function resolveEthers() {
   // Resolve `ethers` from this repo's node_modules locations before falling back to a
   // bare require (which works if NODE_PATH points at agent/node_modules, the way the
-  // original deploy-creditcoin.js was run).
+  // original deploy-creditcoin.js was run). Note: this script lives in contracts/script/,
+  // so the repo root is two levels up.
   const candidates = [
-    path.join(__dirname, "..", "agent", "node_modules", "ethers"),
-    path.join(__dirname, "..", "node_modules", "ethers"),
+    path.join(__dirname, "..", "..", "agent", "node_modules", "ethers"),
+    path.join(__dirname, "..", "..", "node_modules", "ethers"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(path.join(c, "package.json"))) return require(c);
@@ -92,13 +93,16 @@ async function main() {
   console.log("Tenant B:", userB.address, "bal:", ethersMod.formatEther(await provider.getBalance(userB.address)), "CTC");
   console.log("Chain config: verifier=%s dex=%s base=%s quote=%s priceSource=%s\n", VERIFIER, DEX_ROUTER, BASE_ASSET, QUOTE_ASSET, PRICE_CONTRACT);
 
-  // 1. Deploy the factory (permissionless — deployer has no post-deployment power).
-  const factoryAddr = await deployContract(
-    "ASCTreasuryFactory",
-    "out/ASCTreasuryFactory.sol/ASCTreasuryFactory.json",
-    [VERIFIER, DEX_ROUTER, BASE_ASSET, QUOTE_ASSET, PRICE_CONTRACT],
-    deployer
-  );
+  // 1. Deploy the factory (permissionless — deployer has no post-deployment power), or
+  // reuse an existing one via FACTORY_ADDRESS (idempotent re-runs).
+  const factoryAddr =
+    process.env.FACTORY_ADDRESS ??
+    (await deployContract(
+      "ASCTreasuryFactory",
+      "out/ASCTreasuryFactory.sol/ASCTreasuryFactory.json",
+      [VERIFIER, DEX_ROUTER, BASE_ASSET, QUOTE_ASSET, PRICE_CONTRACT],
+      deployer
+    ));
 
   // 2. Give each tenant a little CTC so stage-2+ sign-ups can pay their own gas.
   const GAS_STAKE = ethersMod.parseEther("0.5");
@@ -117,7 +121,7 @@ async function main() {
   const factoryAbi = JSON.parse(
     fs.readFileSync(path.join(basePath, "out/ASCTreasuryFactory.sol/ASCTreasuryFactory.json"), "utf8")
   );
-  const factory = new ethersMod.Contract(factoryAddr, factoryAbi, deployer);
+  const factory = new ethersMod.Contract(factoryAddr, factoryAbi.abi, deployer);
 
   async function createInstance(label, owner, g) {
     console.log(`\nCreating instance for ${label} (owner ${owner})...`);
@@ -144,7 +148,7 @@ async function main() {
     fs.readFileSync(path.join(basePath, "out/ASCTreasuryJournal.sol/ASCTreasuryJournal.json"), "utf8")
   );
   const readInstance = async (label, addr, expectedOwner, expected) => {
-    const t = new ethersMod.Contract(addr, treasuryAbi, provider);
+    const t = new ethersMod.Contract(addr, treasuryAbi.abi, provider);
     const got = {
       owner: await t.owner(),
       maxTradeSize: (await t.MAX_TRADE_SIZE()).toString(),

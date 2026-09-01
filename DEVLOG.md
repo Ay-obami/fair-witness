@@ -8,9 +8,7 @@ for the original architecture write-up.
 
 ## Status snapshot
 
-**Last updated:** Build session 7 — **LIVE on both testnets.** Two real Attestcoin-proven
-executions on Creditcoin testnet, replay CLI verified with hash match, adversarial replay
-rejected live, frontend + reasoning store on GitHub Pages.
+**Last updated:** Build session 8 — **Stage 1 multi-tenant pivot completed.** Factory deployed with two independent tenant instances on Creditcoin testnet, each with immutable per-tenant guardrails verified on-chain and via Blockscout.
 
 | Component | Status |
 |---|---|
@@ -506,3 +504,51 @@ What remains, honestly, is productionization rather than proof:
 - The source-side price feed remains our own permissionless toy contract by design; any
   production version needs a trust story for *who* reports prices that goes beyond
   Attestcoin's inclusion proofs.
+
+### Session 8 — Stage 1 multi-tenant pivot (completed)
+
+**Goal**: Deploy the factory and two demo instances to Creditcoin testnet, with immutable per-tenant guardrails enforced at construction time.
+
+**Why**: To prove the non-negotiable "no shared mutable settings" constraint holds in a live deployment — each tenant gets its own independent `ASCTreasuryJournal` with immutable guardrails baked in at deploy-time.
+
+**What was done**:
+- Refactored `ASCTreasuryJournal.sol` constants into `immutable` constructor arguments, making guardrails non-negotiable per-tenant settings
+- Created `ASCTreasuryFactory.sol` — a permissionless factory that holds the canonical chain configuration (verifier, DEX, base/quote assets, price source) and deploys independent treasury instances with tenant-specific immutable guardrails
+- Deployed the factory and two demo tenant instances to Creditcoin testnet with different guardrails, verified on-chain and via Blockscout
+
+**Deployed addresses (Creditcoin testnet, chainId 102031):**
+
+| Contract | Address |
+|---|---|
+| **ASCTreasuryFactory** | **`0x97c81D68BbCDb1A673b61176d60F071963Abe7f2**** |
+| baseAsset (USDC-like, 6dp) | `0x0bFA6eF009f8739c727b292849029608bd6b115A` |
+| quoteAsset (MQT, 6dp) | `0x6A97b1913Bca9d17A57cAae1F6b5C1885bE1DAA1` |
+| MockDexRouter (seeded 1M:1M) | `0x8D40f9D47886f21223357874e1a99a22DD4f9E5e` |
+| Verifier precompile | `0x0000000000000000000000000000000000000FD2` |
+| Price source | `0x23433fcA0f35CC5e801b6888293B2B11017900c7` |
+
+**Tenant instances (different guardrails):**
+
+| Instance | Owner | maxTradeSize | maxSlippageBps | minArbWidthBps | maxDriftBps | maxConfirmGapBlocks | maxActionsPerEpoch | epochLength |
+|---|---|---|---|---|---|---|---|---|
+| **Instance A** `0x13CACe3989b295048De47C68F32Ff3d844AC2026` | `0xd1D4020279C86e41FE688A1D7F31f7F8436A1C77` | 5,000,000 | 150 | 80 | 100 | 20 | 6 | 86400 (1d) |
+| **Instance B** `0xD66C607072df7dB98A75aEe81fCA4089462c60aB` | `0xa3fC15a9F8899E10bBe77456e9E6466C274c3a90` | 10,000,000 | 200 | 120 | 150 | 30 | 3 | 86400 (1d) |
+
+**Deployment transactions:**
+- Factory: `0x9e0637f154aa1016ca247b6f34647a2dfa124a4dfb4514084b1887a88551ed18` (block 5411764)
+- Instance A: `0xb0bb01e60dc1086cd5c75eb66ba31f91b0aff95449578c354edd1e33295daf30` (block 5411765)
+- Instance B: `0xdd657fa6291c4924789131ba4d3ab63f0b3eb4ea540f14ab378947e33d1345d2` (block 5411766)
+
+**Verification:**
+- All contracts visible on Blockscout at their respective addresses
+- `TreasuryDeployed` events confirmed in logs with correct instance addresses and owners
+- On-chain guardrail reads via RPC confirm each instance has the correct immutable parameters
+- Factory is permissionless (no admin controls), holds the canonical chain config
+
+**Technical notes:**
+- Fixed `deploy-factory.js` to use `factoryAbi.abi` and `treasuryAbi.abi` when constructing contracts (passed whole artifact previously)
+- Added `FACTORY_ADDRESS` env var support for idempotent re-runs against an existing factory
+- Deploy script confirms `abi is not iterable` error was the final blocker; resolved by using proper ABI structure
+- Deployment used `ethers` from local `node_modules` to avoid path resolution issues
+
+**Next stage**: Build the agent and frontend adapters to discover and interact with arbitrary factory-deployed instances, starting with a multi-tenant viewer that shows activity across multiple independent treasuries.
