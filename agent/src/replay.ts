@@ -18,7 +18,7 @@ async function main() {
   }
 
   const provider = new ethers.JsonRpcProvider(config.creditcoinRpcUrl);
-  const treasury = new ethers.Contract(config.treasuryAddress, treasuryAbi, provider);
+  const treasury = new ethers.Contract(config.treasuryAddress, treasuryAbi.abi, provider);
   const reasoningStore = new ReasoningStore();
 
   const entry = await treasury.getJournalEntry(key);
