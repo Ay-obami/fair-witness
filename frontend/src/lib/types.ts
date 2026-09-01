@@ -40,3 +40,28 @@ export interface ReplayData {
   hashMatches: boolean | null; // null if reasoning wasn't found at all
   sepoliaExplorerFactHint: string; // human-readable pointer for independent verification
 }
+
+/**
+ * Mirrors the immutable guardrails baked into an ASCTreasuryJournal instance at
+ * construction time (V2 multi-tenant pivot). These are constructor-set `immutable`s —
+ * they can never be loosened after deployment, even by the instance's owner, which is
+ * exactly why showing them next to a replayed action is meaningful: the viewer proves
+ * which rigid bounds the contract enforced, read live from the instance itself.
+ */
+export interface Guardrails {
+  maxTradeSize: string;
+  maxSlippageBps: number;
+  minArbWidthBps: number;
+  maxDriftBps: number;
+  maxConfirmGapBlocks: number;
+  maxActionsPerEpoch: number;
+  epochLength: number;
+}
+
+/** The live identity of a treasury instance being viewed. */
+export interface TreasuryInfo {
+  address: string;
+  owner: string;
+  journalLength: number;
+  guardrails: Guardrails;
+}

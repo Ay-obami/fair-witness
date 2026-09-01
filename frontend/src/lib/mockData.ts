@@ -1,5 +1,4 @@
-import { ActionType, type ReplayData } from "./types";
-
+import { ActionType, type ReplayData, type TreasuryInfo } from "./types";
 // Sample data illustrating three real scenarios this UI needs to make legible:
 // 1. A normal, hash-verified execution (the common case).
 // 2. A tampered reasoning payload — demonstrates the mismatch detector actually catching
@@ -91,3 +90,61 @@ export const MOCK_ENTRIES: Record<string, ReplayData> = {
 };
 
 export const MOCK_ACTION_KEYS = Object.keys(MOCK_ENTRIES);
+
+// Illustrative per-instance guardrails for demo mode, mirroring the two real Stage-1
+// tenant instances (5M/150/80 vs 10M/200/120). In demo mode the instance switcher maps
+// these two addresses to this data so the multi-tenant UI is explorable with no RPC.
+// Values here are illustrative only — live mode reads the real immutables from chain.
+export const MOCK_TREASURIES: Record<string, TreasuryInfo> = {
+  "0x13CACe3989b295048De47C68F32Ff3d844AC2026": {
+    address: "0x13CACe3989b295048De47C68F32Ff3d844AC2026",
+    owner: "0xd1D4020279C86e41FE688A1D7F31f7F8436A1C77",
+    journalLength: 3,
+    guardrails: {
+      maxTradeSize: "5000000",
+      maxSlippageBps: 150,
+      minArbWidthBps: 80,
+      maxDriftBps: 100,
+      maxConfirmGapBlocks: 20,
+      maxActionsPerEpoch: 6,
+      epochLength: 86400,
+    },
+  },
+  "0xD66C607072df7dB98A75aEe81fCA4089462c60aB": {
+    address: "0xD66C607072df7dB98A75aEe81fCA4089462c60aB",
+    owner: "0xa3fC15a9F8899E10bBe77456e9E6466C274c3a90",
+    journalLength: 2,
+    guardrails: {
+      maxTradeSize: "10000000",
+      maxSlippageBps: 200,
+      minArbWidthBps: 120,
+      maxDriftBps: 150,
+      maxConfirmGapBlocks: 30,
+      maxActionsPerEpoch: 3,
+      epochLength: 86400,
+    },
+  },
+};
+
+export const MOCK_TREASURY_ADDRESSES = Object.keys(MOCK_TREASURIES);
+
+export function mockTreasuryInfo(address: string): TreasuryInfo {
+  const match = MOCK_TREASURIES[address];
+  if (match) return match;
+  // Any other address gets an honest placeholder so demo mode never crashes — clearly
+  // labeled illustrative bounds, not real chain data.
+  return {
+    address,
+    owner: "0x0000000000000000000000000000000000000000",
+    journalLength: 0,
+    guardrails: {
+      maxTradeSize: "0",
+      maxSlippageBps: 0,
+      minArbWidthBps: 0,
+      maxDriftBps: 0,
+      maxConfirmGapBlocks: 0,
+      maxActionsPerEpoch: 0,
+      epochLength: 0,
+    },
+  };
+}
