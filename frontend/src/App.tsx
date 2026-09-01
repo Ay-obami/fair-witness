@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { config } from "./lib/config";
 import { fetchReplayData, fetchTreasury } from "./lib/dataProvider";
+import { fetchTenantList, type DiscoveredTenant } from "./lib/tenantDiscovery";
 import { SearchBar } from "./components/SearchBar";
 import { ReplayCard } from "./components/ReplayCard";
 import { TenantPanel } from "./components/TenantPanel";
@@ -20,6 +21,23 @@ export default function App() {
   const [treasury, setTreasury] = useState<TreasuryInfo | null>(null);
   const [treasuryLoading, setTreasuryLoading] = useState(false);
   const [treasuryError, setTreasuryError] = useState<string | null>(null);
+
+  // Instances enumerated from the committed on-chain index (TenantPanel chips). Fetched
+  // once on mount; failure is non-fatal — paste-to-view still works.
+  const [discovered, setDiscovered] = useState<DiscoveredTenant[]>([]);
+  const [discoveryFailed, setDiscoveryFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchTenantList().then(({ tenants }) => {
+      if (cancelled) return;
+      setDiscovered(tenants);
+      setDiscoveryFailed(tenants.length === 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     // Synchronize the viewer with the selected instance's chain identity + guardrails.
@@ -104,6 +122,8 @@ export default function App() {
             loading={treasuryLoading}
             error={treasuryError}
             onSwitch={setTreasuryAddress}
+            discovered={discovered}
+            discoveryFailed={discoveryFailed}
           />
 
           <SearchBar onSearch={handleSearch} loading={loading} />
