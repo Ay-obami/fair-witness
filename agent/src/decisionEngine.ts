@@ -1,11 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { config } from "./config.js";
+import type { TreasuryGuardrails } from "./treasuryGuardrails.js";
 
 export interface DecisionInput {
   srcPrice: bigint;
   confPrice: bigint;
   destPrice: bigint;
   gapBps: number;
+  guardrails: TreasuryGuardrails; // Now tenant-specific
 }
 
 export interface Decision {
@@ -28,6 +30,10 @@ the current destination DEX price is wide enough to plausibly represent a real, 
 arbitrage opportunity rather than noise or a stale/manipulated observation. When in
 doubt, recommend NOT acting — the contract's bounds are a floor, not a target; you should
 be more conservative than the contract, never less.
+
+Rule R-ARB-2: always consider the tenant-specific guardrails provided (max trade size,
+max slippage bps, min arb width bps, max drift bps, rate limit). Different tenants have
+different risk profiles, so your decision should be calibrated to their specific bounds.
 
 Respond only with the requested JSON structure.`;
 
@@ -62,7 +68,7 @@ export class DecisionEngine {
   }
 
   private cacheKey(input: DecisionInput): string {
-    return `${input.srcPrice}:${input.confPrice}:${input.destPrice}`;
+    return `${input.srcPrice}:${input.confPrice}:${input.destPrice}:${input.gapBps}:${input.guardrails.maxTradeSize}:${input.guardrails.minArbWidthBps}`;
   }
 
   async decide(input: DecisionInput): Promise<Decision> {
@@ -74,6 +80,14 @@ export class DecisionEngine {
 Confirmation price (attested, later block): ${input.confPrice}
 Current destination DEX price (Creditcoin, PenguinSwap): ${input.destPrice}
 Observed gap vs destination: ${input.gapBps} bps
+
+Tenant-specific guardrails:
+- Max trade size: ${input.guardrails.maxTradeSize} tokens
+- Max slippage: ${input.guardrails.maxSlippageBps} bps
+- Min arb width: ${input.guardrails.minArbWidthBps} bps
+- Max drift: ${input.guardrails.maxDriftBps} bps
+- Max actions per epoch: ${input.guardrails.maxActionsPerEpoch}
+- Epoch length: ${input.guardrails.epochLength} seconds
 
 Should the contract be recommended to act on this?`;
 

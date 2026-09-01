@@ -5,9 +5,24 @@ import type { AttestedProof } from "./attestcoinClient.js";
 
 export class TreasurySubmitter {
   private contract: ethers.Contract;
+  private signer: ethers.Wallet;
 
   constructor(signer: ethers.Wallet) {
-    this.contract = new ethers.Contract(config.treasuryAddress, treasuryAbi, signer);
+    this.signer = signer;
+    // Note: contract will be initialized with the correct address via setTreasuryAddress
+    this.contract = new ethers.Contract(
+      "0x0000000000000000000000000000000000000000",
+      treasuryAbi.abi,
+      signer
+    );
+  }
+
+  /**
+   * Sets the target treasury address. This allows the submitter to work with
+   * factory-deployed instances.
+   */
+  setTreasuryAddress(treasuryAddress: string): void {
+    this.contract = new ethers.Contract(treasuryAddress, treasuryAbi.abi, this.signer);
   }
 
   /**
