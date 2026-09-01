@@ -4,13 +4,40 @@ import { SepoliaWatcher } from "./sepoliaWatcher.js";
 import { AttestcoinClient } from "./attestcoinClient.js";
 import { DecisionEngine } from "./decisionEngine.js";
 import { ReasoningStore } from "./reasoningStore.js";
-import { TreasurySubmitter } from "./submitter.js";
-import { DexPriceReader, bpsGap } from "./dexPriceReader.js";
-import { factKey, deterministicNonce, actionKey } from "./keys.js";
-import { readTreasuryGuardrails } from "./treasuryGuardrails.js";
 import { resolveTreasuryAddress } from "./treasuryGuardrails.js";
+import { loadTenantConfigs, assertAgentRegisteredOrWarn, type TenantConfig } from "./tenants.js";
+import {
+  createTenantRuntime,
+  buildCycleProofs,
+  runTenantCycle,
+  type SharedDeps,
+  type TenantRuntime,
+} from "./tenantRunner.js";
 
 const log = (msg: string) => console.log(`[${new Date().toISOString()}] ${msg}`);
+
+/**
+ * Resolves the tenant roster. Two modes:
+ *  - MULTI-TENANT: TENANTS_FILE points at a JSON registry of instances → one agent
+ *    process polls every tenant, submitting proofs per user against THAT user's contract
+ *    (docs/ARCHITECTURE_V2.md §3.1 "Multi-tenant agent service").
+ *  - SINGLE-TENANT (V1 runbook, unchanged): TREASURY_ADDRESS (+ optional TENANT_ID).
+ */
+async function resolveTenantRoster(): Promise<TenantConfig[]> {
+  const tenants = await loadTenantConfigs();
+  if (tenants) {
+    log(`Tenant registry loaded (${tenants.length} tenant(s)) — multi-tenant mode.`);
+    return tenants;
+  }
+  const address = await resolveTreasuryAddress(process.env.TENANT_ID);
+  log(`Single-tenant mode: ${address}${process.env.TENANT_ID ? ` (tenant: ${process.env.TENANT_ID})` : ""}`);
+  return [
+    {
+      label: process.env.TENANT_ID ?? "default",
+      treasuryAddress: ethers.getAddress(address),
+    },
+  ];
+}
 
 async function main() {
   log("Starting agent runner (no funds held — see DEVLOG.md custody-separation notes)");
@@ -19,134 +46,45 @@ async function main() {
   const attestcoin = new AttestcoinClient();
   const decisionEngine = new DecisionEngine();
   const reasoningStore = new ReasoningStore();
-  const submitter = new TreasurySubmitter(attestcoin.signer);
+  const shared: SharedDeps = { watcher, attestcoin, decisionEngine, reasoningStore };
 
   const creditcoinProvider = new ethers.JsonRpcProvider(config.creditcoinRpcUrl);
-  
-  // Resolve the treasury address (either direct or via factory)
-  const treasuryAddress = await resolveTreasuryAddress(process.env.TENANT_ID);
-  log(`Target treasury address: ${treasuryAddress}${process.env.TENANT_ID ? ` (tenant: ${process.env.TENANT_ID})` : ''}`);
-  
-  // Update submitter with the resolved treasury address
-  submitter.setTreasuryAddress(treasuryAddress);
-  
-  // Read immutable guardrails from the target treasury
-  log("Reading immutable guardrails from treasury...");
-  const guardrails = await readTreasuryGuardrails(creditcoinProvider, treasuryAddress);
-  log(`Guardrails loaded: maxTradeSize=${guardrails.maxTradeSize}, maxSlippage=${guardrails.maxSlippageBps}bps, minArbWidth=${guardrails.minArbWidthBps}bps, maxDrift=${guardrails.maxDriftBps}bps, maxActionsPerEpoch=${guardrails.maxActionsPerEpoch}, epochLength=${guardrails.epochLength}s`);
-  
-  // NOTE: DEX_ROUTER_ADDRESS / BASE_ASSET / QUOTE_ASSET are read from the deployed
-  // treasury contract's own immutables at startup, rather than duplicated in agent env
-  // vars, so the agent can never drift out of sync with what the contract actually
-  // trades. See docs/DEPLOYMENT.md for the one-time setup this assumes.
-  const treasuryReadOnly = new ethers.Contract(
-    treasuryAddress,
-    ["function DEX_ROUTER() view returns (address)", "function BASE_ASSET() view returns (address)", "function QUOTE_ASSET() view returns (address)"],
-    creditcoinProvider
-  );
-  const [routerAddress, baseAsset, quoteAsset] = await Promise.all([
-    treasuryReadOnly.DEX_ROUTER(),
-    treasuryReadOnly.BASE_ASSET(),
-    treasuryReadOnly.QUOTE_ASSET(),
-  ]);
-  const dexReader = new DexPriceReader(routerAddress, baseAsset, quoteAsset, creditcoinProvider);
+  const signer = attestcoin.signer;
 
   log(`Agent submit address: ${attestcoin.submitterAddress} (must hold zero token balance — verify manually before going live)`);
   await attestcoin.assertSourceChainSupported();
   log(`Source chain key ${config.sourceChainKey} confirmed supported.`);
 
-  async function evaluateAndAct(): Promise<void> {
-    const observation = await watcher.pollLatest();
-    if (!observation) return;
-
-    const destPrice = await dexReader.currentPrice();
-    const gap = bpsGap(observation.price, destPrice);
-
-    if (gap < config.minArbWidthBpsLocalEstimate) {
-      // Local pre-filter only — saves a proof-generation round trip on an obviously
-      // too-narrow gap. The contract's MIN_ARB_WIDTH_BPS is the real, authoritative
-      // bound and is re-checked independently on submission regardless.
-      return;
-    }
-
-    log(`Candidate: src=${observation.price} dest=${destPrice} gap=${gap}bps — building source proof`);
-
-    // The source tx's block must clear Sepolia's reorg-protection window AND be attested
-    // before the proof builder can serve a proof for it — otherwise getProof() 404s with
-    // "BlockNotOnSourceChain" (retriable) and this candidate would be silently dropped,
-    // since pollLatest() advances its scan cursor regardless. Wait for attestation first;
-    // same pattern the confirmation proof below already uses.
-    log(`Waiting for source block ${observation.blockHeight} to be attested...`);
-    await attestcoin.waitUntilReady(observation.blockHeight);
-
-    const sourceProof = await attestcoin.buildProof(observation.transactionHash);
-    const fact = factKey(sourceProof.chainKey, sourceProof.blockHeight, sourceProof.transactionIndex);
-
-    // Wait for a later block to be attested before building the confirmation proof —
-    // this IS the "second independent attestation" from the design doc, not a formality.
-    const targetConfirmHeight = observation.blockHeight + config.confirmGapTargetBlocks;
-    log(`Waiting for block ${targetConfirmHeight} to be attested for the confirmation proof...`);
-    await attestcoin.waitUntilReady(targetConfirmHeight);
-
-    const confirmObservation = await watcher.pollAt(targetConfirmHeight);
-    if (!confirmObservation) {
-      log("No new observation at the confirmation height — skipping this cycle.");
-      return;
-    }
-    const confirmProof = await attestcoin.buildProof(confirmObservation.transactionHash);
-
-    const nonce = deterministicNonce(fact, observation.price, confirmObservation.price);
-    const key = actionKey(fact, attestcoin.submitterAddress, nonce);
-
-    // Pre-flight replay check — gas-saving optimization only, see submitter.ts docs.
-    if (await submitter.alreadyExecuted(key)) {
-      log(`Action ${key} already executed — skipping resubmission (retry-safe, no-op).`);
-      return;
-    }
-
-    const destPriceNow = await dexReader.currentPrice();
-    const finalGap = bpsGap(confirmObservation.price, destPriceNow);
-
-    const decision = await decisionEngine.decide({
-      srcPrice: observation.price,
-      confPrice: confirmObservation.price,
-      destPrice: destPriceNow,
-      gapBps: finalGap,
-      guardrails,
-    });
-
-    log(`LLM decision: act=${decision.act} — "${decision.rationale}"`);
-
-    const decisionHash = await reasoningStore.put({
-      observedGapBps: finalGap,
-      sourcePrice: observation.price.toString(),
-      confirmPrice: confirmObservation.price.toString(),
-      destPrice: destPriceNow.toString(),
-      rule: "R-ARB-1",
-      llmRationale: decision.rationale,
-      timestamp: new Date().toISOString(),
-    });
-
-    if (!decision.act) {
-      log("LLM recommended not acting — no submission made. (The contract's bounds are a floor, not a target; the LLM may decline even when the contract would technically allow it.)");
-      return;
-    }
-
-    try {
-      const result = await submitter.submit(sourceProof, confirmProof, nonce, decisionHash);
-      log(`Executed. actionKey=${result.actionKey} tx=${result.txHash}`);
-    } catch (err) {
-      // Expected reverts (stale, too-narrow, rate-limited, replay) are the rigid
-      // business logic working as designed, not agent failures — see DEVLOG.md.
-      log(`Rejected by contract (expected if stale/narrow/rate-limited/replayed): ${err}`);
-    }
+  // Build each tenant's runtime sequentially (chain reads), with a per-tenant
+  // registration check — registration is per-instance, so being registered on Tenant A's
+  // instance grants nothing on Tenant B's. A missing registration is a loud warning, not
+  // fatal: the owner may register later, and submissions would revert clearly.
+  const roster = await resolveTenantRoster();
+  const runtimes: TenantRuntime[] = [];
+  for (const tenantConfig of roster) {
+    const runtime = await createTenantRuntime(tenantConfig, creditcoinProvider, signer, log);
+    await assertAgentRegisteredOrWarn(creditcoinProvider, tenantConfig, attestcoin.submitterAddress, log);
+    runtimes.push(runtime);
   }
+  log(`${runtimes.length} tenant runtime(s) ready.`);
 
   log(`Entering poll loop (interval ${config.pollIntervalMs}ms)`);
   // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
-      await evaluateAndAct();
+      // Fact-scoped work ONCE per cycle (source poll → attestations → both proofs), then
+      // the per-tenant half sequentially: one tenant's failure must never abort the
+      // others' evaluation, and the loop must survive a whole cycle throwing.
+      const proofs = await buildCycleProofs(shared, runtimes[0]?.dexReader, log);
+      if (proofs) {
+        for (const runtime of runtimes) {
+          try {
+            await runTenantCycle(runtime, shared, proofs, log);
+          } catch (err) {
+            log(`[${runtime.config.label}] tenant cycle failed (other tenants unaffected): ${err}`);
+          }
+        }
+      }
     } catch (err) {
       log(`Unexpected error in evaluation cycle (will retry next poll): ${err}`);
     }
