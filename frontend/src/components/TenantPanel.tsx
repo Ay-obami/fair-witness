@@ -2,6 +2,7 @@ import { useState } from "react";
 import { config } from "../lib/config";
 import { MOCK_TREASURY_ADDRESSES } from "../lib/mockData";
 import type { TreasuryInfo } from "../lib/types";
+import type { DiscoveredTenant } from "../lib/tenantDiscovery";
 import { DataRow } from "./DataRow";
 
 interface Props {
@@ -9,11 +10,19 @@ interface Props {
   loading: boolean;
   error: string | null;
   onSwitch: (address: string) => void;
+  /** Instances discovered from the on-chain index (`public/tenants.json`). */
+  discovered: DiscoveredTenant[];
+  discoveryFailed: boolean;
 }
 
 const SHORT_LABELS: Record<string, string> = {
   "0x13CACe3989b295048De47C68F32Ff3d844AC2026": "Tenant A (5M cap)",
   "0xD66C607072df7dB98A75aEe81fCA4089462c60aB": "Tenant B (10M cap)",
+};
+
+const KNOWN_ADDRESS_TO_LABEL: Record<string, string> = {
+  "0x13cace3989b295048de47c68f32ff3d844ac2026": "Tenant A (5M cap)",
+  "0xd66c607072df7db98a75aee81fca4089462c60ab": "Tenant B (10M cap)",
 };
 
 function epochLabel(seconds: number): string {
@@ -23,6 +32,12 @@ function epochLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
+function shortLabel(address: string, fallback: string): string {
+  const lower = address.toLowerCase();
+  if (KNOWN_ADDRESS_TO_LABEL[lower]) return KNOWN_ADDRESS_TO_LABEL[lower];
+  return SHORT_LABELS[address] ?? fallback;
+}
+
 /**
  * The multi-tenant entry point (V2 pivot): shows WHICH treasury instance is being
  * viewed and its immutable guardrails, read live from the instance itself, plus a
@@ -30,12 +45,28 @@ function epochLabel(seconds: number): string {
  *
  * Honest framing, matching the repo's conventions: the factory is permissionless and
  * deliberately keeps NO tenant registry, so instances can't be enumerated from-chain —
- * an instance address must be pasted (deploy manifest / Blockscout). The guardrails
- * shown are always read from the instance, which is the source of truth, so the switcher
- * input accepts any instance address the viewer can reach on the configured RPC.
+ * enumeration comes from the indexer (`contracts/script/index-tenants.js`) reading the
+ * factory's `TreasuryDeployed` events, whose output is committed to
+ * `public/tenants.json`. The guardrails shown are ALWAYS read from the instance (the
+ * source of truth); the index only supplies identities (label/address/owner), never
+ * bounds, so a stale index can mislead about WHO exists but never about WHICH bounds are
+ * in force.
  */
-export function TenantPanel({ treasury, loading, error, onSwitch }: Props) {
+export function TenantPanel({ treasury, loading, error, onSwitch, discovered, discoveryFailed }: Props) {
   const [draft, setDraft] = useState("");
+
+  const chips: DiscoveredTenant[] =
+    discovered.length > 0
+      ? discovered
+      : MOCK_TREASURY_ADDRESSES.map((a) => ({
+          label: SHORT_LABELS[a] ?? a,
+          treasuryAddress: a,
+          owner: "",
+        }));
+
+  const chosen = treasury
+    ? chips.find((d) => d.treasuryAddress.toLowerCase() === treasury.address.toLowerCase())
+    : undefined;
 
   return (
     <section className="rounded-lg border border-ledger-700 bg-ledger-900 p-5">
@@ -68,7 +99,10 @@ export function TenantPanel({ treasury, loading, error, onSwitch }: Props) {
           <dl>
             <DataRow
               label="Instance"
-              value={SHORT_LABELS[treasury.address] ?? treasury.address}
+              value={
+                shortLabel(treasury.address, treasury.address) +
+                (chosen ? ` (${chosen.label})` : "")
+              }
               mono={!SHORT_LABELS[treasury.address]}
             />
             <DataRow label="Owner" value={treasury.owner} truncate />
@@ -119,22 +153,36 @@ export function TenantPanel({ treasury, loading, error, onSwitch }: Props) {
         </button>
       </form>
 
-      {config.demoMode && MOCK_TREASURY_ADDRESSES.length > 0 && (
+      {chips.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs uppercase tracking-wide text-ledger-400">Try:</span>
-          {MOCK_TREASURY_ADDRESSES.map((address) => (
+          <span className="text-xs uppercase tracking-wide text-ledger-400">
+            {config.demoMode
+              ? "Try:"
+              : discovered.length > 0
+                ? "From on-chain index:"
+                : "Try (demo mocks):"}
+          </span>
+          {chips.map((t) => (
             <button
-              key={address}
+              key={t.treasuryAddress}
               onClick={() => {
-                setDraft(address);
-                onSwitch(address);
+                setDraft(t.treasuryAddress);
+                onSwitch(t.treasuryAddress);
               }}
               className="rounded-full border border-ledger-600 bg-ledger-800 px-3 py-1 text-xs text-ledger-200 transition hover:border-verified-500/50 hover:text-verified-400"
             >
-              {SHORT_LABELS[address] ?? address}
+              {SHORT_LABELS[t.treasuryAddress] ?? t.label}
             </button>
           ))}
         </div>
+      )}
+
+      {discoveryFailed && discovered.length === 0 && !config.demoMode && (
+        <p className="mt-3 text-xs text-ledger-400">
+          No on-chain index found (<code className="font-data">tenants.json</code>) — paste an
+          instance address above, or serve the indexer output from{" "}
+          <code className="font-data">public/tenants.json</code>.
+        </p>
       )}
     </section>
   );
