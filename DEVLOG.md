@@ -552,3 +552,59 @@ What remains, honestly, is productionization rather than proof:
 - Deployment used `ethers` from local `node_modules` to avoid path resolution issues
 
 **Next stage**: Build the agent and frontend adapters to discover and interact with arbitrary factory-deployed instances, starting with a multi-tenant viewer that shows activity across multiple independent treasuries.
+
+### Session 8 (cont.) — Stages 2 & 3: agent + frontend multi-tenant support
+
+**Stage 2 — agent talks to any instance (RPC read path):**
+- `config.ts`: `TREASURY_ADDRESS` is now optional when factory mode is intended; added
+  optional `FACTORY_ADDRESS`.
+- New `treasuryGuardrails.ts`: `readTreasuryGuardrails()` reads `owner()` +
+  `MAX_TRADE_SIZE()` / `MAX_SLIPPAGE_BPS()` / `MIN_ARB_WIDTH_BPS()` / `MAX_DRIFT_BPS()` /
+  `MAX_CONFIRM_GAP_BLOCKS()` / `MAX_ACTIONS_PER_EPOCH()` / `EPOCH_LENGTH()` live from an
+  instance. **Pitfall found live:** the first version called camelCase getters
+  (`maxTradeSize()`) which don't exist — ethers throws `not a function`; the Solidity
+  immutables are UPPER_SNAKE. Also: the whole Foundry artifact JSON was being passed where
+  the ABI belongs; must use `artifact.abi` (same class of bug as the deploy script).
+- `resolveTreasuryAddress()`: direct mode (TREASURY_ADDRESS) or factory mode. **Honest
+  limitation discovered:** the factory has NO `tenantTreasury()` registry — instances are
+  independent by design, so factory mode currently requires the instance address to be
+  supplied explicitly (error message says so). A future Stage could add a registry to the
+  factory, but that trades away some of the "no shared mutable state" purity; the
+  deploy-manifest/Blockscout path is the interim answer.
+- `submitter.ts`: `setTreasuryAddress()` so one agent process can be pointed at any
+  instance; `decisionEngine.ts`: guardrails are now part of `DecisionInput`, included in
+  the prompt (R-ARB-2: calibrate to the tenant's specific bounds) and in the cache key so
+  two tenants with different bounds never share a cached LLM decision for the same fact.
+- `index.ts`: resolves the instance, prints its guardrails at startup, passes them to the
+  decision engine.
+- **Verified live** (`src/testMultiTenant.ts`, against the Stage-1 deployments): Tenant A
+  `0x13CA…2026` returns 5,000,000/150/80/100/20/6/86400 with owner
+  `0xd1D4…1C77`; Tenant B `0xD66C…60aB` returns 10,000,000/200/120/150/30/3/86400 with
+  owner `0xa3fC…3a90`. Agent build clean, 16/16 vitest passing.
+- Tenant env files (`agent/.env.tenant-a` / `.env.tenant-b`) capture the per-instance
+  configuration. Note: these were committed with `-f` because they contain real testnet
+  keys — **worthless testnet keys only** (documented at the top of the file), but this
+  pattern must never be repeated with funded keys.
+
+**Stage 3 — frontend multi-tenant viewer:**
+- `types.ts`: `Guardrails` + `TreasuryInfo` mirroring the on-chain immutable struct.
+- `contractReader.ts`: new `fetchTreasuryInfo(address)` reads owner + all seven immutable
+  guardrails + journal length from ANY instance; `fetchLiveReplayData()` takes an
+  instance address (defaults to config). Journal length is probed by walking
+  `journalIndex(i)` until revert, capped at 500 with the cap disclosed in-code (Solidity
+  arrays expose no length accessor through this ABI slice — the honest alternative would
+  be an on-chain `journalLength()` getter; noted as a possible contract-side follow-up).
+- New `TenantPanel.tsx`: shows which instance is being viewed, its owner, journal count,
+  and its immutable guardrails with the framing that matters: "constructor-set — can
+  never be loosened, even by the owner". Includes an instance switcher (paste any
+  instance address; demo-mode chips for the two Stage-1 tenants).
+- `App.tsx`: instance state drives both the guardrail read and which journal replays are
+  queried from; switch race guarded by a `cancelled` flag (fixed an oxlint
+  set-state-in-effect warning at the same time).
+- Demo mode: mock treasuries mirror the two real instances, clearly labeled illustrative.
+- **Verified:** `tsc -b && vite build` clean; `oxlint` 0 warnings / 0 errors.
+
+**What Stage 4 needs** (full multi-tenant rollout): a factory-side tenant registry (or an
+off-chain indexer over `TreasuryDeployed` events) so tenants can be enumerated; per-tenant
+agent deployment story (one agent process per instance today); and re-deploying the GitHub
+Pages viewer with the new env vars.
