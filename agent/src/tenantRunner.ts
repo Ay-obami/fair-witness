@@ -141,6 +141,19 @@ export async function buildCycleProofs(
     log("No new observation at the confirmation height — skipping this cycle.");
     return null;
   }
+  // pollAt() scans [target, target+5] and returns the FIRST event, which can sit up to 5
+  // blocks ABOVE the target. The prover can only serve a tx proof once ITS OWN block is
+  // attested — waiting only for the target height then asking for a tx in a higher,
+  // not-yet-attested block deterministically fails with a 422 (observed live 2026-09-02,
+  // confirmation event at source+7 while only source+3 was attested). So wait for the
+  // height we will actually prove; it is >= target, so the contract's confirm-gap bound
+  // still holds, and when the event sits exactly at the target this call is a no-op.
+  if (confirmObservation.blockHeight !== targetConfirmHeight) {
+    log(
+      `Confirmation event found at block ${confirmObservation.blockHeight} (target was ${targetConfirmHeight}) — waiting for that block's attestation before proof generation...`
+    );
+    await shared.attestcoin.waitUntilReady(confirmObservation.blockHeight);
+  }
   const confirmProof = await shared.attestcoin.buildProof(confirmObservation.transactionHash);
 
   const nonce = deterministicNonce(fact, observation.price, confirmObservation.price);
