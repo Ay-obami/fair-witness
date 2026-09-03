@@ -537,6 +537,7 @@ What remains, honestly, is productionization rather than proof:
 **Deployment transactions:**
 - Factory: `0x9e0637f154aa1016ca247b6f34647a2dfa124a4dfb4514084b1887a88551ed18` (block 5411764)
 - Instance A: `0xb0bb01e60dc1086cd5c75eb66ba31f91b0aff95449578c354edd1e33295daf30` (block 5411765)
+
 - Instance B: `0xdd657fa6291c4924789131ba4d3ab63f0b3eb4ea540f14ab378947e33d1345d2` (block 5411766)
 
 **Verification:**
@@ -701,3 +702,78 @@ index can mislead about *who* exists but never about *which bounds* are in force
 Supabase login-gated per-user dashboard (auth ↔ contract-address mapping), the
 reasoning-payload instance-context change (done only when the demo no longer needs to
 verify pre-pivot entries), and redeploying the GitHub Pages viewer.
+
+### Session 9 — Stage 3/4: live multi-tenant loop closed end-to-end (proven on-chain)
+
+The last missing pieces between "runtimes build" and "the loop actually runs" were two
+race conditions that only a live run could expose — plus one security hole found in the
+process.
+
+**Bug 1 (found live, 2026-09-02): confirmation-proof 422 race.** The agent waited for the
+attestation of `source + CONFIRM_GAP_TARGET` (the *target* height) and then built a proof
+for whatever tx `pollAt` returned — but `pollAt` scans `[target, target+5]` and the first
+event can sit *above* the target (live: event at source+7 while only source+3 was
+attested). The prover cannot serve a tx proof for a block it has not attested, so the
+cycle deterministically failed with an Axios 422 right after both attestations. Fix
+(`tenantRunner.ts`): after selecting the confirmation observation, wait for **its own
+block's** attestation before `buildProof` (a no-op when the event sits exactly at the
+target). Covered by a regression test with a confirm event at source+7.
+
+**Bug 2 (hardening): empty confirmation windows.** During public-RPC storms the firer's
+write gaps exceeded 6 blocks, so `[target, target+5]` found nothing and cycles skipped.
+Widened to `[target, target+15]` — still under every tenant's confirm-gap bound (20/30
+blocks), and the contract re-checks the bound on-chain regardless, so the scan is pure
+recall, never a safety claim.
+
+**End-to-end proof (CC3 testnet, verified by receipt, not by log line):** Sepolia source
+observation at 11622681 → confirmation at 11622685 (the 422-fix path executed exactly as
+written) → tenant-a LLM `act=true` (140bps gap vs its 80bps floor) → `executeArbitrage`
+mined at CC3 testnet block **5,420,111**, status `0x1`, against instance
+`0x13CACe…2026`: two precompile (`0x…0FD2`) proof-verification events, an Approval +
+Transfer of 2,187,500 units in and 2,182,130 back (~24.5bps slippage, inside the 150bps
+cap), and the instance's own `ActionJournaled`. **Tenant-b declined the same facts**
+(120bps floor, conservative rationale) — no submission, reasoning journaled. Same proofs,
+two independent per-tenant outcomes: the §3 architecture demonstrated live.
+
+**Security: tracked env files.** `agent/.env` / `.env.tenant-a` / `.env.tenant-b` were
+committed (078acdd) with a real submit private key and a real Gemini API key; `.gitignore`
+already covered them but ignore rules never untrack tracked files. Untracked in f40191b
+(working copies untouched — the running agent kept using them) and added an explicit
+`agent/.env.tenant-*` rule. **Both exposed keys must still be rotated**, and any key pasted
+in plaintext (chat, shell history) must be treated as burned.
+
+### Session 10 — Landing/docs prompt: gate audit says NOT YET, so it wasn't built
+
+The next prompt in the sequence asks for a public landing page + plain-language help
+section, and gates itself: *"Do not start this if any of the 5 stages' done-when
+checklists aren't independently confirmed true — this prompt assumes a working sign-up
+flow, dashboard, and multi-tenant agent service already exist."* That audit was run
+against the actual repo before writing a single line of copy:
+
+- **Stage 1 (factory)** — done and verified on-chain (Session 8).
+- **Stage 2 (sign-up: Thirdweb embedded wallet → user deploys their own instance)** —
+  **not built.** `frontend/package.json` depends only on react/react-dom/ethers — no
+  thirdweb, no router, no auth code anywhere. The only frontend is the Replay & Audit
+  Viewer plus the Stage 4b discovery chips. There is no sign-up flow for a CTA to link
+  to.
+- **Stage 3 (multi-tenant agent service)** — done, and as of Session 9 live-verified
+  end-to-end on CC3 testnet (receipt-checked).
+- **Stage 4/5 (login-gated per-user dashboard, hosted viewer)** — the on-chain indexer +
+  instance-discovery half shipped (4a/4b); the Supabase auth ↔ contract-address mapping
+  and the GitHub Pages redeploy remain open, exactly as listed under "What remains for a
+  real Stage 4/5 rollout" above.
+
+The gate therefore fails on Stage 2 (and the auth half of 4/5), and the landing page was
+**not** built. Publishing a "sign up" call-to-action that links to a flow which doesn't
+exist is precisely the overstatement this project refuses everywhere else — the prompt's
+own gate rule and the repo's honesty standard land on the same side. Also flagged: the
+prompt names `docs/ROADMAP.md` as required reading, but no such file exists in the repo
+(the roadmap lives in this DEVLOG and ARCHITECTURE_V2's stage diagram); noting that
+rather than inventing one.
+
+**What unlocks the landing page:** Stage 2 — an embedded-wallet sign-up that walks a user
+through deploying their own instance via `ASCTreasuryFactory.createTreasury` with
+guardrails they choose once — then the auth-gated dashboard. After that, the landing
+prompt's proof section and CTA have real things to point at, and the gate audit can be
+re-run in minutes.
+
