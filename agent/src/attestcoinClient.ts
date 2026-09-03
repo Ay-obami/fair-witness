@@ -34,7 +34,15 @@ export class AttestcoinClient {
     // (confirmed via `find node_modules`); this is TypeScript treating the SDK's
     // bundled `.d.ts` private-field brands as a structurally different type than our
     // installed copy, not a real runtime incompatibility.
-    this.proofBuilder = new proofProvider.service.ProofBuilder(config.sourceChainKey, config.proofBuilderUrl, 30000);
+    // CC3's Sepolia proof builder issues SNARK proving requests that routinely
+    // exceed 30s (observed live: a 30s AxiosError on getProof). Make the HTTP
+    // timeout env-tunable with a generous default so the agent doesn't abort a
+    // cycle after both attestations + proofs are already in flight — see DEVLOG.md.
+    this.proofBuilder = new proofProvider.service.ProofBuilder(
+      config.sourceChainKey,
+      config.proofBuilderUrl,
+      Number(process.env.PROOF_BUILDER_TIMEOUT_MS ?? "120000")
+    );
     this.blockProver = new blockProverNs.PrecompileBlockProver(this.creditcoinProvider as unknown as ConstructorParameters<typeof blockProverNs.PrecompileBlockProver>[0]);
     this.chainInfoProvider = new chainInfoNs.PrecompileChainInfoProvider(this.creditcoinProvider as unknown as ConstructorParameters<typeof chainInfoNs.PrecompileChainInfoProvider>[0]);
   }

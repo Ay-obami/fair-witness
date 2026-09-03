@@ -8,6 +8,14 @@ function requireEnv(name: string): string {
 
 export const config = {
   sepoliaRpcUrl: requireEnv("SEPOLIA_RPC_URL"),
+  // Optional comma-separated backup endpoints (same public read-only role). Sepolia public
+  // RPCs degrade in waves (reads AND writes) — observed repeatedly on 2026-09-02 — so every
+  // Sepolia read tries these in order and pins the last one that worked. When unset the
+  // watcher simply uses SEPOLIA_RPC_URL alone.
+  sepoliaRpcUrls: (process.env.SEPOLIA_RPC_URLS ?? "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean),
   priceContractAddress: requireEnv("PRICE_CONTRACT_ADDRESS"),
 
   creditcoinRpcUrl: requireEnv("CREDITCOIN_RPC_URL"),
