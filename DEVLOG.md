@@ -830,3 +830,47 @@ dashboard and hosted viewer remain as noted).
   discovery index (existing limitation, noted in ROADMAP).
 - Key rotation is still outstanding (P0) — see the security section.
 
+### Session 12 — README rewrite, docs/HELP.md, GH Pages SPA fallback
+
+Continuing the Stage 5 close-out docs after Session 11 built the landing/sign-up/help
+routes. This session finished the remaining doc + deploy-config items from the Stage 5
+done-when that were buildable without external access.
+
+**What was built:**
+- `README.md` — full rewrite. The previous text described the **pre-pivot single-tenant
+  build** (old Vercel/GH Pages mirror URLs, old treasury address `0x78C9…`, old test
+  counts). Replaced with the actual current reality: factory-based multi-tenancy,
+  the live CC3 factory + Tenant A/B instance addresses, the verified
+  `executeArbitrage` tx (0xae01e705…), the new routes table (`/`, `/signup`,
+  `/signup/done`, `/verify`, `/docs`), an honest per-stage status table, and the
+  must-rotate key caveat banner. Also verified the tx and instance addresses embedded
+  in the docs during the rewrite (Blockscout: status success, method
+  `0xc296ff5e` = `executeArbitrage(...)`, from agent submit address, to Tenant A).
+- `docs/HELP.md` — plain-language help as a repo doc (the hosted `routes/Help.tsx` was
+  already built in Session 11; this is the markdown done-when item). Answers all six
+  required questions, no jargon, with the verified-vs-reported trust distinction kept
+  explicit.
+- `frontend/public/404.html` + `frontend/src/main.tsx` restore block — the GitHub Pages
+  SPA fallback. GH Pages has no server rewrites; 404.html is served for unknown paths,
+  stashes the real path+query in `sessionStorage["fw:redirect"]`, redirects to `/`, and
+  main.tsx restores it via `history.replaceState` before React renders. So a hard
+  refresh on `/signup/done?address=…` lands back on the right route. No-op on hosts
+  with proper rewrites.
+- `docs/ROADMAP.md` — Stage 5 + 4d status updated to match.
+
+**Pitfall hit (minor but real):** the README heredoc contained several accidental
+typos/markdown errors (`statusof`, `:10 USDC`, stray `}`, unclosed parens in the table).
+Caught with a paren-balance scan across both docs and fixed one by one. Cheap lesson
+reinforced: doc rewrites of this size deserve a mechanical lint pass (parens, markdown
+link syntax) before commit, not a skim.
+
+**Verification this session:**
+- `tsc --noEmit` 0 errors, `oxlint` 0/0, `vite build` clean; `dist/404.html` +
+  `dist/tenants.json` both present in the production build.
+- Both docs paren-balanced; embedded addresses/tx re-checked against Blockscout.
+
+**Honest remaining (external-gated, unchanged):**
+- Actual `gh-pages` deploy (`cd frontend && npm run build && npx gh-pages -d dist`)
+  — needs GH auth/credentials; config is in place.
+- Stage 4b/4c Supabase dashboard + auth↔address mapping — external provisioning.
+- Key rotation (P0) still outstanding.

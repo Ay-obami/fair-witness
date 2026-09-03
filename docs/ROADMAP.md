@@ -147,19 +147,28 @@ index).
   against on-chain `decisionHash`) visibly distinct from rejections. ❌
 - 4c: replace `instanceStore.ts` localStorage prototype with a Supabase upsert keyed on
   `auth.uid()` <-> instance address. ❌
-- 4d: redeploy GitHub Pages with new routes + committed `tenants.json`. ❌
+- 4d: redeploy GitHub Pages with new routes + committed `tenants.json`. ❌ deploy
+  needs external access/credentials (config is ready — `public/404.html` SPA fallback
+  with `fw:redirect` sessionStorage restore in `main.tsx`)
 
 ## Stage 5 — Landing page + help/docs  🔄 (unblocked)
 
 The Stage 2 sign-up flow is now built (Session 11), so the landing-page gate is lifted.
-Built this session:
+Built across Sessions 11–12:
 - `frontend/src/routes/Home.tsx` — landing page (honest pitch, real proof from live CC3,
    how-it-works beats, scope statement, CTA -> /signup, footer -> /verify + /docs)
 - `frontend/src/routes/Help.tsx` — plain-language help answering all 6 required questions
+- `docs/HELP.md` — the same plain-language help as a repo doc (required by this stage's
+   done-when + by anyone auditing the repo, not just the hosted app)
 - `frontend/src/routes/Verify.tsx` — the old Replay & Audit Viewer, relocated to /verify
+- `README.md` — rewritten to describe the actual current multi-tenant reality (factory,
+   live instances + execution tx, new routes, honest status table, caveats)
+- `frontend/public/404.html` + `main.tsx` restore — GH Pages SPA fallback so hard
+   refreshes on `/signup/done?address=…` land back on the same route
 
-Remaining: deploy to GitHub Pages (the SPA routes need a static-host fallback: rewrite
-all non-asset paths to index.html so refreshing /signup/done works).
+Remaining: the actual `gh-pages` deploy (credential/access-gated — nothing codeblocked
+here; run `cd frontend && npm run build && npx gh-pages -d dist` from a machine with
+GH auth).
 
 Done when: root landing with plain-language copy + CTA -> `/signup`; `docs/HELP.md` +
 `docs/DEPLOYMENT.md#stage-2-sign-up` updated with the flow + env reference; hosted on
