@@ -777,3 +777,56 @@ guardrails they choose once — then the auth-gated dashboard. After that, the l
 prompt's proof section and CTA have real things to point at, and the gate audit can be
 re-run in minutes.
 
+### Session 11 — Stage 2: embedded-wallet sign-up flow (built; browser E2E unverified)
+
+Per Session 10's own unlock path, building the Stage 2 sign-up flow that was explicitly
+deferred. The gate on the landing-page prompt is now unblocked (though the Stage 4b/5
+dashboard and hosted viewer remain as noted).
+
+**What was built:**
+- `frontend/src/lib/thirdweb.ts` — `thirdwebClient` (`createThirdwebClient`, public client-id only,
+  never a secret), `inAppWallet` (`authFlow: "standard"`), and `creditcoinTestnet`
+  (`defineChain({ id: 102031 })`). Confirmed Thirdweb v5 accepts arbitrary chain IDs directly —
+  CC3 is not in its default chain list, so the custom chain definition is required.
+- `frontend/src/lib/abi.ts` — imports the Foundry-built factory/journal ABIs from
+  `src/abi/` (copied from `contracts/out/` during the build step). This is the one artifact
+  copy step a new contributor must run.
+- `frontend/src/routes/SignUp.tsx` — three-step flow (email → guardrails → deploying):
+  `wallet.signUp(creditcoinTestnet, { email })` → ethers.BrowserProvider(wallet.getEthersProvider)
+  → `factory.createTreasury(userAddr, [guardrails])` → parses `TreasuryDeployed` from the receipt
+  → navigates to `/signup/done?address=<newInstance>`.
+- `frontend/src/routes/SignUpDone.tsx` — confirmation page that reads the new instance's
+  guardrails live from-chain and prompts the user to mint/deposit BASE_ASSET test USDC to fund it.
+- `frontend/src/routes/Home.tsx` — the landing page (honest pitch, real proof pulled from the
+  live CC3 deployment, how-it-works beats, scope statement, CTA → /signup, footer → /verify and
+  /docs, factory-contract explorer link). No jargon — no factKey/decisionHash on this page.
+- `frontend/src/routes/Verify.tsx` — the old App.tsx Replay & Audit Viewer, relocated to /verify.
+- `frontend/src/routes/Help.tsx` — plain-language help answering all six required questions
+  (guardrails immutability, non-custodial deposit, verified-vs-rejected distinction, LLM scope,
+  testnet disclaimer, troubleshooting).
+- `frontend/src/main.tsx` — wired up BrowserRouter with ThirdwebProvider wrapping all routes.
+- `frontend/src/lib/config.ts` — added `explorerBaseUrl` + `agentSubmitAddress` fields.
+- `frontend/src/lib/types.ts` — added `GuardrailsInput` (string form for the form UI).
+- `frontend/.env.example` — added `VITE_THIRDWEB_CLIENT_ID`, `VITE_EXPLORER_BASE_URL`,
+  `VITE_AGENT_SUBMIT_ADDRESS`.
+- `docs/DEPLOYMENT.md` — appended "Stage 2 — Sign-up flow (embedded wallet)" section with env
+  reference and the CC3 chain-config detail.
+
+**Verified this session:**
+- `tsc --noEmit` → 0 errors
+- `oxlint` → 0 warnings, 0 errors
+- `vite build` → succeeds; `dist/tenants.json` present; all routes bundled
+- `git status` confirms no `.env` files (real or example-with-keys) are being committed
+
+**Honest limitations (not done, not faked):**
+- Browser E2E of the Thirdweb wallet flow is unverified in this sandbox — no browser
+  session was available. The `signUp` call signature and `createTreasury` calldata were
+  smoke-tested against the real factory ABI in `agent` (TS compiles, calldata matches
+  `createTreasury(address, Guardrails)`), but the email OTP flow, wallet persistence, and
+  actual `tx.wait()` parsing in-browser are not confirmed end-to-end here. Flagged as the
+  first thing to test with a real Thirdweb client ID.
+- The sign-up flow does NOT yet auto-write to `tenants.json` — after a user deploys through
+  it, `contracts/script/index-tenants.js` must be re-run to pick up the new instance in the
+  discovery index (existing limitation, noted in ROADMAP).
+- Key rotation is still outstanding (P0) — see the security section.
+

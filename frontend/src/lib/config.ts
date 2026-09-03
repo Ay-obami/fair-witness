@@ -20,4 +20,6 @@ export const config = {
   // reachable from a browser — a real deployment needs this pointed at something
   // fetchable (IPFS gateway, a small API, etc.). See docs/DEPLOYMENT.md.
   reasoningApiUrl: import.meta.env.VITE_REASONING_API_URL ?? "",
+  explorerBaseUrl: import.meta.env.VITE_EXPLORER_BASE_URL ?? "https://creditcoin-testnet.blockscout.com",
+  agentSubmitAddress: import.meta.env.VITE_AGENT_SUBMIT_ADDRESS ?? "",
 } as const;

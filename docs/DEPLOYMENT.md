@@ -143,3 +143,45 @@ Per the PRD's week-4 plan: deliberately submit a stale, too-narrow, or duplicate
 live and show the contract cleanly rejecting it. This is a stronger demo moment than
 only showing the happy path — it's the actual evidence the rigid bounds work, not just a
 claim in the README.
+
+## Stage 2 — Sign-up flow (embedded wallet)
+
+The V2 multi-tenant pivot adds a Thirdweb embedded-wallet sign-up flow. A visitor lands
+on the Vite-built SPA, signs up with an email, and the app:
+
+1. Creates a non-custodial embedded wallet (no seed phrase, no MetaMask) for them via
+   Thirdweb's `inAppWallet`.
+2. Prompts them to choose seven guardrails (max trade size, max slippage, min arb
+   width, max drift, max confirm gap, actions per epoch, epoch length).
+3. Signs a `factory.createTreasury(owner, guardrails)` transaction from the user's
+   wallet — the factory is permissionless, so this works for anyone.
+4. Parses the `TreasuryDeployed` event from the receipt, then routes the user to
+   `/signup/done?address=<theirNewInstance>` — a confirmation page that reads their
+   guardrails back live from the instance and prompts them to fund it.
+
+### Frontend env (`.env` / `.env.example`)
+
+```
+VITE_DEMO_MODE=false
+VITE_CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
+VITE_FACTORY_ADDRESS=0x97c81D68BbCDb1A673b61176d60F071963Abe7f2
+VITE_THIRDWEB_CLIENT_ID=<your-client-id>
+VITE_EXPLORER_BASE_URL=https://creditcoin-testnet.blockscout.com
+VITE_AGENT_SUBMIT_ADDRESS=0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2
+VITE_REASONING_API_URL=http://localhost:8787  # the static server from Step 5
+```
+
+### Creditcoin testnet via Thirdweb
+
+Thirdweb's custom chain config (in `frontend/src/lib/thirdweb.ts`) uses `defineChain`
+with `id: 102031` directly — this is the one non-trivial detail: Thirdweb's default
+chain list doesn't include CC3, and the embedded-wallet RPC must point at the real
+Creditcoin testnet RPC (`https://rpc.cc3-testnet.creditcoin.network`), not a generic
+Ethereum endpoint.
+
+### Funding a new instance
+
+The BASE_ASSET on CC3 testnet is `0x0bFA6eF009f8739c727b292849029608bd6b115A`
+(USDC-like, 6 decimals, public mint). After deployment, the user mints/deposits test
+USDC to their instance contract address. The agent (Step 4) then begins watching that
+instance automatically once it appears in `public/tenants.json`.
