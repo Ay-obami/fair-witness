@@ -65,3 +65,18 @@ export interface TreasuryInfo {
   journalLength: number;
   guardrails: Guardrails;
 }
+
+/**
+ * String-based form inputs for the sign-up flow. These are converted to BigInt
+ * when passed to the factory's createTreasury() function (USDC has 6 decimals,
+ * so maxTradeSize is entered in dollars and multiplied by 1_000_000).
+ */
+export interface GuardrailsInput {
+  maxTradeSize: string;
+  maxSlippageBps: string;
+  minArbWidthBps: string;
+  maxDriftBps: string;
+  maxConfirmGapBlocks: string;
+  maxActionsPerEpoch: string;
+  epochLength: string;
+}

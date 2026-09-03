@@ -12,7 +12,9 @@
   "dependencies": {
     "ethers": "^6.17.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3",
+    "thirdweb": "^5.121.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
