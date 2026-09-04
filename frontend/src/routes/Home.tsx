@@ -19,6 +19,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
           <span className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</span>
           <div className="flex items-center gap-6 text-sm">
+            <Link to="/dashboard" className="text-ledger-400 hover:text-verified-400 transition">Dashboard</Link>
             <Link to="/verify" className="text-ledger-400 hover:text-verified-400 transition">Verify</Link>
             <Link to="/docs" className="text-ledger-400 hover:text-verified-400 transition">Docs</Link>
             <Link to="/signup" className="rounded-md bg-verified-500 px-4 py-1.5 text-xs font-semibold text-ledger-950 hover:bg-verified-400 transition">Sign up</Link>
@@ -141,6 +142,9 @@ export default function Home() {
           <div className="flex items-center gap-6">
             <Link to="/verify" className="text-ledger-400 hover:text-verified-400 transition">
               Verify an action
+            </Link>
+            <Link to="/dashboard" className="text-ledger-400 hover:text-verified-400 transition">
+              Your instances
             </Link>
             <Link
               to="/docs"

@@ -60,6 +60,7 @@ and `docs/DEPLOYMENT.md`.
 | `/signup/done` | Confirmation page — reads your new instance's guardrails live from-chain + next step (fund it) |
 | `/verify` | Replay & Audit Viewer (search-by-key, public transparency — the "verify this yourself" tool) |
 | `/docs` | Plain-language help (non-technical) |
+| `/dashboard` | **Your instances** — login-gated (embedded wallet) per-owner list from the Supabase mapping + an add-your-own-instance flow (owner verified on-chain) |
 
 The old single-tenant Replay & Audit Viewer now lives at `/verify`; the root route is
 the landing page. (The previously-listed Vercel/GH Pages mirrors were the pre-pivot
@@ -84,18 +85,20 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 | Stage | Status |
 |---|---|
 | 1 — Factory + >=2 instances | ✅ live on CC3, verified on Blockscout |
-| 2 — Embedded-wallet sign-up | 🔄 frontend built (`tsc`/`oxlint`/`vite` clean); browser E2E needs a real Thirdweb client ID |
+| 2 — Embedded-wallet sign-up | 🔄 frontend built (`tsc`/`oxlint`/`vite` clean); client ID configured — browser E2E (email OTP → deploy) still needs to be run against the hosted site |
 | 3 — Multi-tenant agent service | ✅ live-verified end-to-end (receipt-checked) |
 | 4a — On-chain tenant enumeration | ✅ shipped (`index-tenants.js` → `tenants.json`) |
-| 4b/4c — Login-gated per-user dashboard (Supabase auth ↔ address) | ❌ external provisioning |
+| 4b/4c — Login-gated per-user dashboard (Supabase auth ↔ address) | ✅ code built + migration committed (`frontend/supabase/migrations/0001_user_instances.sql`); apply the migration, then live-verify |
 | 4d/5 — Hosted GH Pages redeploy | 🔄 landing+help built; deploy needs the SPA fallback config (now included) and GH Pages credentials |
 
-**Honest caveats:** All funds are testnet USDC with no value. Both an agent submit key
-and a Gemini key were committed to this repo early on and are flagged **must-rotate**
-before any real funds (`docs/ROADMAP.md` → Security). The deterministic-LLM layer uses
-Gemini / OpenAI / Mistral (Claude excluded — no seed parameter). The contract's own
-independent bound-checking is the safety property — key-storage sophistication was a
-deliberately cut scope item (`DEVLOG.md`)..
+**Honest caveats:** All funds are testnet USDC with no value. The agent submit key and a
+Gemini key were committed to this repo early on. **Both were rotated 2026-09-03**
+(Session 13): the submit key now derives address `0xB1D19F…654f` and the Gemini key in
+`agent/.env` is a fresh value (confirmed absent from git history) — see
+`docs/ROADMAP.md` → Security. The deterministic-LLM layer uses Gemini / OpenAI / Mistral
+(Claude excluded — no seed parameter). The contract's own independent bound-checking is
+the safety property — key-storage sophistication was a deliberately cut scope item
+(`DEVLOG.md`).
 
 
 

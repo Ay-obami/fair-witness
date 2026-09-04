@@ -167,7 +167,7 @@ VITE_CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network
 VITE_FACTORY_ADDRESS=0x97c81D68BbCDb1A673b61176d60F071963Abe7f2
 VITE_THIRDWEB_CLIENT_ID=<your-client-id>
 VITE_EXPLORER_BASE_URL=https://creditcoin-testnet.blockscout.com
-VITE_AGENT_SUBMIT_ADDRESS=0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2
+VITE_AGENT_SUBMIT_ADDRESS=0xB1D19F71d68c4e7065749e8593D338E9A30D654f
 VITE_REASONING_API_URL=http://localhost:8787  # the static server from Step 5
 ```
 
@@ -185,3 +185,47 @@ The BASE_ASSET on CC3 testnet is `0x0bFA6eF009f8739c727b292849029608bd6b115A`
 (USDC-like, 6 decimals, public mint). After deployment, the user mints/deposits test
 USDC to their instance contract address. The agent (Step 4) then begins watching that
 instance automatically once it appears in `public/tenants.json`.
+## Stage 4b/4c — Login-gated dashboard + Supabase auth↔address mapping
+
+The frontend's `/dashboard` route (Stage 4b) is a login-gated per-owner list of
+instances, backed by a **Supabase** auth↔address mapping (Stage 4c). It is optional:
+if the Supabase vars are unset the dashboard shows a clear note and the rest of the
+app is unaffected.
+
+### 1. Apply the migration
+
+Create the table + RLS policies by running the committed migration in the Supabase
+Dashboard (SQL editor) or via psql:
+
+```bash
+psql "$DATABASE_URL" -f frontend/supabase/migrations/0001_user_instances.sql
+```
+
+The migration creates `public.user_instances (id, email, wallet_address,
+instance_address unique, created_at)` with indexes and baseline RLS.
+
+### 2. Frontend env (`frontend/.env` — ANON key only, never service-role)
+
+```
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon/publishable key>
+```
+
+The browser bundle must **never** contain a service-role key. The anon key is
+deliberately limited by the RLS policies in the migration.
+
+### 3. How it fits the flow
+
+- `/signup` persists the `(email, wallet_address) ↔ instance_address` mapping
+  fire-and-forget right after `TreasuryDeployed` is parsed. The on-chain deployment is
+  the source of truth; a failed save never blocks the sign-up.
+- `/dashboard` reads mappings by `wallet_address` for the signed-in embedded wallet.
+  The "add an instance you own" flow verifies `owner() == wallet` on-chain *before*
+  saving, so claims on other people's contracts are refused.
+
+### Honest scope (see `docs/ROADMAP.md` → Stage 4b/4c)
+
+As-built, RLS is an anon-read/write baseline (instances are already public on-chain —
+this table is a convenience index, not a confidentiality boundary). True per-user
+access auth — a custom JWT bridging Thirdweb login identity into Supabase `auth.jwt`
+claims — is the tracked production hardening item.

@@ -4,10 +4,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ethers } from "ethers";
-import { creditcoinTestnet, wallet } from "../lib/thirdweb";
+import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thirdweb";
 import { config } from "../lib/config";
 import { FACTORY_ABI } from "../lib/abi";
 import type { GuardrailsInput } from "../lib/types";
+import { getUserEmail } from "thirdweb/wallets/in-app";
+import { saveInstanceMapping } from "../lib/instanceStore";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -76,6 +78,22 @@ export default function SignUp() {
 
       if (!deployed) throw new Error("TreasuryDeployed event not found in receipt.");
       const addr = ethers.getAddress(deployed);
+
+      // Stage 4c: persist the email/wallet↔instance mapping so the dashboard's "Your
+      // instances" can list it. Fire-and-forget: if Supabase is unconfigured or the
+      // save fails, the sign-up flow must still succeed (on-chain deployment is the
+      // source of truth; the mapping is a convenience index).
+      try {
+        const signupEmail = await getUserEmail({ client: thirdwebClient });
+        await saveInstanceMapping({
+          email: signupEmail ?? email,
+          walletAddress: userAddress,
+          instanceAddress: addr,
+        });
+      } catch {
+        /* mapping is best-effort — never block deployment success on it */
+      }
+
       navigate(`/signup/done?address=${addr}`);
     } catch (err: any) {
       setError(err?.message ?? "Something went wrong.");

@@ -22,4 +22,9 @@ export const config = {
   reasoningApiUrl: import.meta.env.VITE_REASONING_API_URL ?? "",
   explorerBaseUrl: import.meta.env.VITE_EXPLORER_BASE_URL ?? "https://creditcoin-testnet.blockscout.com",
   agentSubmitAddress: import.meta.env.VITE_AGENT_SUBMIT_ADDRESS ?? "",
+  // Stage 4c: optional Supabase auth<->address mapping (dashboard "your instances").
+  // ANON/publishable key only — never the service-role key. When unset, the dashboard
+  // degrades to on-chain enumeration (owner == wallet) gracefully.
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL ?? "",
+  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? "",
 } as const;
