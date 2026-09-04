@@ -75,7 +75,10 @@ instance holds them.
 Done when:
 - [x] `thirdweb@^5` + `react-router-dom@^7` added to `frontend/package.json` (peer
   `react ^18 || ^19` — React 19 compatible, no peer conflicts).
-- [x] `ThirdwebProvider` wraps the app; CC3 chain + `VITE_THIRDWEB_CLIENT_ID` configured.
+- [x] CC3 chain + `VITE_THIRDWEB_CLIENT_ID` configured in `src/lib/thirdweb.ts`.
+  *(Updated Session 14: thirdweb v5.121's `ThirdwebProvider` takes no client/theme —
+  the app no longer mounts it; the wallet session is owned per-route via
+  `preAuthenticate` → `wallet.connect` with `wallet.getAccount()/autoConnect()`.)*
 - [x] `/signup` route: Email + Google via `inAppWallet` (no separate password flow).
 - [x] Guardrails form: 7 fields, V1-default pre-fill, live validation mirroring
   `createTreasury`'s `InvalidGuardrails` revert (non-zero; bps bounds <= 10,000).

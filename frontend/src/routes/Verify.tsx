@@ -5,7 +5,7 @@ import { fetchTenantList, type DiscoveredTenant } from "../lib/tenantDiscovery";
 import { SearchBar } from "../components/SearchBar";
 import { ReplayCard } from "../components/ReplayCard";
 import { TenantPanel } from "../components/TenantPanel";
-import type { ReplayData, TreasuryInfo } from "./lib/types";
+import type { ReplayData, TreasuryInfo } from "../lib/types";
 
 export default function Verify() {
   const [data, setData] = useState<ReplayData | null>(null);
