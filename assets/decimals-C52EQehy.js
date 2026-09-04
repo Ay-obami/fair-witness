@@ -1,0 +1,1 @@
+import{t as e}from"./withCache-DcCyeuF6.js";import{t}from"./read-contract-BLDrvorD.js";var n=`0x313ce567`,r=[],i=[{type:`uint8`}];async function a(e){return t({contract:e.contract,method:[n,r,i],params:[]})}async function o(t){return e(()=>a(t),{cacheKey:`${t.contract.chain.id}:${t.contract.address}:decimals`,cacheTime:1/0})}export{o as decimals};

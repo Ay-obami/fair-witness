@@ -1,0 +1,1 @@
+import{a as e}from"./utils-7_ZDWBpy.js";async function t(t){let n=await e();if(!t.every(e=>n.includes(e.id)))throw Error(`Insight is not available for chains ${t.filter(e=>!n.includes(e.id)).map(e=>e.id).join(`, `)}`)}export{t as assertInsightEnabled};

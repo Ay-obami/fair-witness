@@ -1,0 +1,1 @@
+var e=(e,t,n)=>JSON.stringify(e,(e,n)=>{let r=typeof n==`bigint`?n.toString():n;return typeof t==`function`?t(e,r):r},n);export{e as t};

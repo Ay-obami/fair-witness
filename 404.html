@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fair Witness — redirecting</title>
+  <style>
+    body {
+      background: #0a0e0f;
+      color: #dde5e7;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      text-align: center;
+      padding: 2rem;
+      border: 1px solid #212b2f;
+      border-radius: 8px;
+    }
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: #5ee6c2;
+    }
+  </style>
+  <script>
+    // GitHub Pages serves this file for any unknown path (it has no SPA rewrite
+    // support). Preserve the full path + query so a refresh on /signup/done?address=…
+    // lands back on the same route once index.html loads.
+    // The query-string param `p` isn't needed: we stash the real URL and restore it
+    // in main.tsx before React renders.
+    (function () {
+      var full = window.location.pathname + window.location.search;
+      if (full && full !== "/404.html") {
+        try {
+          sessionStorage.setItem("fw:redirect", full);
+        } catch (e) {
+          // sessionStorage unavailable — fall back to bare redirect
+        }
+      }
+      window.location.replace("./");
+    })();
+  </script>
+</head>
+<body>
+  <div class="card">
+    <p>Redirecting to <code>Fair Witness</code>…</p>
+  </div>
+</body>
+</html>

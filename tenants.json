@@ -1,0 +1,14 @@
+{
+  "tenants": [
+    {
+      "label": "tenant-1",
+      "treasuryAddress": "0x13CACe3989b295048De47C68F32Ff3d844AC2026",
+      "owner": "0xd1D4020279C86e41FE688A1D7F31f7F8436A1C77"
+    },
+    {
+      "label": "tenant-2",
+      "treasuryAddress": "0xD66C607072df7dB98A75aEe81fCA4089462c60aB",
+      "owner": "0xa3fC15a9F8899E10bBe77456e9E6466C274c3a90"
+    }
+  ]
+}

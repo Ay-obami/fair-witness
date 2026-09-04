@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-hePW80VL.js";var t=e({stringify:()=>n});function n(e,t,n){return JSON.stringify(e,(e,n)=>{let r=typeof n==`bigint`?n.toString():n;return typeof t==`function`?t(e,r):r},n)}export{n,t};

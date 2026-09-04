@@ -1,0 +1,1 @@
+import{o as e,r as t}from"./hex-GiPoZn-v.js";async function n(n,r){let i=await n({method:`eth_getTransactionCount`,params:[r.address,r.blockNumber?e(r.blockNumber):r.blockTag||`pending`]});return t(i)}export{n as eth_getTransactionCount};

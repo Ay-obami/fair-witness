@@ -1,0 +1,1 @@
+import{n as e}from"./hex-GiPoZn-v.js";async function t(t,n){let r=await t({method:`eth_estimateGas`,params:[n]});return e(r)}export{t as eth_estimateGas};
