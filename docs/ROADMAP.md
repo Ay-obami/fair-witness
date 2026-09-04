@@ -16,12 +16,12 @@ Chain: **Creditcoin CC3 testnet** — `chainId 102031`, RPC
 | Stage | Goal | Status | Verified |
 |---:|---|---:|---|
 | 1 | Factory + >=2 instances on CC3 testnet | ✅ | on-chain (block 5,420,111; DEVLOG Sessions 8–9) |
-| 2 | Embedded-wallet sign-up -> user deploys own instance | 🔄 | frontend built (tsc+oxlint+vite clean); browser E2E pending real Thirdweb client ID |
+| 2 | Embedded-wallet sign-up -> user deploys own instance | 🔄 | live on GH Pages — real client ID, allowlisted origins (localhost + ay-obami.github.io), thirdweb v5.121 email-OTP API; only the browser E2E walkthrough remains |
 | 3 | Multi-tenant agent service polls every instance | ✅ | on-chain (DEVLOG Session 9) |
 | 4a | On-chain tenant enumeration (TreasuryDeployed -> registry) | ✅ | DEVLOG Session 8 |
 | 4b | Login-gated per-user dashboard (plain-language activity) | ❌ | blocked on auth<->address mapping |
 | 4c | Supabase auth <-> contract-address mapping | ❌ | external provisioning |
-| 5 | Landing page + help/docs + hosted viewer (GH Pages) | 🔄 | landing + help built; GH Pages redeploy pending |
+| 5 | Landing page + help/docs + hosted viewer (GH Pages) | ✅ | live at https://ay-obami.github.io/fair-witness/ — SPA deep-route fallback, tenants registry and the shipped bundle (md5-verified) all confirmed on the deployed site |
 
 ## Chain & contract reference (CC3 testnet)
 
