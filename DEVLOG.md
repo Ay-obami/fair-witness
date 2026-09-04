@@ -988,3 +988,47 @@ the old provider-based flow (ROADMAP Stage 2, DEPLOYMENT Stage 2).
 **Still external-gated:** Supabase migration apply, Thirdweb domain allowlist,
 `gh-pages` deploy, browser E2E, revoke old Gemini key.
 
+### Session 15 — 2026-09-04 — register-agent button + live GH Pages deploy (verified)
+
+**External blockers cleared and *proven*, not assumed:**
+- **Supabase migration applied** — REST checks against the live project: table exists,
+  anon insert works, and **DELETE/PATCH are silent no-ops** (row survives byte-for-byte)
+  → the append-only RLS posture is enforced, not just declared.
+- **Thirdweb allowlist configured and enforced** — probed the real OTP endpoint
+  (`embedded-wallet.thirdweb.com/api/2024-05-05/login/email`) with origin headers:
+  bogus client ID → `401 KEY_NOT_FOUND` (control); after the dashboard save, foreign
+  origin flipped from pass-through to `401 ORIGIN_UNAUTHORIZED` while
+  `http://localhost:5173` and `https://ay-obami.github.io` pass to the last
+  (email-content) validation gate. CORS preflight grants both origins.
+
+**The last code gap — self-serve agent registration on `/signup/done`:**
+`registerAgent` is owner-only, and a new user's owner is their embedded wallet, which
+can neither drive Blockscout nor the stage-key script — without this, signups could
+never get the agent watching their instance.
+- `lib/contractReader.ts` — `registeredAgents(address)` auto-getter added to the ABI
+  (the mapping is the only read accessor; there is no single `agent()` field) +
+  `fetchAgentRegistered()` helper.
+- `routes/SignUpDone.tsx` — "Register the agent" card: session restore via
+  `wallet.autoConnect`, live on-chain status (loading/unset/registered/error), one-tx
+  owner write through `ethers6Adapter.signer.toEthers`, receipt status check,
+  post-tx re-read to confirm, wallet-rejection message handling, and a
+  dashboard-login fallback line when no session exists in the browser.
+- `vite.config.ts` — `base: "/fair-witness/"` (GH Pages project site).
+
+**Deploy (user's GH auth):** `npm run build && npx gh-pages -d dist`; Pages config
+confirmed (serving `gh-pages` @ `/`, HTTPS enforced). Live verification chain:
+homepage 200 with correct `/fair-witness/` asset paths; deep route `/dashboard`
+serves the SPA-fallback shell; `tenants.json` live with both tenants; and the main
+bundle is **md5-identical to the local build** (`269d1f13…`) and contains the button
+string. Pitfall: an identity-Encoding GET returned a mangled 573 KB stream that
+grepped empty — re-fetched with `--compressed` it decodes to the exact local bytes.
+Lesson: verify deploys by checksum, not by grepping an unverified transfer.
+
+**Verification:** `tsc --noEmit` 0 errors; `oxlint` 0 warnings / 0 errors; build clean;
+commit `d887c6f` pushed to `origin/master`; live bundle checksum-matched.
+
+**Still open (user-side):** revoke the old Gemini key in Google AI Studio; run the
+browser E2E walkthrough (fresh email → OTP → deploy → register agent via the new
+button → fund → agent cycle → `/verify` hash-match).
+
+
