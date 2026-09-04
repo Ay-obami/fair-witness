@@ -1,10 +1,18 @@
-// Confirmation page — shows the deployed instance and next steps (fund it).
+// Confirmation page — shows the deployed instance and next steps (fund it, register
+// the agent). The "Register the agent" card is the one-tx owner action that allowlists
+// the platform's low-privilege agent key as a submitter on the fresh instance — without
+// it, a newly deployed instance is never watched by the agent at all.
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { ethers } from "ethers";
+import { ethers6Adapter } from "thirdweb/adapters/ethers6";
+import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thirdweb";
 import { config } from "../lib/config";
-import { fetchTreasuryInfo } from "../lib/contractReader";
+import { fetchTreasuryInfo, fetchAgentRegistered } from "../lib/contractReader";
 import type { TreasuryInfo } from "../lib/types";
+
+// Owner-only write: add the platform agent to the instance's submitter allowlist.
+const REGISTER_AGENT_ABI = ["function registerAgent(address agent)"];
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -17,6 +25,11 @@ export default function SignUpDone() {
   const [treasury, setTreasury] = useState<TreasuryInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Agent-registration card state.
+  const [account, setAccount] = useState(() => wallet.getAccount());
+  const [agentStatus, setAgentStatus] = useState<"loading" | "unset" | "registered" | "error">("loading");
+  const [regState, setRegState] = useState<"idle" | "pending" | "done" | "error">("idle");
+  const [regError, setRegError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!addr) {
@@ -29,6 +42,78 @@ export default function SignUpDone() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [addr, navigate]);
+
+  // Restore the embedded-wallet session — the wallet that just deployed (or a
+  // returning session in this browser) is the instance owner, the only address
+  // allowed to call registerAgent.
+  useEffect(() => {
+    let cancelled = false;
+    wallet
+      .autoConnect({ client: thirdwebClient })
+      .then(() => {
+        if (!cancelled) setAccount(wallet.getAccount());
+      })
+      .catch(() => {
+        /* no stored session in this browser — the card offers the dashboard route */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Public on-chain read: is the platform agent already allowlisted on THIS instance?
+  useEffect(() => {
+    if (!addr) return;
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setAgentStatus("loading");
+      try {
+        const ok = await fetchAgentRegistered(ethers.getAddress(addr), config.agentSubmitAddress);
+        if (!cancelled) setAgentStatus(ok ? "registered" : "unset");
+      } catch {
+        if (!cancelled) setAgentStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [addr]);
+
+  async function handleRegisterAgent() {
+    if (!account || !addr) return;
+    if (!config.agentSubmitAddress) {
+      setRegError("Build is missing VITE_AGENT_SUBMIT_ADDRESS — cannot register.");
+      setRegState("error");
+      return;
+    }
+    setRegError(null);
+    setRegState("pending");
+    try {
+      const checksummed = ethers.getAddress(addr);
+      const signer = await ethers6Adapter.signer.toEthers({
+        client: thirdwebClient,
+        chain: creditcoinTestnet,
+        account,
+      });
+      const instance = new ethers.Contract(checksummed, REGISTER_AGENT_ABI, signer);
+      const tx = await instance.registerAgent(config.agentSubmitAddress);
+      const receipt = await tx.wait();
+      if (receipt?.status !== 1) throw new Error("Transaction reverted (status 0).");
+      const ok = await fetchAgentRegistered(checksummed, config.agentSubmitAddress);
+      setAgentStatus(ok ? "registered" : "error");
+      setRegState("done");
+    } catch (err) {
+      setRegState("error");
+      const msg = err instanceof Error ? err.message : String(err);
+      setRegError(
+        /user rejected|user denied|user cancelled/i.test(msg)
+          ? "Transaction was rejected in your wallet — nothing was sent."
+          : msg
+      );
+    }
+  }
 
   if (!addr) return null;
 
@@ -102,6 +187,67 @@ export default function SignUpDone() {
             ) to your contract above. The public mint function is available on testnet.
             Once funded, your agent will begin watching for arbitrage opportunities.
           </p>
+        </div>
+
+        {/* One-tx owner action: allowlist the platform agent as a submitter. */}
+        <div className="mt-6 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wider text-ledger-400">Fair Witness agent</p>
+            {agentStatus === "registered" && (
+              <span className="text-xs font-data text-verified-400">registered ✓</span>
+            )}
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-ledger-400">
+            Register the platform's agent key as an allowed submitter on your contract. It
+            is a separate low-privilege key that holds gas money only — it can never move
+            your funds, and every action it takes is still hard-checked against the
+            immutable guardrails above.
+          </p>
+          {agentStatus === "loading" && (
+            <p className="mt-3 text-sm text-ledger-400">Checking registration…</p>
+          )}
+          {agentStatus === "error" && (
+            <p className="mt-3 text-sm text-alert-400">
+              Couldn't read agent status from the chain — check the RPC config and reload.
+            </p>
+          )}
+          {agentStatus === "registered" ? (
+            <p className="mt-3 text-sm text-verified-400">
+              ✓ Registered. Once your contract is funded, the agent will begin watching it.
+            </p>
+          ) : (
+            <>
+              {agentStatus === "unset" && (
+                <p className="mt-3 text-sm text-ledger-400">
+                  Not registered yet — one transaction from you (the owner) enables it.
+                </p>
+              )}
+              {account && config.agentSubmitAddress ? (
+                <>
+                  <button
+                    onClick={handleRegisterAgent}
+                    disabled={regState === "pending"}
+                    className="mt-4 rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                  >
+                    {regState === "pending" ? "Confirm in your wallet…" : "Register the agent"}
+                  </button>
+                  {regError && <p className="mt-3 text-sm text-alert-400">{regError}</p>}
+                </>
+              ) : (
+                <p className="mt-3 text-xs text-ledger-500">
+                  {config.agentSubmitAddress ? (
+                    <>
+                      No wallet session in this browser — sign in via the{" "}
+                      <Link to="/dashboard" className="underline hover:text-verified-400">Dashboard</Link>{" "}
+                      to register.
+                    </>
+                  ) : (
+                    "Build config missing VITE_AGENT_SUBMIT_ADDRESS."
+                  )}
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         <div className="mt-6">
