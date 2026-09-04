@@ -137,6 +137,37 @@ npm run build
 
 `dist/` is a static site — any static host works (Vercel, Netlify, GitHub Pages, etc.).
 
+### Vercel mirror (live: https://fair-witness.vercel.app)
+
+Two repo-specific notes before deploying here:
+
+- `vite.config.ts` bakes `base: "/fair-witness/"` for GitHub Pages, so Vercel needs the
+  committed `frontend/vercel.json` rewrites to serve both the prefixed assets/registry
+  and SPA deep routes (at `/dashboard` and `/fair-witness/dashboard`).
+- Vercel never sees `frontend/.env` (gitignored) — a plain git-import deploy builds with
+  EMPTY `VITE_*` config and the app falls back to demo mode (this is exactly why the
+  first deployment went stale and non-functional). Deploy via the CLI with env inline:
+
+  ```
+  cd frontend
+  vercel link --yes -p fair-witness
+  vercel --prod --yes \
+    -e VITE_DEMO_MODE=false \
+    -e VITE_CREDITCOIN_RPC_URL=https://rpc.cc3-testnet.creditcoin.network \
+    -e VITE_TREASURY_ADDRESS=0x13CACe3989b295048De47C68F32Ff3d844AC2026 \
+    -e VITE_FACTORY_ADDRESS=0x97c81D68BbCDb1A673b61176d60F071963Abe7f2 \
+    -e VITE_THIRDWEB_CLIENT_ID=<from frontend/.env> \
+    -e VITE_EXPLORER_BASE_URL=https://creditcoin-testnet.blockscout.com \
+    -e VITE_AGENT_SUBMIT_ADDRESS=0xB1D19F71d68c4e7065749e8593D338E9A30D654f \
+    -e VITE_SUPABASE_URL=<from frontend/.env> \
+    -e VITE_SUPABASE_ANON_KEY=<from frontend/.env>
+  ```
+
+  For a permanent git-integration setup, set these as project Environment Variables in
+  the Vercel dashboard instead (future `git push` then auto-deploys). Also add
+  `https://fair-witness.vercel.app` to the Thirdweb **allowed domains** list, or
+  embedded-wallet logins from the mirror will be rejected with `ORIGIN_UNAUTHORIZED`.
+
 ## Step 7 — Rehearse the adversarial demo
 
 Per the PRD's week-4 plan: deliberately submit a stale, too-narrow, or duplicate proof

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/fair-witness/assets/:path*", "destination": "/assets/:path*" },
+    { "source": "/fair-witness/tenants.json", "destination": "/tenants.json" },
+    { "source": "/fair-witness/:path*", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
