@@ -432,7 +432,9 @@ Source side (Sepolia): toy `PriceObservation` at
 
 Agent submit key: `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`. **Custody separation was
 verified live, twice: zero USDC / zero MQT / zero allowances BEFORE going live, and again
-after two successful executions moved treasury funds.**
+after two successful executions moved treasury funds.** *(ROTATED 2026-09-03 — see
+Session 13. This address is historical; the current agent submit address is
+`0xB1D19F71d68c4e7065749e8593D338E9A30D654f`.)*
 
 **Live executions (real Attestcoin-proven Sepolia txs → treasury execution):**
 1. actionKey `0x5e2ce2608dc59700b771ce9682d14633045e3d403ddc581f65b783ebc0fbdf0b`,
@@ -874,3 +876,72 @@ link syntax) before commit, not a skim.
   — needs GH auth/credentials; config is in place.
 - Stage 4b/4c Supabase dashboard + auth↔address mapping — external provisioning.
 - Key rotation (P0) still outstanding.
+### Session 13 — Key rotation, Supabase dashboard (Stage 4b/4c), Stellar-iPredict removal
+
+External blockers from prior sessions cleared: the user supplied the rotated agent
+submit private key, a fresh Gemini API key, the Thirdweb client ID, and Supabase
+project creds; and asked to delete `Stellar-iPredict/` from the repo entirely.
+
+**Key rotation (P0, complete):**
+- **Agent submit key** — replaced in `agent/.env`. New private key
+  `0x60baa62f…48d3` derives address `0xB1D19F71d68c4e7065749e8593D338E9A30D654f`
+  (checked with `ethers.Wallet`). The old address/key (`0x2404Ed...f3d2` /
+  `0xf571031a...ee38f`) was in git history and is treated as burned. All docs updated:
+  README, `docs/ROADMAP.md` (Security + Stage 2 + Environment reference),
+  `docs/DEPLOYMENT.md`, and DEVLOG Session 9's historical line is annotated as
+  superseded.
+- **Gemini API key** — the first value the user pasted (`AQ.Ab8RN6K...`) was the
+  *same* string already committed in `b8094f45`, so it could not be a valid rotation;
+  flagged it and the user supplied a fresh key `AQ.Ab8RN6I...` (different suffix,
+  confirmed via `git grep` across all commits that this value is **not** in history).
+  Written to `agent/.env`. Reminder left in docs to revoke the old key in Google AI
+  Studio.
+- Both env files are gitignored (verified with `git check-ignore`), so the new secrets
+  are not committed.
+
+**Stage 4b/4c — login-gated dashboard + Supabase auth↔address mapping (built):**
+- `frontend/src/lib/supabase.ts` — `createClient` from `@supabase/supabase-js`; `null`
+  when `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are unset, so the app degrades
+  gracefully. Env vars added to `frontend/.env` + `.env.example`.
+- `frontend/src/lib/instanceStore.ts` — the Stage-4c mapping store: upsert keyed on
+  `(email, wallet_address) ↔ instance_address` (onConflict on the unique
+  `instance_address`), fetch-by-wallet; every call no-ops when Supabase is unconfigured.
+  This replaces the pre-pivot localStorage prototype that never shipped.
+- `frontend/src/routes/Dashboard.tsx` — Stage-4b dashboard at `/dashboard`. Email OTP
+  sign-in via the same `wallet.signUp(...)` used by /signup (so the instance-owner key
+  and dashboard login are the same identity); lists `user_instances` rows for the
+  active wallet; an "add an instance you own" form verifies `owner() == wallet`
+  **on-chain** (`fetchTreasuryInfo`) before saving, so you can't claim someone else's
+  contract. Route wired in `main.tsx`; nav links added to `Home.tsx` header + footer.
+- `frontend/supabase/migrations/0001_user_instances.sql` — `user_instances` table +
+  indexes + RLS baseline (anon can select/insert; no update/delete). This is what the
+  user must apply in the Supabase dashboard before the page returns rows.
+- `SignUp.tsx` — after parsing `TreasuryDeployed`, best-effort
+  `saveInstanceMapping(...)` (fire-and-forget; a failure never blocks the redirect).
+- README status table + ROADMAP Stage 4 statuses updated (4b 🔄 once migration applied,
+  4c ✅ built).
+
+**Cleanup:** `Stellar-iPredict/` deleted from the working tree (433M untracked,
+unrelated project).
+
+**Pitfall (tooling, not code):** the sandbox's shell wrapper strips a leading
+`[ ... ]` and runs the contents as a command, producing "command not found" for
+anything inside brackets. Several wasted turns — the fix is to run bare commands only.
+Also: the first Dashboard.tsx attempt was assembled with several insert-into-EOF calls
+and left the file unparseable (TS1381); rewritten in one heredoc write, then fixed a
+lint warning (`set-state-in-effect`) via the same `await Promise.resolve()` pattern
+Verify.tsx already uses.
+
+**Verification:** `tsc --noEmit` 0 errors; `oxlint` 0 warnings / 0 errors; `vite
+build` clean (dist build passes). New key absent from git history (`git grep` across
+all revs); old keys still reachable in history → treat as burned.
+
+**Honest remaining (external-gated, unchanged):**
+- Apply the Supabase migration (user action in the Supabase dashboard) then live-verify
+  `/dashboard` against the real project.
+- Actual `gh-pages` deploy (`cd frontend && npm run build && npx gh-pages -d dist`) —
+  needs GH auth/credentials.
+- Regenerate the supabase project's service-role key if it has been shared anywhere
+  (anon key was used here only).
+- Revoke the old Gemini key in Google AI Studio (this session only rotates the value
+  in `.env`).

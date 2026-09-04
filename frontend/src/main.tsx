@@ -9,6 +9,7 @@ import Verify from './routes/Verify'
 import SignUp from './routes/SignUp'
 import SignUpDone from './routes/SignUpDone'
 import Help from './routes/Help'
+import Dashboard from './routes/Dashboard'
 
 // GitHub Pages SPA fallback: `public/404.html` stashes the real path+query in
 // sessionStorage before redirecting to `/`;restore it here so a hard refresh on
@@ -36,6 +37,7 @@ createRoot(document.getElementById('root')!).render(
       >
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signup/done" element={<SignUpDone />} />

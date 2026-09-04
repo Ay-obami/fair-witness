@@ -103,7 +103,7 @@ Files touched (this session):
 ### Post-deploy lifecycle (wallet-signed by the user/owner)
 1. **Deploy** — `factory.createTreasury(msg.sender, guardrails)`. In flow.
 2. **Register agent** — `instance.registerAgent(AGENT_ADDRESS)` (owner-only, per-instance).
-   `0x2404...f3d2` is the platform agent submit address.
+   `0xB1D19F...654f` is the platform agent submit address (rotated 2026-09-03).
 3. **Fund** — `BASE_ASSET.mint(owner, ...)` then `transfer(instance, ...)`. Testnet-only
    (public mint); production token has no public mint, so this UI is testnet-only.
 
@@ -119,9 +119,10 @@ Files touched (this session):
   gas-sponsorship is a tracked follow-up once a supported bundler/chain is chosen.
 - The embedded wallet is an EOA (`createOnLogin: "eoa"`) so it can be `owner` and call
   `registerAgent`/`mint`/`transfer` directly.
-- **Keys.** The platform submit key is exposed (DEVLOG Session 9). Its *address* is shown
-  above (public, not secret) but the **key must be rotated** before any real funds — see
-  Security.
+- **Keys.** The platform submit key was exposed (DEVLOG Session 9) and has been
+  **rotated** (2026-09-03, Session 13); the Gemini key has been rotated too (new value
+  absent from git history). *Addresses* are public, not secret; the private material now
+  lives only in `agent/.env` (gitignored) — see Security.
 
 ## Stage 3 — Multi-tenant agent service  ✅ (Session 9)
 
@@ -139,14 +140,23 @@ index).
 
 ## Stage 4 — Dashboard + hosted viewer
 
-4a (enumeration) ✅ | 4b (dashboard) ❌ | 4c (auth<->address mapping) ❌ | 4d (hosted viewer) ❌
+4a (enumeration) ✅ | 4b (dashboard) 🔄 built, needs migration + live verify | 4c (auth<->address mapping) ✅ built | 4d (hosted viewer) ❌ deploy-gated
 
 - 4a: factory is deliberately registry-free (sec 3.3); source of truth is `TreasuryDeployed`.
   `contracts/script/index-tenants.js` scans it -> `{tenants}` JSON. ✅ shipped.
-- 4b: login-gated; shows only *your own* contract; verified-execution rows (checkable
-  against on-chain `decisionHash`) visibly distinct from rejections. ❌
-- 4c: replace `instanceStore.ts` localStorage prototype with a Supabase upsert keyed on
-  `auth.uid()` <-> instance address. ❌
+- 4b: login-gated dashboard at `/dashboard` (Session 13). Requires a funded Thirdweb
+  embedded-wallet session (same OTP as /signup). Lists the wallet's instances from the
+  Supabase mapping; per-instance "add yours" flow verifies on-chain `owner() == wallet`
+  before saving, so claims on other people's contracts fail. Verified-execution detail
+  remains the Replay & Audit Viewer (executed rows journaled on-chain vs absent/not-found
+  = rejected/never-happened). Honest gap: version 4b as-built shows per-owner instances;
+  the RLS policy is anon-read/write baseline — per-user access auth (custom JWT bridging
+  Thirdweb login to Supabase `auth.jwt`) is the production hardening tracked below. 🔄
+- 4c: replace the pre-pivot localStorage prototype (never shipped) with a Supabase upsert
+  keyed on `(email, wallet_address)` <-> `instance_address`. `instanceStore.ts` +
+  `frontend/supabase/migrations/0001_user_instances.sql` (run it in the Supabase SQL
+  editor). Fire-and-forget from `/signup`; the on-chain deployment is the source of truth.
+  ✅ built; needs the migration applied to the project + live verify.
 - 4d: redeploy GitHub Pages with new routes + committed `tenants.json`. ❌ deploy
   needs external access/credentials (config is ready — `public/404.html` SPA fallback
   with `fw:redirect` sessionStorage restore in `main.tsx`)
@@ -176,11 +186,16 @@ GH Pages with SPA fallback configured.
 
 ## Security (P0 — before any real funds)
 
-- **KEY ROTATION.** Platform submit key `0xf571031a...ee38f` -> address
-  `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`, and the Gemini key, were committed to the
-  repo (DEVLOG commits `078acdd`, `f40191b`). Both **must be rotated**; treat any key
-  pasted in plaintext (chat / shell history) as burned. The sign-up flow exposes only the
-  agent's **address**, never its key.
+- **KEY ROTATION.** The platform submit key `0xf571031a...ee38f` (address
+  `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`) and the first Gemini key were committed to
+  the repo (DEVLOG commits `078acdd`, `f40191b`; the old Gemini `AQ.Ab8RN6K...` is also in
+  commit `b8094f45`). **Both rotated 2026-09-03 (Session 13):** the submit key is replaced
+  — new address `0xB1D19F71d68c4e7065749e8593D338E9A30D654f` (new private key in
+  `agent/.env`), and the Gemini key in `agent/.env` is now a fresh value (`AQ.Ab8RN6I...`,
+  confirmed **not** in git history). Both rotations are local-only (`agent/.env` is
+  gitignored). Revoke the old Gemini key in Google AI Studio. Treat any key pasted in
+  plaintext (chat / shell history) as burned. The sign-up flow exposes only the agent's
+  **address**, never its key.
 - No admin/escape hatch on the instance — unchanged and not reintroduced by Stage 2.
 - `registerAgent` is owner-only and per-instance — Stage 2 calls it from the **user's**
   wallet, never the platform.
@@ -193,10 +208,10 @@ GH Pages with SPA fallback configured.
 
 Frontend (`.env` / `frontend/.env.example`): `VITE_CREDITCOIN_RPC_URL` · `VITE_CHAIN_ID=102031` ·
 `VITE_FACTORY_ADDRESS=0x97c81D68BbCDb1A673b61176d60F071963Abe7f2` ·
-`VITE_AGENT_SUBMIT_ADDRESS=0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2` ·
-`VITE_THIRDWEB_CLIENT_ID=...` ·
+`VITE_AGENT_SUBMIT_ADDRESS=0xB1D19F71d68c4e7065749e8593D338E9A30D654f` · `VITE_THIRDWEB_CLIENT_ID=...` ·
 `VITE_EXPLORER_BASE_URL=https://creditcoin-testnet.blockscout.com` ·
-`VITE_DEMO_MODE=false`.
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (Stage 4c; migration in
+`frontend/supabase/migrations/0001_user_instances.sql`) · `VITE_DEMO_MODE=false`.
 
 Agent (`agent/.env` / `.env.example`): `SEPOLIA_RPC_URL`, `CREDITCOIN_RPC_URL`,
 `CREDITCOIN_PROOF_BUILDER_URL`, `TREASURY_ADDRESS`, `FACTORY_ADDRESS`, `TENANT_ID`,
