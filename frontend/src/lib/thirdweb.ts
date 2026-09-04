@@ -12,7 +12,8 @@ export const creditcoinTestnet = defineChain({
     symbol: "CTC",
     decimals: 18,
   },
-  rpc: ["https://rpc.cc3-testnet.creditcoin.network"],
+  // NOTE: thirdweb v5.121 expects a single rpc string here (not an array).
+  rpc: "https://rpc.cc3-testnet.creditcoin.network",
   blockExplorers: [
     {
       name: "Creditcoin Testnet Explorer (Blockscout)",
@@ -28,10 +29,13 @@ export const thirdwebClient = createThirdwebClient({
   clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID ?? "",
 });
 
-export const wallet = inAppWallet({
-  client: thirdwebClient,
-  authFlow: "standard",
-});
+// Email-OTP auth is driven per-route via preAuthenticate + wallet.connect (see
+// routes/SignUp.tsx, routes/Dashboard.tsx). inAppWallet() takes no client — the
+// client is passed to each connect/preAuthenticate call (thirdweb v5.121 API).
+// executionMode "EOA" is explicit: the embedded wallet must be a plain EOA so it
+// can own treasury instances and sign createTreasury directly (no 4337 bundler —
+// CC3 isn't on thirdweb's account-abstraction allowlist).
+export const wallet = inAppWallet({ executionMode: { mode: "EOA" } });
 
 export { thirdwebClient as client };
 

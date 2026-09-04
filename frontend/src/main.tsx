@@ -1,8 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { ThirdwebProvider, darkTheme } from 'thirdweb/react'
-import { client } from './lib/thirdweb'
 import './index.css'
 import Home from './routes/Home'
 import Verify from './routes/Verify'
@@ -21,29 +19,20 @@ if (pendingRedirect) {
   window.history.replaceState(null, '', pendingRedirect)
 }
 
+// No ThirdwebProvider: thirdweb v5.121's provider takes no client/theme, and no
+// route uses thirdweb React context — the wallet session is handled directly via
+// src/lib/thirdweb (see Dashboard.tsx for the session-restore pattern).
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ThirdwebProvider
-        client={client}
-        theme={darkTheme({
-          colors: {
-            primaryButton: '#2dd4a7',
-            secondaryButton: '#6b7f87',
-            buttonText: '#0a0e0f',
-            modalBg: '#0a0e0f',
-          },
-        })}
-      >
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/signup/done" element={<SignUpDone />} />
-          <Route path="/docs" element={<Help />} />
-        </Routes>
-      </ThirdwebProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/verify" element={<Verify />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/signup/done" element={<SignUpDone />} />
+        <Route path="/docs" element={<Help />} />
+      </Routes>
     </BrowserRouter>
   </StrictMode>,
 )

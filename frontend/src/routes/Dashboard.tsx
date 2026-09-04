@@ -7,16 +7,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
-import { useActiveAccount } from "thirdweb/react";
-import { getUserEmail } from "thirdweb/wallets/in-app";
+import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
 import { creditcoinTestnet, wallet, client } from "../lib/thirdweb";
 import { config } from "../lib/config";
 import { fetchTreasuryInfo } from "../lib/contractReader";
 import { fetchInstancesForWallet, saveInstanceMapping, type SupabaseMapping } from "../lib/instanceStore";
 
 export default function Dashboard() {
-  const account = useActiveAccount();
+  // Wallet session is owned locally: thirdweb v5.121's ThirdwebProvider takes no
+  // client and programmatic wallet.connect() doesn't populate a React account
+  // context — wallet.getAccount()/autoConnect() cover the session + its restore.
+  const [account, setAccount] = useState(() => wallet.getAccount());
+  useEffect(() => {
+    let cancelled = false;
+    wallet.autoConnect({ client })
+      .then((a) => {
+        if (!cancelled && a) setAccount(a);
+      })
+      .catch(() => { /* no stored session — fine */ });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
@@ -70,9 +85,32 @@ export default function Dashboard() {
     setAuthError(null);
     setSigningIn(true);
     try {
-      // Same non-custodial email OTP flow as /signup — an existing account logs back
-      // in to the same embedded wallet (the wallet is the instance owner key).
-      await wallet.signUp(creditcoinTestnet, { email });
+      // Same non-custodial email OTP flow as /signup: email a code first, then
+      // verify it below — an existing account logs back in to the same embedded
+      // wallet (the wallet is the instance owner key).
+      await preAuthenticate({ client, strategy: "email", email });
+      setAwaitingOtp(true);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  async function handleOtpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthError(null);
+    setSigningIn(true);
+    try {
+      await wallet.connect({
+        client,
+        chain: creditcoinTestnet,
+        strategy: "email",
+        email,
+        verificationCode: otp,
+      });
+      setAccount(wallet.getAccount());
+      setAwaitingOtp(false);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -139,22 +177,47 @@ export default function Dashboard() {
             <p className="mt-1 text-xs text-ledger-400">
               Non-custodial embedded wallet — the same login you used at sign-up. No seed phrase.
             </p>
-            <form onSubmit={handleSignIn} className="mt-4 flex gap-3">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={signingIn}
-                className="rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
-              >
-                {signingIn ? "Sending code…" : "Sign in"}
-              </button>
-            </form>
+            {!awaitingOtp ? (
+              <form onSubmit={handleSignIn} className="mt-4 flex gap-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={signingIn}
+                  className="rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                >
+                  {signingIn ? "Sending code…" : "Send code"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleOtpSubmit} className="mt-4">
+                <p className="text-xs text-ledger-400">
+                  A one-time code was emailed to <span className="text-ledger-200">{email}</span>. Enter it to sign in.
+                </p>
+                <div className="mt-3 flex gap-3">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="6-digit code"
+                    className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={signingIn}
+                    className="rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                  >
+                    {signingIn ? "Verifying…" : "Verify & sign in"}
+                  </button>
+                </div>
+              </form>
+            )}
             {authError && <p className="mt-3 text-sm text-alert-400">{authError}</p>}
           </div>
         )}

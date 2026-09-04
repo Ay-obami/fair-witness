@@ -149,8 +149,11 @@ claim in the README.
 The V2 multi-tenant pivot adds a Thirdweb embedded-wallet sign-up flow. A visitor lands
 on the Vite-built SPA, signs up with an email, and the app:
 
-1. Creates a non-custodial embedded wallet (no seed phrase, no MetaMask) for them via
-   Thirdweb's `inAppWallet`.
+1. Emails a one-time code (`preAuthenticate`), then creates/restores a non-custodial
+   embedded wallet (no seed phrase, no MetaMask) for them via Thirdweb's
+   `inAppWallet` + `wallet.connect({ strategy: "email", verificationCode })` —
+   verified with the code they received. *(Session 14: programmatic email-OTP flow;
+   thirdweb v5.121's provider takes no client and `wallet.signUp` is gone.)*
 2. Prompts them to choose seven guardrails (max trade size, max slippage, min arb
    width, max drift, max confirm gap, actions per epoch, epoch length).
 3. Signs a `factory.createTreasury(owner, guardrails)` transaction from the user's

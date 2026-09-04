@@ -8,13 +8,16 @@ import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thir
 import { config } from "../lib/config";
 import { FACTORY_ABI } from "../lib/abi";
 import type { GuardrailsInput } from "../lib/types";
-import { getUserEmail } from "thirdweb/wallets/in-app";
+import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
+import { ethers6Adapter } from "thirdweb/adapters/ethers6";
 import { saveInstanceMapping } from "../lib/instanceStore";
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"email" | "guardrails" | "deploying">("email");
+  const [step, setStep] = useState<"email" | "guardrails" | "otp" | "deploying">("email");
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardrails, setGuardrails] = useState<GuardrailsInput>({
     maxTradeSize: "5",
@@ -26,27 +29,55 @@ export default function SignUp() {
     epochLength: "86400",
   });
 
-  function handleEmailSubmit(e: React.FormEvent) {
+  async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.includes("@")) {
       setError("Please enter a valid email address.");
       return;
     }
-    setStep("guardrails");
+    setError(null);
+    setSendingCode(true);
+    try {
+      // Email the one-time code now, so it lands while the user picks guardrails.
+      await preAuthenticate({ client: thirdwebClient, strategy: "email", email });
+      setStep("guardrails");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSendingCode(false);
+    }
   }
 
-  async function handleSignUpAndDeploy() {
+  function handleGuardrailsContinue() {
+    setError(null);
+    setStep("otp");
+  }
+
+  async function handleVerifyAndDeploy(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
     setStep("deploying");
     try {
-      // 1. Embedded wallet: non-custodial, email-based, no seed phrase.
-      const account = await wallet.signUp(creditcoinTestnet, { email });
+      // 1. Embedded wallet: verify the emailed code. Non-custodial, email-based,
+      //    no seed phrase — the same email always resolves to the same wallet.
+      const account = await wallet.connect({
+        client: thirdwebClient,
+        chain: creditcoinTestnet,
+        strategy: "email",
+        email,
+        verificationCode: otp,
+      });
       const userAddress = account.address;
 
       // 2. Deploy treasury with chosen guardrails — the user's wallet signs,
       //    the factory is permissionless, guardrails become immutable.
-      const provider = new ethers.BrowserProvider(wallet.getEthersProvider(account));
-      const signer = await provider.getSigner();
+      //    (thirdweb v5.121 removed wallet.getEthersProvider — the ethers6
+      //    adapter bridges the thirdweb account to an ethers v6 signer.)
+      const signer = await ethers6Adapter.signer.toEthers({
+        client: thirdwebClient,
+        chain: creditcoinTestnet,
+        account,
+      });
 
       const factoryAddr = config.factoryAddress;
       if (!factoryAddr) throw new Error("Factory address not configured (VITE_FACTORY_ADDRESS)");
@@ -97,7 +128,7 @@ export default function SignUp() {
       navigate(`/signup/done?address=${addr}`);
     } catch (err: any) {
       setError(err?.message ?? "Something went wrong.");
-      setStep("email");
+      setStep("otp"); // back to code entry — the guardrails input is preserved
     }
   }
 
@@ -132,9 +163,10 @@ export default function SignUp() {
             />
             <button
               type="submit"
-              className="mt-4 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
+              disabled={sendingCode}
+              className="mt-4 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
             >
-              Create wallet
+              {sendingCode ? "Sending code…" : "Create wallet"}
             </button>
           </form>
         </div>
@@ -194,17 +226,62 @@ export default function SignUp() {
           {error && <p className="mt-4 text-sm text-alert-400">{error}</p>}
 
           <button
-            onClick={handleSignUpAndDeploy}
+            onClick={handleGuardrailsContinue}
             className="mt-6 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
           >
-            Create account &amp; deploy contract
+            Continue — verify your email
           </button>
         </div>
       </div>
     );
   }
 
-  // --- Step 3: Deploying ---
+  // --- Step 3: Email verification code ---
+  if (step === "otp") {
+    return (
+      <div className="min-h-screen bg-ledger-950">
+        <nav className="border-b border-ledger-800">
+          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
+            <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
+          </div>
+        </nav>
+        <div className="mx-auto max-w-2xl px-6 py-16">
+          <h1 className="text-3xl font-bold text-ledger-100">Check your email</h1>
+          <p className="mt-3 text-sm leading-relaxed text-ledger-400">
+            A one-time sign-in code was sent to <span className="text-ledger-200">{email}</span>.
+            Enter it below — your wallet is created (or restored) the moment it verifies.
+          </p>
+          {error && <p className="mt-4 text-sm text-alert-400">{error}</p>}
+          <form onSubmit={handleVerifyAndDeploy} className="mt-6">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              placeholder="6-digit code"
+              autoFocus
+              className="w-full rounded-md border border-ledger-700 bg-ledger-900 px-4 py-3 text-sm text-ledger-100 placeholder-ledger-500 focus:border-verified-500/50 focus:outline-none"
+              required
+            />
+            <button
+              type="submit"
+              className="mt-4 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
+            >
+              Verify &amp; deploy my contract
+            </button>
+          </form>
+          <button
+            onClick={() => void preAuthenticate({ client: thirdwebClient, strategy: "email", email })}
+            className="mt-4 text-xs text-ledger-400 hover:text-verified-400 transition"
+          >
+            Didn't get it? Resend the code
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Step 4: Deploying ---
   if (step === "deploying") {
     return (
       <div className="min-h-screen bg-ledger-950">

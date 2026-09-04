@@ -945,3 +945,46 @@ all revs); old keys still reachable in history → treat as burned.
   (anon key was used here only).
 - Revoke the old Gemini key in Google AI Studio (this session only rotates the value
   in `.env`).
+
+### Session 14 — 2026-09-03 — thirdweb v5.121 API migration + agent-registration tooling committed
+
+**Why:** the lockfile resolved thirdweb to v5.121.x, where the APIs the sign-up flow
+was written against no longer exist. Verified directly from `node_modules` types:
+- `ThirdwebProvider` now takes only `connectionManager` (no `client`/`theme` props).
+- `InAppWallet` lost `signUp`, `getEthersProvider`, and `authFlow` (auth options moved
+  into `auth: { options: [...] }` for the connect modal only).
+- `preAuthenticate` / `authenticate` / `getUserEmail` are exported from
+  `thirdweb/wallets/in-app`; email OTP is `{ strategy: "email", verificationCode }`.
+- `ethers6Adapter.signer.toEthers({ client, chain, account })` bridges a thirdweb
+  account to an ethers v6 signer (the deploy path survives via the adapter).
+- `defineChain` rpc is a single string, not an array.
+
+**Changes:**
+- `main.tsx` — `ThirdwebProvider`/`darkTheme` removed entirely (no route uses
+  thirdweb React context).
+- `Dashboard.tsx` — session owned locally: `wallet.getAccount()` state +
+  `wallet.autoConnect({ client })` restore; sign-in is a real two-step email OTP
+  (`preAuthenticate` → code form → `wallet.connect`).
+- `SignUp.tsx` — flow is now email → guardrails → OTP → deploying: code is emailed
+  at step 1 (so it lands while the user picks guardrails), verified at step 3, then
+  `wallet.connect` + `ethers6Adapter.signer.toEthers` drive the deploy. Guardrail
+  inputs survive a failed verification.
+- `lib/thirdweb.ts` — bare `inAppWallet({ executionMode: { mode: "EOA" } })` (EOA
+  invariant now explicit — the embedded wallet must be able to own instances);
+  rpc string form; `client` re-export kept for existing imports.
+- `routes/Verify.tsx` — fixed a stale relative import (`./lib/types` → `../lib/types`)
+  that `tsc -b` would have caught.
+- `contracts/script/register-agent.js` — committed (from the previous session's
+  terminal work): scans `frontend/public/tenants.json` for instances owned by the
+  gitignored stage keys, owner-checks each on-chain before sending, idempotent on
+  re-run, `--fund-ctc` helper, ad-hoc instance via argv + `OWNER_PK`. Both live
+  instances (A, B) were already re-registered to the rotated agent with it (blocks
+  5429497/5429498, status 1).
+
+**Verification:** `tsc --noEmit` 0 errors; `oxlint` 0 warnings / 0 errors;
+`npm run build` (`tsc -b && vite build`) clean. Docs updated where they described
+the old provider-based flow (ROADMAP Stage 2, DEPLOYMENT Stage 2).
+
+**Still external-gated:** Supabase migration apply, Thirdweb domain allowlist,
+`gh-pages` deploy, browser E2E, revoke old Gemini key.
+
