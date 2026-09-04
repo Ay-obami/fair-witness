@@ -190,14 +190,18 @@ GH Pages with SPA fallback configured.
 ## Security (P0 — before any real funds)
 
 - **KEY ROTATION.** The platform submit key `0xf571031a...ee38f` (address
-  `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`) and the first Gemini key were committed to
-  the repo (DEVLOG commits `078acdd`, `f40191b`; the old Gemini `AQ.Ab8RN6K...` is also in
-  commit `b8094f45`). **Both rotated 2026-09-03 (Session 13):** the submit key is replaced
-  — new address `0xB1D19F71d68c4e7065749e8593D338E9A30D654f` (new private key in
-  `agent/.env`), and the Gemini key in `agent/.env` is now a fresh value (`AQ.Ab8RN6I...`,
-  confirmed **not** in git history). Both rotations are local-only (`agent/.env` is
-  gitignored). Revoke the old Gemini key in Google AI Studio. Treat any key pasted in
-  plaintext (chat / shell history) as burned. The sign-up flow exposes only the agent's
+  `0x2404Ed7251fAecb2981886BA1d2A88060D4ef3d2`) was committed to the repo (DEVLOG commits
+  `078acdd`, `f40191b`) and **rotated 2026-09-03 (Session 13)** — new address
+  `0xB1D19F71d68c4e7065749e8593D338E9A30D654f` (new private key in `agent/.env`).
+  The first Gemini key was **never committed** — a 2026-09-04 pickaxe audit
+  (`git log --all -S 'AQ.Ab8RN6K'`) found the string in exactly one commit (`f849d82`),
+  which only adds a 10-char doc prefix mention; a real leak would show an add+remove pair.
+  The `b8094f45` hash previously cited here does not exist in this repo ("malformed object
+  name"). The Gemini key in `agent/.env` is a fresh value (`AQ.Ab8RN6I...`, confirmed
+  **not** in git history); the user elected to keep the first key in service since it
+  never touched the repo. The submit-key rotation is local-only (`agent/.env` is
+  gitignored). Standing rule: treat any key pasted in plaintext (chat / shell history) as
+  burned — rotate if the channel is ever in doubt. The sign-up flow exposes only the agent's
   **address**, never its key.
 - No admin/escape hatch on the instance — unchanged and not reintroduced by Stage 2.
 - `registerAgent` is owner-only and per-instance — Stage 2 calls it from the **user's**

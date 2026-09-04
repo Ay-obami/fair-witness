@@ -890,12 +890,12 @@ project creds; and asked to delete `Stellar-iPredict/` from the repo entirely.
   README, `docs/ROADMAP.md` (Security + Stage 2 + Environment reference),
   `docs/DEPLOYMENT.md`, and DEVLOG Session 9's historical line is annotated as
   superseded.
-- **Gemini API key** — the first value the user pasted (`AQ.Ab8RN6K...`) was the
-  *same* string already committed in `b8094f45`, so it could not be a valid rotation;
-  flagged it and the user supplied a fresh key `AQ.Ab8RN6I...` (different suffix,
-  confirmed via `git grep` across all commits that this value is **not** in history).
-  Written to `agent/.env`. Reminder left in docs to revoke the old key in Google AI
-  Studio.
+- **Gemini API key** — the first value the user pasted (`AQ.Ab8RN6K...`) was flagged as a
+  possible compromise out of caution, and the user supplied a fresh key `AQ.Ab8RN6I...`
+  (different suffix, confirmed via `git grep` across all commits that this value is **not**
+  in history). Written to `agent/.env`. **Corrected in Session 16:** the "already committed
+  in `b8094f45`" claim recorded here at the time was wrong — that hash doesn't exist in
+  this repo, and the pickaxe audit below shows the first key never entered git history.
 - Both env files are gitignored (verified with `git check-ignore`), so the new secrets
   are not committed.
 
@@ -1030,5 +1030,26 @@ commit `d887c6f` pushed to `origin/master`; live bundle checksum-matched.
 **Still open (user-side):** revoke the old Gemini key in Google AI Studio; run the
 browser E2E walkthrough (fresh email → OTP → deploy → register agent via the new
 button → fund → agent cycle → `/verify` hash-match).
+
+## Session 16 — Gemini-key record corrected; E2E checklist shipped (2026-09-04)
+
+- **Correction (honesty fix):** Session 13's claim that the first Gemini key was "already
+  committed in `b8094f45`" was wrong. Verified three ways: `git branch -r --contains
+  b8094f45` → no branch contains it; `git log --all -S 'AQ.Ab8RN6K'` → exactly one match
+  (`f849d82`, which only adds a 10-char doc prefix mention — a real leak would show an
+  add+remove pair); and the repo is public (HTTP 200), so the audit matters. The full key
+  never entered git history. Session 13 and ROADMAP passages amended in place.
+- **Decision:** the user keeps the first Gemini key in service (never touched the repo;
+  only ever shared in this private chat). The "revoke the old key" to-do is dropped.
+  Standing rule retained: keys pasted in plaintext are treated as burned — rotate if the
+  channel is ever in doubt.
+- `docs/E2E-CHECKLIST.md` — the MVP acceptance walkthrough: 9 sections covering agent
+  pre-flight, fresh-email sign-up → OTP → deploy, the new register-agent button click,
+  funding via the public mint, tenant re-index + agent watch, cycle/decision log
+  expectations (incl. "act=false is normal"), `/verify` (live limitation: no reasoning
+  API → hash-match shows "couldn't be retrieved"; local full-hash demo path), dashboard,
+  verdict + triage table.
+- MVP status: only the E2E remains — everything else is shipped or verified.
+
 
 
