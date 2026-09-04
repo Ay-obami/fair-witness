@@ -18,6 +18,10 @@ const TREASURY_ABI = [
   "function MAX_ACTIONS_PER_EPOCH() view returns (uint256)",
   "function EPOCH_LENGTH() view returns (uint256)",
   "function journalIndex(uint256) view returns (bytes32)",
+  // Auto-getter of the `mapping(address => bool) public registeredAgents` — the
+  // only read accessor for the submitter allowlist (there is no single agent()
+  // field; multiple submitters can be allowlisted by the owner).
+  "function registeredAgents(address) view returns (bool)",
 ];
 
 function getProvider() {
@@ -80,6 +84,24 @@ export async function fetchTreasuryInfo(treasuryAddress: string): Promise<Treasu
       epochLength: Number(epochLength),
     },
   };
+}
+
+/**
+ * Public read: is `agentAddress` allowlisted as a submitter on this instance?
+ * (registeredAgents is a public mapping in ASCTreasuryJournal — see the ABI note
+ * above. The sign-up flow's /signup/done page uses this to render the one-tx
+ * "Register the agent" owner action.)
+ */
+export async function fetchAgentRegistered(
+  treasuryAddress: string,
+  agentAddress: string
+): Promise<boolean> {
+  if (!agentAddress) {
+    throw new Error("No agent address configured (VITE_AGENT_SUBMIT_ADDRESS).");
+  }
+  const provider = getProvider();
+  const treasury = new ethers.Contract(treasuryAddress, TREASURY_ABI, provider);
+  return await treasury.registeredAgents(agentAddress);
 }
 
 /**
