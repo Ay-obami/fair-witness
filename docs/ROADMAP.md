@@ -21,7 +21,7 @@ Chain: **Creditcoin CC3 testnet** — `chainId 102031`, RPC
 | 4a | On-chain tenant enumeration (TreasuryDeployed -> registry) | ✅ | DEVLOG Session 8 |
 | 4b | Login-gated per-user dashboard (plain-language activity) | ❌ | blocked on auth<->address mapping |
 | 4c | Supabase auth <-> contract-address mapping | ❌ | external provisioning |
-| 5 | Landing page + help/docs + hosted viewer (GH Pages) | ✅ | live at https://ay-obami.github.io/fair-witness/ — SPA deep-route fallback, tenants registry and the shipped bundle (md5-verified) all confirmed on the deployed site |
+| 5 | Landing page + help/docs + hosted viewer (GH Pages) | ✅ | live at https://ay-obami.github.io/fair-witness/ — SPA deep-route fallback, tenants registry and the shipped bundle (md5-verified) all confirmed on the deployed site. Mirror: https://fair-witness.vercel.app (CLI deploy with VITE_* env baked + vercel.json SPA rewrites) |
 
 ## Chain & contract reference (CC3 testnet)
 

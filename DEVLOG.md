@@ -1051,5 +1051,19 @@ button → fund → agent cycle → `/verify` hash-match).
   verdict + triage table.
 - MVP status: only the E2E remains — everything else is shipped or verified.
 
+## Session 16b — Vercel mirror refreshed (2026-09-04)
+
+- https://fair-witness.vercel.app was 12 days stale: a git-import deploy built without any
+  VITE_* env (frontend/.env is gitignored), so it served an old demo-mode build.
+- Redeployed via CLI (`vercel link --yes -p fair-witness`, then `vercel --prod --yes` with
+  all nine VITE_* vars passed inline); remote Vite build green, alias updated.
+- Added frontend/vercel.json: rewrites serve the GH-Pages-baked /fair-witness/ base and
+  both deep-route flavors on Vercel; link artifacts (.vercel/, .env.local) now gitignored.
+- Live probes all green: /, /dashboard, /fair-witness/dashboard, /fair-witness/tenants.json,
+  and the shipped bundle contains the register-agent button.
+- Follow-ups noted in DEPLOYMENT.md: add the Vercel origin to Thirdweb allowed domains;
+  future git pushes do NOT auto-update Vercel (repeat the CLI command or configure
+  dashboard env vars + git integration).
+
 
 
