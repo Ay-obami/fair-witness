@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { config } from "./config.js";
 import treasuryAbi from "./abi/ASCTreasuryJournal.json" with { type: "json" };
+import { TradeDirection } from "./dexPriceReader.js";
 import type { AttestedProof } from "./attestcoinClient.js";
 
 export class TreasurySubmitter {
@@ -39,7 +40,8 @@ export class TreasurySubmitter {
     sourceProof: AttestedProof,
     confirmProof: AttestedProof,
     nonce: bigint,
-    decisionHash: string
+    decisionHash: string,
+    direction: TradeDirection
   ): Promise<{ actionKey: string; txHash: string }> {
     const toContractProof = (p: AttestedProof) => ({
       chainKey: p.chainKey,
@@ -54,7 +56,8 @@ export class TreasurySubmitter {
       toContractProof(sourceProof),
       toContractProof(confirmProof),
       nonce,
-      decisionHash
+      decisionHash,
+      direction
     );
     const receipt = await tx.wait();
 

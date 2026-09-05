@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-An autonomous cross-chain arbitrage system for Creditcoin where an LLM-driven agent decides *whether* to act, but never holds funds and never executes directly. All capital sits in an on-chain ASC treasury that enforces rigid, pre-committed bounds and executes exclusively through a single Attestcoin-verified, replay-safe entry point. Every execution — and every rejected attempt — is written to an on-chain journal that lets anyone reconstruct exactly why a given trade happened, with the underlying facts independently verifiable against Sepolia.
+An autonomous cross-chain arbitrage system for Creditcoin where an LLM-driven agent decides *whether* to act, but never holds funds and never executes directly. All capital sits in an on-chain ASC treasury that enforces rigid, pre-committed bounds and executes exclusively through a single Attestcoin-verified, replay-safe entry point. Every execution is written to an on-chain journal that lets anyone reconstruct exactly why a given trade happened — rejected attempts revert on-chain and are visible as failed transactions, but aren't separately journaled — with the underlying facts independently verifiable against Sepolia.
 
 **Core claim being demonstrated:** manipulation-resistant, custody-free, fully auditable autonomous execution — explicitly *not* a speed-competitive arbitrage bot.
 

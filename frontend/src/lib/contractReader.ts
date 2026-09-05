@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { config } from "./config";
-import type { ReplayData, ReasoningPayload, TreasuryInfo } from "./types";
+import type { ReplayData, ReasoningPayload, TreasuryInfo, TradeDirection } from "./types";
 import { ActionType } from "./types";
 
 // Minimal ABI slice — only what the replay viewer needs to read.
@@ -134,10 +134,31 @@ export async function fetchLiveReplayData(
   const raw = await treasury.getJournalEntry(actionKey);
   if (raw.actedAt === 0n) return null;
 
-  const [tradeSize, srcPrice, confPrice, arbWidthBps, amountOut] = ethers.AbiCoder.defaultAbiCoder().decode(
-    ["uint256", "uint256", "uint256", "uint256", "uint256"],
-    raw.actionPayload
-  );
+  // Task 3.3: the payload gained a 6th word (trade direction). Entries journaled
+  // before that change carry a 5-word payload — decode tolerantly rather than crash
+  // on the live chain's history, and surface those as honestly "direction not
+  // recorded" instead of guessing.
+  let tradeSize: bigint;
+  let srcPrice: bigint;
+  let confPrice: bigint;
+  let arbWidthBps: bigint;
+  let amountOut: bigint;
+  let directionRaw: bigint | undefined;
+  try {
+    [tradeSize, srcPrice, confPrice, arbWidthBps, amountOut, directionRaw] =
+      ethers.AbiCoder.defaultAbiCoder().decode(
+        ["uint256", "uint256", "uint256", "uint256", "uint256", "uint8"],
+        raw.actionPayload
+      );
+  } catch {
+    [tradeSize, srcPrice, confPrice, arbWidthBps, amountOut] =
+      ethers.AbiCoder.defaultAbiCoder().decode(
+        ["uint256", "uint256", "uint256", "uint256", "uint256"],
+        raw.actionPayload
+      );
+  }
+  const direction: TradeDirection | undefined =
+    directionRaw === undefined ? undefined : directionRaw === 0n ? "SELL_BASE_FOR_QUOTE" : "BUY_BASE_FOR_QUOTE";
 
   let reasoning: ReasoningPayload | null = null;
   let hashMatches: boolean | null = null;
@@ -154,6 +175,10 @@ export async function fetchLiveReplayData(
           destPrice: reasoning.destPrice,
           rule: reasoning.rule,
           llmRationale: reasoning.llmRationale,
+          // MUST sit between llmRationale and timestamp — it mirrors the agent's
+          // serialize() key order exactly, and JSON.stringify omits it when undefined
+          // so pre-direction payloads still hash-match their on-chain commitments.
+          direction: reasoning.direction,
           timestamp: reasoning.timestamp,
         });
         hashMatches = ethers.keccak256(ethers.toUtf8Bytes(serialized)) === raw.decisionHash;
@@ -164,7 +189,7 @@ export async function fetchLiveReplayData(
     }
   }
 
-  return {
+    return {
     entry: {
       actionKey,
       factKey: raw.factKey,
@@ -173,6 +198,7 @@ export async function fetchLiveReplayData(
       agent: raw.agent,
       decisionHash: raw.decisionHash,
       actionType: Number(raw.actionType) as ActionType,
+      direction,
       tradeSize: tradeSize.toString(),
       srcPrice: srcPrice.toString(),
       confPrice: confPrice.toString(),

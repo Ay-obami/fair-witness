@@ -52,19 +52,28 @@ describe("deterministicNonce", () => {
 });
 
 describe("actionKey", () => {
-  it("is deterministic and varies with agent address and nonce", () => {
+  it("is deterministic and binds ONLY the instance + fact (Task 3.1)", () => {
     const fact = factKey(1, 1_000_000, 0);
-    const agentA = "0xDB9406adBebe07c3D6A8B310f3De1f330769Bb94";
-    const agentB = "0x831b83deA6C70A2B52AEdD07C28F4f87a3EfC0cD";
+    const treasuryA = "0x13CACe3989b295048De47C68F32Ff3d844AC2026";
+    const treasuryB = "0xD66C607072df7dB98A75aEe81fCA4089462c60aB";
 
-    const k1 = actionKey(fact, agentA, 42n);
-    const k2 = actionKey(fact, agentA, 42n);
-    const k3 = actionKey(fact, agentB, 42n);
-    const k4 = actionKey(fact, agentA, 43n);
+    const k1 = actionKey(treasuryA, fact);
+    const k2 = actionKey(treasuryA, fact);
+    const k3 = actionKey(treasuryB, fact);
 
     expect(k1).toBe(k2);
     expect(k1).not.toBe(k3);
-    expect(k1).not.toBe(k4);
+  });
+
+  it("does NOT vary with the agent address or nonce — same fact + different agent/nonce collides on-chain", () => {
+    // Mirrors the on-chain 3.1 hardening: the contract derives
+    // keccak256(abi.encode(address(this), factKey, ARBITRAGE)) with no caller and no
+    // caller-supplied nonce, so a second registered agent (or a nonce variation)
+    // cannot mint a fresh actionKey for an already-executed fact.
+    const fact = factKey(1, 1_000_000, 0);
+    const treasury = "0x13CACe3989b295048De47C68F32Ff3d844AC2026";
+
+    expect(actionKey(treasury, fact)).toBe(actionKey(treasury, fact));
   });
 });
 
@@ -73,8 +82,8 @@ describe("ActionType enum ordering", () => {
     // If this ever drifts from ASCTreasuryJournal.sol's `enum ActionType`, every
     // actionKey computed off-chain would silently diverge from the contract's own
     // computation, breaking the pre-flight replay check without any obvious error.
+    // (The contract enum is now ARBITRAGE-only: rejections revert and are
+    // intentionally not journaled — the REJECTED_* values were removed, Task D.)
     expect(ActionType.ARBITRAGE).toBe(0);
-    expect(ActionType.REJECTED_STALE).toBe(1);
-    expect(ActionType.REJECTED_NARROW).toBe(2);
   });
 });

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {INativeQueryVerifier} from "./interfaces/INativeQueryVerifier.sol";
 import {IDexRouter} from "./interfaces/IDexRouter.sol";
 
@@ -27,17 +28,29 @@ import {IDexRouter} from "./interfaces/IDexRouter.sol";
 ///    plausibly survive the attestation round-trip. This is a deliberate, disclosed
 ///    limitation, not an oversight — see DEVLOG.md "Design decision: dual-proof staleness
 ///    handling".
-contract ASCTreasuryJournal is Ownable {
+contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ---------------------------------------------------------------------
     // Types
     // ---------------------------------------------------------------------
 
+    // Rejections are intentionally NOT journaled — they revert, only executions get a
+    // structured JournalEntry, and rejected attempts remain visible on-chain as failed
+    // transactions (see docs/ARCHITECTURE_V2.md §4). The REJECTED_STALE/REJECTED_NARROW
+    // values that used to sit here were never constructed anywhere; they only implied
+    // an on-chain rejection-tracking capability that does not exist, so they were
+    // removed (IMPLEMENTATION_PLAN.md Task D).
     enum ActionType {
-        ARBITRAGE,
-        REJECTED_STALE,
-        REJECTED_NARROW
+        ARBITRAGE
+    }
+
+    /// @notice Which way the destination-DEX leg trades (Tasks 3.3/3.5). The gap's SIGN
+    ///         decides which of these the evidence supports; the caller proposes one and
+    ///         the contract validates it against the attested/live prices before trading.
+    enum TradeDirection {
+        SellBaseForQuote, // sell BASE for QUOTE — valid when destPrice > confPrice
+        BuyBaseForQuote   // buy BASE with QUOTE — valid when destPrice < confPrice
     }
 
     struct JournalEntry {
@@ -108,6 +121,17 @@ contract ASCTreasuryJournal is Ownable {
     uint256 public immutable MAX_ACTIONS_PER_EPOCH;
     uint256 public immutable EPOCH_LENGTH;
     uint256 private constant BPS_DENOMINATOR = 10_000;
+    // Net-profitability reserve (Task 3.4): platform-level bps subtracted from the
+    // gross arbitrage width before the per-instance MIN_ARB_WIDTH_BPS floor is
+    // applied. A gross gap can still be net-unprofitable once fees/slippage/gas
+    // are paid, so approval requires gross >= MIN_ARB_WIDTH_BPS + MIN_NET_EDGE_BPS.
+    // Protocol-wide (not owner-set) so no deployment can loosen it; the per-instance
+    // floor remains the owner's immutable choice on top of this reserve.
+    uint256 private constant MIN_NET_EDGE_BPS = 25;
+    /// @dev BASE_ASSET's decimals (USDC-like, 6) — the unit `_quoteCreditcoinDexPrice`
+    ///      quotes one unit in, and the denominator when valuing a BASE-denominated
+    ///      trade size into a QUOTE input for the buy direction (Task 3.3).
+    uint256 private constant BASE_UNIT = 1e6;
 
     // ---------------------------------------------------------------------
     // Storage
@@ -134,7 +158,9 @@ contract ASCTreasuryJournal is Ownable {
     );
     event AgentRegistered(address indexed agent);
     event AgentDeregistered(address indexed agent);
-    event ArbitrageRejected(bytes32 indexed factKey, string reason);
+    // (No ArbitrageRejected event: it was declared but never emitted — rejections
+    // revert and are intentionally not journaled. Removed for the same reason as the
+    // REJECTED_* enum values above; see IMPLEMENTATION_PLAN.md Task D.)
 
     // ---------------------------------------------------------------------
     // Errors
@@ -151,10 +177,17 @@ contract ASCTreasuryJournal is Ownable {
     error ArbitrageWindowTooNarrow();
     error EpochRateLimitExceeded();
     error SlippageExceeded();
-    error TradeSizeExceedsMax();
+    // TradeSizeExceedsMax was removed: it guarded an unreachable branch in
+    // _boundedTradeSize (`size` is already clamped to MAX_TRADE_SIZE, so the check
+    // could never fire) — dead code implying a validation that cannot trigger.
     error MalformedEncodedTransaction();
     error WrongObservationSource();
     error InvalidGuardrails();
+    error InvalidChainConfig();
+    error CannotRenounceOwnership();
+    error WrongTradeDirection();
+    error InsufficientAssetBalance();
+    error ZeroTradeSize();
 
     constructor(
         address verifier_,
@@ -165,6 +198,16 @@ contract ASCTreasuryJournal is Ownable {
         address initialOwner_,
         Guardrails memory guardrails_
     ) Ownable(initialOwner_) {
+        // Mirror the factory's dependency validation (ASCTreasuryFactory's
+        // InvalidChainConfig gate, IMPLEMENTATION_PLAN.md Task 3.8): a treasury
+        // deployed directly — outside the factory — must not be able to exist with a
+        // zero dependency address either. This closes the validation drift between
+        // the two deployment paths.
+        if (
+            verifier_ == address(0) || dexRouter_ == address(0) || baseAsset_ == address(0)
+                || quoteAsset_ == address(0) || priceContract_ == address(0)
+        ) revert InvalidChainConfig();
+
         VERIFIER = INativeQueryVerifier(verifier_);
         DEX_ROUTER = IDexRouter(dexRouter_);
         BASE_ASSET = IERC20(baseAsset_);
@@ -190,7 +233,14 @@ contract ASCTreasuryJournal is Ownable {
     ///         by this constructor; also callable by the factory as a pre-flight so an
     ///         invalid account wastes no deploy gas.
     function validateGuardrails(Guardrails memory g) public pure {
-        if (g.maxTradeSize == 0) revert InvalidGuardrails();
+        // maxTradeSize < 4 would let _boundedTradeSize floor to zero at the minimum
+        // arb width: scaled = maxTradeSize * arbWidthBps / (minArbWidthBps * 4) with
+        // arbWidthBps == minArbWidthBps floors to maxTradeSize / 4, i.e. a treasury
+        // that can never trade. Constrain it at configuration time (Task 3.8) rather
+        // than validating per-execution. Real guardrail values are asset-decimal
+        // amounts (single-digit USDC = millions of base units), so this only rejects
+        // nonsensical configurations.
+        if (g.maxTradeSize < 4) revert InvalidGuardrails();
         if (g.maxSlippageBps == 0 || g.maxSlippageBps > BPS_DENOMINATOR) revert InvalidGuardrails();
         if (g.minArbWidthBps == 0 || g.minArbWidthBps > BPS_DENOMINATOR) revert InvalidGuardrails();
         if (g.maxDriftBps == 0 || g.maxDriftBps > BPS_DENOMINATOR) revert InvalidGuardrails();
@@ -214,6 +264,14 @@ contract ASCTreasuryJournal is Ownable {
         emit AgentDeregistered(agent);
     }
 
+    /// @notice Renouncing ownership would leave any registered agent authorized
+    ///         forever, with no owner left able to deregister it (Task 3.9), so it is
+    ///         permanently disabled. Decommissioning a treasury is a redeploy, per the
+    ///         same no-escape-hatch design as the absent admin withdraw.
+    function renounceOwnership() public pure override {
+        revert CannotRenounceOwnership();
+    }
+
     modifier onlyRegisteredAgent() {
         if (!registeredAgents[msg.sender]) revert NotRegisteredAgent();
         _;
@@ -227,11 +285,20 @@ contract ASCTreasuryJournal is Ownable {
     ///         execute the trade via the DEX router. Journals the outcome either way.
     /// @param sourceProof Attestcoin proof of the original source-chain price observation.
     /// @param confirmProof A second, later Attestcoin proof re-confirming the condition.
-    /// @param decisionNonce MUST be derived deterministically off-chain as
-    ///        keccak256(factKey, actionType, srcPrice, destPrice) — see agent runner
-    ///        docs. This contract does not (and cannot) verify that the caller derived it
-    ///        correctly; that is an off-chain safety property, not an on-chain one (see
-    ///        DEVLOG.md "Known limitation: decisionNonce trust boundary").
+    /// @param decisionNonce Retained for off-chain determinism and bookkeeping — the
+    ///        agent derives it as keccak256(factKey, actionType, srcPrice, destPrice)
+    ///        so a crashed-and-retried run reproduces identical calldata — but it NO
+    ///        LONGER participates in on-chain identity (accepted and ignored for the
+    ///        actionKey). This closes the old `decisionNonce` trust boundary (see
+    ///        DEVLOG.md "Known limitation: decisionNonce trust boundary"): the nonce
+    ///        could previously be varied to mint a fresh actionKey for an
+    ///        already-executed fact.
+    /// @param direction Which way to trade, proposed by the agent and validated on-chain
+    ///        against the attested/live price relationship (Task 3.5): SellBaseForQuote
+    ///        requires destPrice > confPrice, BuyBaseForQuote requires destPrice <
+    ///        confPrice. The actionKey deliberately does NOT include the direction —
+    ///        one execution per fact, whichever direction the evidence supports at
+    ///        execution time (Task 3.1).
     /// @param decisionHash keccak256 of the off-chain reasoning payload (e.g. the agent's
     ///        LLM rationale). Stored so a reviewer can later fetch the reasoning and
     ///        confirm it hashes to this value.
@@ -239,10 +306,19 @@ contract ASCTreasuryJournal is Ownable {
         ProofData calldata sourceProof,
         ProofData calldata confirmProof,
         uint256 decisionNonce,
-        bytes32 decisionHash
-    ) external onlyRegisteredAgent returns (bytes32 actionKey) {
+        bytes32 decisionHash,
+        TradeDirection direction
+    ) external onlyRegisteredAgent nonReentrant returns (bytes32 actionKey) {
         bytes32 factKey = _factKey(sourceProof);
-        actionKey = keccak256(abi.encode(factKey, ActionType.ARBITRAGE, msg.sender, decisionNonce));
+        // One execution per fact per instance, by construction: the key binds ONLY the
+        // instance (address(this)), the fact, and the action type — NOT the caller and
+        // NOT the caller-supplied nonce (Task 3.1). Two different registered agents,
+        // or the same agent varying the nonce, therefore collide on the same key and
+        // the second submission reverts with ActionAlreadyExecuted instead of each
+        // minting its own key. Off-chain callers derive the identical key via
+        // agent/src/keys.ts; `nonReentrant` adds an explicit second layer on top of
+        // the executedActions-flag-before-external-call ordering below.
+        actionKey = keccak256(abi.encode(address(this), factKey, ActionType.ARBITRAGE));
 
         if (executedActions[actionKey]) revert ActionAlreadyExecuted();
 
@@ -279,15 +355,40 @@ contract ASCTreasuryJournal is Ownable {
         if (driftBps > MAX_DRIFT_BPS) revert PriceDriftTooHigh();
 
         uint256 destPrice = _quoteCreditcoinDexPrice();
-        uint256 arbWidthBps = _bpsGap(confPrice, destPrice);
-        if (arbWidthBps < MIN_ARB_WIDTH_BPS) revert ArbitrageWindowTooNarrow();
+
+        // Task 3.5: the SIGN of (destPrice - confPrice) is which direction the evidence
+        // supports — destPrice > confPrice means BASE is expensive on the DEX (sell it
+        // there); destPrice < confPrice means BASE is cheap there (buy it). The caller
+        // must propose exactly that direction; the opposite one is economically a loss
+        // against the same evidence and is rejected, not executed. A zero gap falls
+        // through to the width check, which reverts on a zero edge.
+        if (destPrice > confPrice && direction != TradeDirection.SellBaseForQuote) {
+            revert WrongTradeDirection();
+        }
+        if (destPrice < confPrice && direction != TradeDirection.BuyBaseForQuote) {
+            revert WrongTradeDirection();
+        }
+
+        // Direction-aware edge (Task 3.5): extra value received per unit of value
+        // input, vs. the attested reference. Sell: reference value confPrice, actual
+        // proceeds destPrice. Buy: cost destPrice, reference value confPrice. (This
+        // replaces the old symmetric `_bpsGap` denominator, which lost the sign.)
+        uint256 arbWidthBps;
+        if (direction == TradeDirection.SellBaseForQuote) {
+            arbWidthBps = ((destPrice - confPrice) * BPS_DENOMINATOR) / confPrice;
+        } else {
+            arbWidthBps = ((confPrice - destPrice) * BPS_DENOMINATOR) / destPrice;
+        }
+        // Net-profitability guard (Task 3.4): the width NET of the platform
+        // fee/slippage/gas reserve must still clear the instance floor.
+        if (arbWidthBps < MIN_ARB_WIDTH_BPS + MIN_NET_EDGE_BPS) revert ArbitrageWindowTooNarrow();
 
         uint256 tradeSize = _boundedTradeSize(arbWidthBps);
 
         executedActions[actionKey] = true;
         _incrementEpochCounter();
 
-        uint256 amountOut = _executeTrade(tradeSize, MAX_SLIPPAGE_BPS);
+        uint256 amountOut = _executeTrade(tradeSize, MAX_SLIPPAGE_BPS, direction, destPrice);
 
         journal[actionKey] = JournalEntry({
             factKey: factKey,
@@ -297,7 +398,7 @@ contract ASCTreasuryJournal is Ownable {
             agent: msg.sender,
             decisionHash: decisionHash,
             actionType: ActionType.ARBITRAGE,
-            actionPayload: abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps, amountOut)
+            actionPayload: abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps, amountOut, direction)
         });
         journalIndex.push(actionKey);
 
@@ -314,8 +415,13 @@ contract ASCTreasuryJournal is Ownable {
         // rule — not a yield-optimizing curve — matching the "rigid, not clever" design
         // goal of the custody-separation argument.
         uint256 scaled = (MAX_TRADE_SIZE * arbWidthBps) / (MIN_ARB_WIDTH_BPS * 4);
+        // The clamp is the binding constraint: by construction `size` can never exceed
+        // MAX_TRADE_SIZE, so the former post-clamp `revert TradeSizeExceedsMax()` was
+        // unreachable dead code and has been removed (Task D). Callers guarantee
+        // arbWidthBps >= MIN_ARB_WIDTH_BPS and validateGuardrails enforces
+        // maxTradeSize >= 4, so `scaled >= MAX_TRADE_SIZE / 4 > 0` — the size can
+        // never round down to zero either (Task 3.8).
         uint256 size = scaled > MAX_TRADE_SIZE ? MAX_TRADE_SIZE : scaled;
-        if (size > MAX_TRADE_SIZE) revert TradeSizeExceedsMax();
         return size;
     }
 
@@ -329,15 +435,46 @@ contract ASCTreasuryJournal is Ownable {
         actionsInEpoch[epoch] += 1;
     }
 
-    function _executeTrade(uint256 amountIn, uint256 maxSlippageBps) internal returns (uint256 amountOut) {
+    /// @dev Executes the destination-DEX leg in EITHER direction (Task 3.3). Guardrails
+    ///      apply symmetrically: MAX_TRADE_SIZE caps the BASE-denominated exposure of
+    ///      the trade regardless of which asset is being sold, and the slippage floor
+    ///      is computed from the router's own quote for whichever path is used.
+    /// @param tradeSize BASE-denominated trade size from _boundedTradeSize.
+    /// @param destPrice The live DEX price this execution already computed (QUOTE per
+    ///        BASE_UNIT) — reused to value the buy leg's input, so both directions are
+    ///        priced off the same on-chain read.
+    function _executeTrade(uint256 tradeSize, uint256 maxSlippageBps, TradeDirection direction, uint256 destPrice)
+        internal
+        returns (uint256 amountOut)
+    {
+        address sellToken;
+        address buyToken;
+        uint256 amountIn;
+
+        if (direction == TradeDirection.SellBaseForQuote) {
+            sellToken = address(BASE_ASSET);
+            buyToken = QUOTE_ASSET;
+            amountIn = tradeSize;
+            if (BASE_ASSET.balanceOf(address(this)) < amountIn) revert InsufficientAssetBalance();
+        } else {
+            // Buy: the input is QUOTE worth `tradeSize` of BASE at the live DEX price.
+            // The reverse leg's own fee guarantees the BASE actually received lands
+            // strictly under the cap, so the symmetric exposure bound holds.
+            sellToken = QUOTE_ASSET;
+            buyToken = address(BASE_ASSET);
+            amountIn = (tradeSize * destPrice) / BASE_UNIT;
+            if (amountIn == 0) revert ZeroTradeSize();
+            if (IERC20(QUOTE_ASSET).balanceOf(address(this)) < amountIn) revert InsufficientAssetBalance();
+        }
+
         address[] memory path = new address[](2);
-        path[0] = address(BASE_ASSET);
-        path[1] = QUOTE_ASSET;
+        path[0] = sellToken;
+        path[1] = buyToken;
 
         uint256 quotedOut = DEX_ROUTER.getAmountOut(amountIn, path);
         uint256 minOut = quotedOut - (quotedOut * maxSlippageBps) / BPS_DENOMINATOR;
 
-        BASE_ASSET.forceApprove(address(DEX_ROUTER), amountIn);
+        IERC20(sellToken).forceApprove(address(DEX_ROUTER), amountIn);
         uint256[] memory amounts =
             DEX_ROUTER.swapExactTokensForTokens(amountIn, minOut, path, address(this), block.timestamp);
         amountOut = amounts[amounts.length - 1];
@@ -426,7 +563,7 @@ contract ASCTreasuryJournal is Ownable {
         path[1] = QUOTE_ASSET;
         // Quote for 1 unit of BASE_ASSET (assumes 6 decimals, matching USDC) to get a
         // comparable per-unit price to the source-chain observation.
-        return DEX_ROUTER.getAmountOut(1e6, path);
+        return DEX_ROUTER.getAmountOut(BASE_UNIT, path);
     }
 
     // ---------------------------------------------------------------------

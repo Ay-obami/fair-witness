@@ -5,6 +5,7 @@ import type { DecisionInput, Decision } from "../src/decisionEngine.js";
 import type { ReasoningPayload } from "../src/reasoningStore.js";
 import { buildCycleProofs, runTenantCycle, type CycleProofs, type TenantRuntime } from "../src/tenantRunner.js";
 import { factKey, deterministicNonce } from "../src/keys.js";
+import { TradeDirection } from "../src/dexPriceReader.js";
 
 // Deterministic coverage of the multi-tenant core loop (docs/ARCHITECTURE_V2 §3.1):
 //   - fact-scoped proofs are built ONCE regardless of tenant count;
@@ -70,7 +71,7 @@ function makeShared(state: {
 
   const decisions = state.decisions ?? [];
   const decisionEngine = {
-    decide: vi.fn(async (input: DecisionInput): Promise<Decision> => decisions.shift() ?? { act: false, rationale: "default" }),
+    decide: vi.fn(async (input: DecisionInput): Promise<Decision> => decisions.shift() ?? { act: false, direction: null, rationale: "default" }),
   } as unknown as import("../src/decisionEngine.js").DecisionEngine;
 
   const reasoningStore = {
@@ -171,11 +172,11 @@ describe("buildCycleProofs", () => {
 });
 
 describe("runTenantCycle", () => {
-  const shared = makeShared({ decisions: [{ act: true, rationale: "go" }] });
+  const shared = makeShared({ decisions: [{ act: true, direction: TradeDirection.BuyBaseForQuote, rationale: "go" }] });
   const runtime = makeRuntime();
 
   it("re-reads the destination price fresh (no stale cycle-wide quote) and calibrates to the tenant's guardrails", async () => {
-    const stateDecisions = [{ act: true, rationale: "go" }];
+    const stateDecisions = [{ act: true, direction: TradeDirection.BuyBaseForQuote, rationale: "go" }];
     const s = makeShared({ decisions: stateDecisions });
     const r = makeRuntime({ dexReader: {
       currentPrice: vi.fn(async () => 1_000_000n),
@@ -195,8 +196,11 @@ describe("runTenantCycle", () => {
     const input = s.mocks.decisionEngine.decide.mock.calls[0][0] as unknown as Parameters<import("../src/decisionEngine.js").DecisionEngine["decide"]>[0];
     expect(input.guardrails.maxTradeSize).toBe(5_000_000n);
     expect(input.guardrails.minArbWidthBps).toBe(80n);
-    expect(input.gapBps).toBeGreaterThanOrEqual(100);
-    expect(input.gapBps).toBeLessThanOrEqual(130);
+    // Task 3.4: gapBps is the gross window NET of the 25bps platform reserve
+    // (edgeBps mirrors ASCTreasuryJournal.MIN_NET_EDGE_BPS), so the old gross
+    // range [100, 130] shifts down by 25.
+    expect(input.gapBps).toBeGreaterThanOrEqual(75);
+    expect(input.gapBps).toBeLessThanOrEqual(105);
     // fresh dest price, NOT a cycle-wide constant shared with other tenants
     expect(s.mocks.decisionEngine.decide).toHaveBeenCalledTimes(1);
   });
@@ -223,7 +227,7 @@ describe("runTenantCycle", () => {
   });
 
   it("stores a per-tenant reasoning payload and submits when the LLM says act", async () => {
-    const s = makeShared({ decisions: [{ act: true, rationale: "positive arb" }] });
+    const s = makeShared({ decisions: [{ act: true, direction: TradeDirection.BuyBaseForQuote, rationale: "positive arb" }] });
     const submit = vi.fn(async () => ({ actionKey: "0xactionkey", txHash: "0xtxhash" }));
     const r = makeRuntime({ submitter: {
       alreadyExecuted: vi.fn(async () => false),
@@ -246,14 +250,18 @@ describe("runTenantCycle", () => {
     expect(payload.sourcePrice).toBe("1010000");
     expect(payload.confirmPrice).toBe("1011000");
     expect(payload.llmRationale).toBe("positive arb");
+    // Task 3.3: the reasoning payload commits to the proposed direction too, and the
+    // submission carries the direction the contract will validate against the prices.
+    expect(payload.direction).toBe("BuyBaseForQuote");
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit.mock.calls[0][0].chainKey).toBe(1);
     expect(submit.mock.calls[0][2]).toBe(42n);
+    expect(submit.mock.calls[0][4]).toBe(TradeDirection.BuyBaseForQuote);
     expect(s.mocks.decisionEngine.decide.mock.calls[0][0].guardrails.owner).toBe(r.guardrails.owner);
   });
 
   it("does NOT submit when the LLM declines (contract bounds are a floor, not a target)", async () => {
-    const s = makeShared({ decisions: [{ act: false, rationale: "too marginal" }] });
+    const s = makeShared({ decisions: [{ act: false, direction: null, rationale: "too marginal" }] });
     const submit = vi.fn(async () => ({ actionKey: "0xaction", txHash: "0xtx" }));
     const r = makeRuntime({ submitter: {
       alreadyExecuted: vi.fn(async () => false),
@@ -276,7 +284,7 @@ describe("runTenantCycle", () => {
   });
 
   it("a contract-side rejection is logged, not thrown (one tenant's revert must not stop the others)", async () => {
-    const s = makeShared({ decisions: [{ act: true, rationale: "go" }] });
+    const s = makeShared({ decisions: [{ act: true, direction: TradeDirection.BuyBaseForQuote, rationale: "go" }] });
     const log = vi.fn();
     const r = makeRuntime({ submitter: {
       alreadyExecuted: vi.fn(async () => false),
