@@ -18,7 +18,7 @@ async function main() {
   }
 
   const provider = new ethers.JsonRpcProvider(config.creditcoinRpcUrl);
-  const treasury = new ethers.Contract(config.treasuryAddress, treasuryAbi.abi, provider);
+  const treasury = new ethers.Contract(config.treasuryAddress, treasuryAbi, provider);
   const reasoningStore = new ReasoningStore();
 
   const entry = await treasury.getJournalEntry(key);
@@ -34,7 +34,11 @@ async function main() {
   console.log(`  -> independently verifiable on the Sepolia explorer for the source tx`);
   console.log(`agent:       ${entry.agent}`);
   console.log(`actionType:  ${entry.actionType}`);
-  console.log(`attestedAt:  ${new Date(Number(entry.attestedAt) * 1000).toISOString()}`);
+  // Task 3.7: observation moments are verifier-attested block positions, not timestamps
+  // (a Creditcoin contract cannot read Sepolia block timestamps; a submitter-supplied
+  // one would be untrusted permissionless input).
+  console.log(`sourceBlock:  ${entry.sourceBlockHeight ?? "not recorded (pre-3.6)"}`);
+  console.log(`confirmBlk:  ${entry.confirmBlockHeight ?? "not recorded (pre-3.6)"}`);
   console.log(`actedAt:     ${new Date(Number(entry.actedAt) * 1000).toISOString()}`);
   console.log(`decisionHash:${entry.decisionHash}`);
 

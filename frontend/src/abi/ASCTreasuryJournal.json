@@ -486,11 +486,6 @@
             "internalType": "bytes32"
           },
           {
-            "name": "attestedAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
             "name": "actedAt",
             "type": "uint64",
             "internalType": "uint64"
@@ -565,11 +560,6 @@
         "name": "actionKey",
         "type": "bytes32",
         "internalType": "bytes32"
-      },
-      {
-        "name": "attestedAt",
-        "type": "uint64",
-        "internalType": "uint64"
       },
       {
         "name": "actedAt",

@@ -14,7 +14,6 @@ export const MOCK_ENTRIES: Record<string, ReplayData> = {
     entry: {
       actionKey: "0xaa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa1",
       factKey: "0xff19e9ab7685bf0c8875f27f9fd89f94a7175b87f7c7f98d4a2aa1e3aca5452",
-      attestedAt: 1755878400,
       actedAt: 1755878400,
       agent: "0xDB9406adBebe07c3D6A8B310f3De1f330769Bb94",
       decisionHash: "0x8f2e1c9a4b7d3e6f0a1c5b8d2e4f6a9c1b3d5e7f9a0c2e4f6a8b0d2e4f6a8b0d",
@@ -42,7 +41,6 @@ export const MOCK_ENTRIES: Record<string, ReplayData> = {
     entry: {
       actionKey: "0xbb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb22bb2",
       factKey: "0x579d92fdb02c658f3b9dc010bfb9e9bda424bc052c07c9164987a9ba73740ea",
-      attestedAt: 1755882000,
       actedAt: 1755882000,
       agent: "0xDB9406adBebe07c3D6A8B310f3De1f330769Bb94",
       decisionHash: "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
@@ -72,7 +70,6 @@ export const MOCK_ENTRIES: Record<string, ReplayData> = {
     entry: {
       actionKey: "0xcc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33cc3",
       factKey: "0x2a4c6e8f0b1d3f5a7c9e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a",
-      attestedAt: 1755885600,
       actedAt: 1755885600,
       agent: "0xDB9406adBebe07c3D6A8B310f3De1f330769Bb94",
       decisionHash: "0x9f8e7d6c5b4a3928170615243342516071869a5b4c3d2e1f0a9b8c7d6e5f4a3",

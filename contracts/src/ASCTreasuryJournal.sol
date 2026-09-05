@@ -56,7 +56,13 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
     struct JournalEntry {
         bytes32 factKey;
         bytes32 actionKey;
-        uint64 attestedAt;
+        // Task 3.7 timestamp semantics: there is deliberately NO `attestedAt` timestamp.
+        // The source-observed and confirmation-observed moments are identified by the
+        // verifier-attested block positions below — deterministic evidence — because a
+        // Creditcoin contract cannot read a Sepolia block's timestamp, and a timestamp
+        // submitted inside the (permissionless) observation call would be untrusted
+        // self-reported input, weaker than the block heights. `actedAt` is the one
+        // timestamp that is honestly knowable on-chain: destination-execution time.
         uint64 actedAt;
         address agent;
         bytes32 decisionHash;
@@ -419,7 +425,6 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
         journal[actionKey] = JournalEntry({
             factKey: factKey,
             actionKey: actionKey,
-            attestedAt: uint64(block.timestamp),
             actedAt: uint64(block.timestamp),
             agent: msg.sender,
             decisionHash: decisionHash,

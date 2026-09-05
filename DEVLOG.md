@@ -1112,3 +1112,26 @@ Re-verified all three review premises against the current contract first, as the
 Client compatibility: the two LIVE CC3 instances run the pre-3.6 8-field struct, so the frontend decodes tolerantly (extended shape first, legacy fallback - evidence fields surface as honestly "not recorded" there); committed agent+frontend ABIs were regenerated from the forge artifact (13-field getter verified by assertion). forge 30/30, agent vitest 40/40, frontend build + oxlint clean.
 
 One honest miss during the pass: an inline python embedded in a background wrapper lost its quoting and silently skipped the ABI regeneration - caught by reading the log, redone standalone with a 13-field assertion. Lesson applied: heredocs inside background wrappers are fragile; standalone scripts with assertions are the pattern.
+
+## Session 19 - Task 3.7: the fabricated timestamp is gone (2026-09-05)
+
+`attestedAt` and `actedAt` were both set to `block.timestamp` at execution time - so the journal
+carried a field named "attested at" that was actually "executed at", implying the source was
+observed at the moment of execution. Fixed by REMOVING the field rather than renaming it, because
+there is no honest timestamp to put there: a Creditcoin contract cannot read a Sepolia block's
+timestamp, and a timestamp submitted inside the (permissionless) `observePrice` call would be
+untrusted self-reported input - weaker evidence than what Task 3.6 already journals. The
+source-observed and confirmation-observed moments are now identified solely by the
+verifier-attested `sourceBlockHeight`/`confirmBlockHeight` (deterministic block identifiers -
+exactly what the task's second checkbox prefers); `actedAt` remains the one knowable on-chain
+time. Struct is 12 fields; ReplayCard and the agent's replay CLI print block heights where the
+fake timestamp used to appear.
+
+**Latent 3.6 miss caught here, honestly:** the 3.6 ABI regeneration rewrote the agent's ABI JSONs
+from minified artifact-objects to bare arrays. Functionally better, but 4 agent call sites used
+`<import>.abi` - an accessor that only existed on the artifact shape - and agent `vitest` never
+noticed because every consumer is mocked at runtime. Only `tsc` caught it (3.6's own closeout ran
+tsc BEFORE the regen landed, which is why it slipped). All 4 sites now use the array directly;
+both packages' ABI files are standardized as bare ABI arrays with a 12-field assertion.
+
+forge 30/30 - agent tsc clean, vitest 40/40 - frontend build + oxlint clean.

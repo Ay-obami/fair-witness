@@ -13,7 +13,7 @@ export class TreasurySubmitter {
     // Note: contract will be initialized with the correct address via setTreasuryAddress
     this.contract = new ethers.Contract(
       "0x0000000000000000000000000000000000000000",
-      treasuryAbi.abi,
+      treasuryAbi,
       signer
     );
   }
@@ -23,7 +23,7 @@ export class TreasurySubmitter {
    * factory-deployed instances.
    */
   setTreasuryAddress(treasuryAddress: string): void {
-    this.contract = new ethers.Contract(treasuryAddress, treasuryAbi.abi, this.signer);
+    this.contract = new ethers.Contract(treasuryAddress, treasuryAbi, this.signer);
   }
 
   /**
