@@ -1167,3 +1167,11 @@ Created `docs/CURRENT_REALITY.md` with the single source of truth and reconciled
 Changes: README, ARCHITECTURE_V2 Stage-3, ROADMAP Stage 3, `docs/HELP.md`, and `frontend/src/routes/Help.tsx` all now say Gemini-only; ROADMAP `/app` -> `/dashboard`; and PRD destination-DEX/trade-asset rows now describe the deployed **MockDexRouter / MockERC20** reality (explicitly retaining PenguinSwap/Sepolia-USDC as the *abandoned plan*, per DESIGN section 9). Remaining `PenguinSwap` references are honest historical/fallback mentions and stay. No code changes (pure docs): README, ARCHITECTURE_V2, ROADMAP, HELP.md, Help.tsx, PRD, + the new doc.
 
 One craft note: the README replacement dropped a backtick link (`see )`); caught and fixed. The `Permission denied` seen once was a stale `git ls-files` red herring on the brand-new untracked `CURRENT_REALITY.md` - the file is normal-writable; `git add -A` picks it up.
+
+## Session 22 - Task 3.10 decision commitment + Task 3.13 final invariants (2026-09-05)
+
+Task 3.10 (re-scoped per the plan's own note: the on-chain decisionHash only ever sits on an execution - rejections revert - so committing the ACT/DECLINE outcome required touching the agent-side reasoning payload). Added `outcome` to ReasoningPayload, serialized between llmRationale and direction, omitted-when-undefined so pre-3.10 payloads hash-verify to their original on-chain commitments (same backward-compat trick as Task 3.3's `direction`). The tenantRunner now stores `outcome: "EXECUTE"` for act and `"DECLINE"` for decline - so a stored decline file self-describes the decision too. Frontend contractReader's hash mirror updated in lock-step.
+
+Task 3.13 (closes the invariant suite): added `test_EverySuccessfulExecutionJournalsExactlyOneEntry` (1-1 journaling, replays add nothing), `test_TradeSizeNeverExceedsCapAndNeverZero` (clamp + 3.8 floor hold; slippage enforced by the contract's own SlippageExceeded revert path), and `test_ZeroComputedBuyInputIsRejected` - a minimal-guardrail treasury sizes to exactly 1 on the SELL leg (succeeds, proving the never-zero floor) while the BUY leg's input rounds to zero and reverts `ZeroTradeSize`. Guardrail immutability was already proven by the existing factory test and is now cross-referenced in the plan.
+
+forge 33/33 - agent vitest 41/41 (new outcome-hash test) + tsc clean - frontend build + lint clean.

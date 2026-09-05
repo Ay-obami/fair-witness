@@ -190,9 +190,13 @@ export async function fetchLiveReplayData(
           destPrice: reasoning.destPrice,
           rule: reasoning.rule,
           llmRationale: reasoning.llmRationale,
-          // MUST sit between llmRationale and timestamp — it mirrors the agent's
-          // serialize() key order exactly, and JSON.stringify omits it when undefined
-          // so pre-direction payloads still hash-match their on-chain commitments.
+          // Task 3.10: outcome sits between llmRationale and direction — MUST mirror the
+          // agent's serialize() key order exactly. JSON.stringify omits when undefined,
+          // so pre-3.10 payloads still hash-match their on-chain commitments.
+          outcome: reasoning.outcome,
+          // MUST sit between outcome and timestamp — mirrors the agent's serialize()
+          // exactly, and JSON.stringify omits it when undefined so pre-direction
+          // payloads still hash-match.
           direction: reasoning.direction,
           timestamp: reasoning.timestamp,
         });

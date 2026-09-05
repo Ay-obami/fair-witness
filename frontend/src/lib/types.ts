@@ -50,6 +50,9 @@ export interface ReasoningPayload {
   destPrice: string;
   rule: string;
   llmRationale: string;
+  /** Task 3.10: the decision OUTCOME is committed too (not just the inputs). Optional +
+   *  omitted when undefined so pre-3.10 payloads still hash-match. */
+  outcome?: "EXECUTE" | "DECLINE";
   /** Task 3.3: human-readable TradeDirection name; absent on pre-direction payloads. */
   direction?: string;
   timestamp: string;
