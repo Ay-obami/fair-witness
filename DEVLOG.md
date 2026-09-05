@@ -1159,3 +1159,11 @@ First run caught real drift: the committed factory ABIs were still stale (the jo
 were already current from Task 3.7 - idempotency proven by the empty journal diff).
 
 forge build clean after deletion - forge 30/30 - agent vitest 40/40 - frontend build+lint clean.
+
+## Session 21 - Task 3.12: docs reconciled to the CURRENT_REALITY source of truth (2026-09-05)
+
+Created `docs/CURRENT_REALITY.md` with the single source of truth and reconciled every doc claim against it. The core finding: the docs carried an ASPIRATIONAL claim the code doesn't support - a "Gemini / OpenAI / Mistral provider allow-list" - when the agent is **Gemini-only by construction** (`GoogleGenAI` + `GEMINI_API_KEY`; no provider switch exists). The honest fix was to mark those three as the "tracked direction" and say *Gemini only* today, not to claim a real allow-list exists.
+
+Changes: README, ARCHITECTURE_V2 Stage-3, ROADMAP Stage 3, `docs/HELP.md`, and `frontend/src/routes/Help.tsx` all now say Gemini-only; ROADMAP `/app` -> `/dashboard`; and PRD destination-DEX/trade-asset rows now describe the deployed **MockDexRouter / MockERC20** reality (explicitly retaining PenguinSwap/Sepolia-USDC as the *abandoned plan*, per DESIGN section 9). Remaining `PenguinSwap` references are honest historical/fallback mentions and stay. No code changes (pure docs): README, ARCHITECTURE_V2, ROADMAP, HELP.md, Help.tsx, PRD, + the new doc.
+
+One craft note: the README replacement dropped a backtick link (`see )`); caught and fixed. The `Permission denied` seen once was a stale `git ls-files` red herring on the brand-new untracked `CURRENT_REALITY.md` - the file is normal-writable; `git add -A` picks it up.

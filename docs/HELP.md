@@ -73,8 +73,9 @@ were the same kind of evidence as a verified execution — that distinction is t
 
 ## What LLM is deciding for me, and can it move my funds on its own?
 
-The platform runs one LLM (Gemini, OpenAI, or Mistral — we deliberately exclude
-Claude because its API lacks the seeding control we need) that decides **whether** to
+The platform runs one LLM (Gemini; OpenAI/Mistral are the tracked direction, and we
+deliberately exclude Claude because its API lacks the seeding control we need) that
+decides **whether** to
 propose a trade. It never decides **how** to execute one, and it never holds your key.
 
 

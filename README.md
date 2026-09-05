@@ -97,8 +97,10 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 Gemini key were committed to this repo early on. **Both were rotated 2026-09-03**
 (Session 13): the submit key now derives address `0xB1D19F…654f` and the Gemini key in
 `agent/.env` is a fresh value (confirmed absent from git history) — see
-`docs/ROADMAP.md` → Security. The deterministic-LLM layer uses Gemini / OpenAI / Mistral
-(Claude excluded — no seed parameter). The contract's own independent bound-checking is
+`docs/ROADMAP.md` → Security. The deterministic-LLM decision layer currently uses **Gemini only**
+(Claude excluded — no seed parameter; OpenAI Chat Completions / Mistral are the tracked
+direction, not a current option — see `docs/CURRENT_REALITY.md`). The
+contract's own independent bound-checking is
 the safety property — key-storage sophistication was a deliberately cut scope item
 (`DEVLOG.md`).
 

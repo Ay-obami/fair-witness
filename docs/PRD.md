@@ -35,8 +35,8 @@ An autonomous cross-chain arbitrage system for Creditcoin where an LLM-driven ag
 | Decision | Choice | Rationale |
 |---|---|---|
 | Source chain | Sepolia only | Simplest for a solo 3–4 week build; avoids doubling integration surface |
-| Destination DEX (Creditcoin side) | **PenguinSwap** (Creditcoin testnet) | Official, already-live Creditcoin DEX — stronger judging narrative than a mock AMM, lower contract risk (reuse audited swap logic instead of writing bonding-curve math) |
-| Trade asset | **Sepolia USDC** (Circle faucet: 20 USDC / address / chain / 2h) | Real recognizable stablecoin reads better to judges than a mock token; faucet throughput is sufficient once `MAX_TRADE_SIZE` is scaled to demo-appropriate amounts (single-digit USDC, not thousands) |
+| Destination DEX (Creditcoin side) | **MockDexRouter** (self-seeded mock constant-product router; deployed) — PenguinSwap was the plan, abandoned (see DESIGN §9) | Official, already-live Creditcoin DEX — stronger judging narrative than a mock AMM, lower contract risk (reuse audited swap logic instead of writing bonding-curve math) |
+| Trade asset | **MockERC20** (creditcoin-side USDC-like + quote token; testnet, no value) — Sepolia USDC via Circle faucet was the plan, abandoned | Real recognizable stablecoin reads better to judges than a mock token; faucet throughput is sufficient once `MAX_TRADE_SIZE` is scaled to demo-appropriate amounts (single-digit USDC, not thousands) |
 | Decision layer | **LLM makes the act/don't-act call**, within the contract's rigid numeric bounds | Per your choice — see §7 for the determinism handling this requires |
 | LLM provider | **Google Gemini** (AI Studio free tier) — no card required, native structured/JSON output, ~1,500 req/day | No Anthropic API key available; Gemini is the strongest free-tier fit for structured decision output. Groq flagged as a fallback if latency becomes a bottleneck |
 | Contracts | Solidity / Foundry | Matches your existing background directly |
@@ -74,7 +74,7 @@ The contract shall execute the trade only if all bounds in §6 are satisfied, re
 Resubmitting a proof set + decision for a fact already acted upon shall be a no-op (rejected on-chain, and short-circuited off-chain before gas is spent where possible).
 
 ### FR6 — Journaling
-Every execution (and, for demo purposes, every rejection) shall be logged with enough information to reconstruct the full causal chain.
+Every execution shall be journaled on-chain with enough information to reconstruct the full causal chain. Rejected attempts revert and are visible as failed transactions, but are not separately journaled (see docs/CURRENT_REALITY.md).
 
 ### FR7 — Replay viewer
 Given an `actionKey`, the frontend shall display: the source fact (with a link to the Sepolia explorer for independent verification), the retrieved off-chain reasoning, a live hash-match confirmation against the on-chain `decisionHash`, and the exact action executed.
