@@ -26,7 +26,7 @@ export async function readTreasuryGuardrails(
   provider: ethers.JsonRpcProvider,
   treasuryAddress: string
 ): Promise<TreasuryGuardrails> {
-  const treasury = new ethers.Contract(treasuryAddress, treasuryAbi.abi, provider);
+  const treasury = new ethers.Contract(treasuryAddress, treasuryAbi, provider);
 
     const [
     owner,

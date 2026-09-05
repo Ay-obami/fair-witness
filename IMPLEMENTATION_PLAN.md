@@ -486,9 +486,9 @@ accuracy, but confirm against the current code before implementing.
 moments: when the source was observed, when it was confirmed, and when
 execution actually happened.
 
-- [ ] Track source-observed time, confirmation-observed time, and
+- [x] Track source-observed time, confirmation-observed time, and
       destination-execution time as separate fields.
-- [ ] Prefer block/transaction identifiers over timestamps alone for
+- [x] Prefer block/transaction identifiers over timestamps alone for
       deterministic evidence where possible.
 
 ### Task 3.8 — Trade-size rounding and constructor validation
@@ -600,8 +600,22 @@ underlying fix exists:
   8-field fallback for the two live pre-3.6 instances); committed agent +
   frontend ABIs regenerated from the forge artifact (13 fields asserted);
   forge 30/30, agent vitest 40/40, frontend build + oxlint clean.
-- Task 3.7: not started (verified: `attestedAt` and `actedAt` are both set to
-  `block.timestamp` at execution time)
+- Task 3.7: done 2026-09-05 — `attestedAt` REMOVED from JournalEntry (it was
+  fabricated: set to execution `block.timestamp` while claiming to mark
+  attestation). The observation moments are recorded as the verifier-attested
+  `sourceBlockHeight`/`confirmBlockHeight` (Task 3.6) — deterministic block
+  identifiers, which this task explicitly prefers over timestamps, and the
+  only honest option: a Creditcoin contract cannot read a Sepolia block's
+  timestamp, and a timestamp inside the permissionless observation call would
+  be untrusted self-reported input. `actedAt` remains the single
+  destination-execution time. Struct now 12 fields; ABIs regenerated with a
+  12-field assertion; ReplayCard and the agent's replay CLI show block
+  heights instead of the fake timestamp. One latent 3.6 miss caught here:
+  the 3.6 ABI regen had silently rewritten the agent's ABI JSONs from
+  artifact-objects to bare arrays, breaking 4 `.abi` call sites that vitest
+  never exercised at runtime (all mocked) — consumer sites now use the array
+  directly; forge 30/30, agent vitest 40/40 + tsc clean, frontend
+  build + oxlint clean.
 - Task 3.8: ✅ 2026-09-05 — constructor now mirrors the factory's zero-address
   dependency gate (`InvalidChainConfig`); `maxTradeSize < 4` rejected in
   `validateGuardrails` (see Task 3.8 checkbox note for the rounding analysis).

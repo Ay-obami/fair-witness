@@ -15,8 +15,9 @@ export type TradeDirection = "SELL_BASE_FOR_QUOTE" | "BUY_BASE_FOR_QUOTE";
 export interface JournalEntry {
   actionKey: string;
   factKey: string;
-  attestedAt: number; // unix seconds
-  actedAt: number; // unix seconds
+  // Task 3.7: deliberately no `attestedAt` timestamp — the observation moments are
+  // the verifier-attested sourceBlockHeight/confirmBlockHeight below, not timestamps.
+  actedAt: number; // unix seconds — destination-execution time
   agent: string;
   decisionHash: string;
   actionType: ActionType;

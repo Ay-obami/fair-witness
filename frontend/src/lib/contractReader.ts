@@ -4,11 +4,13 @@ import type { ReplayData, ReasoningPayload, TreasuryInfo, TradeDirection } from 
 import { ActionType } from "./types";
 
 // Minimal ABI slice — only what the replay viewer needs to read.
-// Task 3.6: the on-chain JournalEntry struct gained 5 evidence fields; the extended
-// tuple is decoded tolerantly in fetchLiveReplayData (extended shape first, legacy
-// fallback) so pre-3.6 live instances keep working.
+// Task 3.6/3.7: the on-chain JournalEntry struct gained 5 evidence fields and then
+// dropped the fabricated `attestedAt` timestamp (the observation moments are recorded
+// as verifier-attested block heights instead — see ASCTreasuryJournal.sol). The tuple
+// below is the current 12-field shape; it is decoded tolerantly in fetchLiveReplayData
+// (extended first, legacy 8-field fallback) so pre-3.6 live instances keep working.
 const JOURNAL_ENTRY_ABI_EXTENDED = [
-  "function getJournalEntry(bytes32 actionKey) view returns (tuple(bytes32 factKey, bytes32 actionKey, uint64 attestedAt, uint64 actedAt, address agent, bytes32 decisionHash, uint8 actionType, bytes actionPayload, uint64 sourceChainKey, uint64 sourceBlockHeight, uint32 sourceTxIndex, uint64 confirmBlockHeight, uint32 confirmTxIndex))",
+  "function getJournalEntry(bytes32 actionKey) view returns (tuple(bytes32 factKey, bytes32 actionKey, uint64 actedAt, address agent, bytes32 decisionHash, uint8 actionType, bytes actionPayload, uint64 sourceChainKey, uint64 sourceBlockHeight, uint32 sourceTxIndex, uint64 confirmBlockHeight, uint32 confirmTxIndex))",
 ];
 const JOURNAL_ENTRY_ABI_LEGACY = [
   "function getJournalEntry(bytes32 actionKey) view returns (tuple(bytes32 factKey, bytes32 actionKey, uint64 attestedAt, uint64 actedAt, address agent, bytes32 decisionHash, uint8 actionType, bytes actionPayload))",
@@ -206,7 +208,6 @@ export async function fetchLiveReplayData(
     entry: {
       actionKey,
       factKey: raw.factKey,
-      attestedAt: Number(raw.attestedAt),
       actedAt: Number(raw.actedAt),
       agent: raw.agent,
       decisionHash: raw.decisionHash,

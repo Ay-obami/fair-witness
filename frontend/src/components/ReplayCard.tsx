@@ -40,7 +40,15 @@ export function ReplayCard({ data }: { data: ReplayData }) {
         </div>
         <dl>
           <DataRow label="factKey" value={entry.factKey} truncate />
-          <DataRow label="Attested at" value={formatTimestamp(entry.attestedAt)} mono={false} />
+          {entry.sourceBlockHeight !== undefined && entry.confirmBlockHeight !== undefined ? (
+            <DataRow
+              label="Observed at blocks (source → confirm)"
+              value={`${entry.sourceBlockHeight} → ${entry.confirmBlockHeight}`}
+              mono
+            />
+          ) : (
+            <DataRow label="Observed at blocks" value="not recorded (pre-3.6 instance)" mono={false} />
+          )}
         </dl>
         <p className="mt-3 text-xs leading-relaxed text-ledger-400">{sepoliaExplorerFactHint}</p>
       </section>
