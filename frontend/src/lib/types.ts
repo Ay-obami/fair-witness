@@ -29,6 +29,16 @@ export interface JournalEntry {
   confPrice: string;
   arbWidthBps: number;
   amountOut: string;
+  /** Task 3.6: explicit evidence identifiers read from the on-chain struct. Undefined
+   *  when the entry comes from a pre-3.6 live instance — displayed as "not recorded",
+   *  never invented. The destination execution tx hash is deliberately NOT a struct
+   *  field: the EVM cannot observe its own tx hash; it is the hash of the transaction
+   *  whose receipt carries this actionKey's ActionJournaled event (any explorer). */
+  sourceChainKey?: number;
+  sourceBlockHeight?: number;
+  sourceTxIndex?: number;
+  confirmBlockHeight?: number;
+  confirmTxIndex?: number;
 }
 
 /** Mirrors agent/src/reasoningStore.ts's ReasoningPayload exactly. */

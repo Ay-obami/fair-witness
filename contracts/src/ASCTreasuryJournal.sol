@@ -61,7 +61,20 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
         address agent;
         bytes32 decisionHash;
         ActionType actionType;
-        bytes actionPayload; // abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps)
+        bytes actionPayload; // abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps, amountOut, direction)
+        // Task 3.6: explicit evidence identifiers. factKey only COMMITS to the source
+        // location as a hash — these make the actual values readable from the journal,
+        // and record the confirmation leg (whose proof was previously used transiently
+        // and stored nowhere). With these, the evidence chain is reconstructible from
+        // the journal alone. The one exception is the destination execution tx hash,
+        // which the EVM cannot observe from inside a transaction: it is the hash of the
+        // transaction whose receipt carries this actionKey's ActionJournaled event,
+        // discoverable from any explorer (documented, not storable).
+        uint64 sourceChainKey;
+        uint64 sourceBlockHeight;
+        uint32 sourceTxIndex;
+        uint64 confirmBlockHeight; // confirm chainKey == source chainKey, enforced on-chain
+        uint32 confirmTxIndex;
     }
 
     struct ProofData {
@@ -132,6 +145,10 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
     ///      quotes one unit in, and the denominator when valuing a BASE-denominated
     ///      trade size into a QUOTE input for the buy direction (Task 3.3).
     uint256 private constant BASE_UNIT = 1e6;
+    /// @dev The only calldata shape `_decodePriceObservation` accepts from PRICE_CONTRACT:
+    ///      an `observePrice(uint256)` call (Task 3.6 — the selector is verified, not
+    ///      assumed from the calldata length).
+    bytes4 private constant OBSERVE_PRICE_SELECTOR = bytes4(keccak256("observePrice(uint256)"));
 
     // ---------------------------------------------------------------------
     // Storage
@@ -170,6 +187,7 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
     error ActionAlreadyExecuted();
     error ConfirmProofNotNewer();
     error ConfirmProofTooOld();
+    error ChainMismatch();
     error SourceVerificationFailed();
     error ConfirmVerificationFailed();
     error UnderlyingTxNotSuccessful();
@@ -182,6 +200,7 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
     // could never fire) — dead code implying a validation that cannot trigger.
     error MalformedEncodedTransaction();
     error WrongObservationSource();
+    error WrongObservationSelector();
     error InvalidGuardrails();
     error InvalidChainConfig();
     error CannotRenounceOwnership();
@@ -329,6 +348,13 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
             revert ConfirmProofTooOld();
         }
 
+        // Task 3.6: the confirmation must re-observe the SAME chain the source fact
+        // lives on. Each proof verifies honestly on its own, so without this check two
+        // honestly-attested proofs from two DIFFERENT chains could pair up and pass the
+        // drift comparison. Structural relationship first — fail before spending any
+        // verification work.
+        if (confirmProof.chainKey != sourceProof.chainKey) revert ChainMismatch();
+
         bool v1 = VERIFIER.verifyAndEmit(
             sourceProof.chainKey,
             sourceProof.blockHeight,
@@ -398,7 +424,16 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
             agent: msg.sender,
             decisionHash: decisionHash,
             actionType: ActionType.ARBITRAGE,
-            actionPayload: abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps, amountOut, direction)
+            actionPayload: abi.encode(tradeSize, srcPrice, confPrice, arbWidthBps, amountOut, direction),
+            // Task 3.6: full evidence identifiers (see the struct's comment). The
+            // destination execution tx hash is intentionally absent — it is the hash
+            // of the very transaction emitting the ActionJournaled event below, which
+            // is how a reviewer links journal -> receipt from any explorer.
+            sourceChainKey: sourceProof.chainKey,
+            sourceBlockHeight: sourceProof.blockHeight,
+            sourceTxIndex: sourceProof.transactionIndex,
+            confirmBlockHeight: confirmProof.blockHeight,
+            confirmTxIndex: confirmProof.transactionIndex
         });
         journalIndex.push(actionKey);
 
@@ -547,13 +582,19 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
 
         // PRICE_CONTRACT's `observePrice(uint256)` calldata is exactly one selector + one
         // 32-byte word. Anything else is a malformed observation call. The price is the
-        // 32 bytes immediately after the 4-byte selector — read them via assembly because
+        // 32 bytes immediately after the 4-byte selector — read via assembly because
         // Solidity's `data[4:]` slice syntax only applies to calldata arrays, and the
         // decoded `data` lives in memory here.
         if (data.length != 4 + 32) revert MalformedEncodedTransaction();
+        // Task 3.6: verify the call is actually `observePrice(uint256)` rather than
+        // assuming the shape from the length alone — a different function on the price
+        // contract (or arbitrary 36-byte calldata) must not decode as a price fact.
+        bytes4 observedSelector;
         assembly {
-            price := mload(add(data, 36))
+            observedSelector := mload(add(data, 32)) // first 4 bytes of data
+            price := mload(add(data, 36)) // the 32 bytes after the selector
         }
+        if (observedSelector != OBSERVE_PRICE_SELECTOR) revert WrongObservationSelector();
         success = (receiptStatus == 1);
     }
 

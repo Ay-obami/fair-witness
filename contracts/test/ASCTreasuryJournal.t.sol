@@ -236,6 +236,78 @@ contract ASCTreasuryJournalTest is TestBase {
     }
 
     // -------------------------------------------------------------------
+    // 6c. Task 3.6: cross-chain confirmation — a structurally valid proof from a
+    //     DIFFERENT chain must not be accepted as the confirmation leg, even when
+    //     it verifies honestly on its own.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnCrossChainConfirmationProof() public {
+        uint64 otherChainKey = SOURCE_CHAIN_KEY + 1;
+        (
+            ASCTreasuryJournal.ProofData memory src,
+            ASCTreasuryJournal.ProofData memory confirm,
+            uint256 srcPrice,
+            uint256 confPrice
+        ) = buildHappyPathProofs(0);
+        confirm.chainKey = otherChainKey;
+        // Registered on the mock under the OTHER chain so the pair would pass pure
+        // per-proof verification if the relationship check didn't exist.
+        verifier.setVerificationResult(otherChainKey, confirm.blockHeight, confirm.encodedTransaction, true);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.ChainMismatch.selector);
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("cross chain test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // 6d. Task 3.6: the decoder must verify the calldata is actually an
+    //     observePrice(uint256) call, not just any 36-byte call to the price contract.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnWrongObservationSelector() public {
+        bytes4 bogusSelector = bytes4(keccak256("notObservePrice(uint256)"));
+        ASCTreasuryJournal.ProofData memory src =
+            buildVerifiedProofWithSelector(5_000_000, 0, 1_005_000, true, bogusSelector);
+        ASCTreasuryJournal.ProofData memory confirm =
+            buildVerifiedProofWithSelector(5_000_003, 0, 1_010_000, true, bogusSelector);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, 1_005_000, 1_010_000);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.WrongObservationSelector.selector);
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("wrong selector test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // 6e. Task 3.6: the journal must carry the full evidence identifiers so a
+    //     reviewer can reconstruct the evidence chain from the journal alone.
+    // -------------------------------------------------------------------
+
+    function test_JournalRecordsFullEvidenceIdentifiers() public {
+        (
+            ASCTreasuryJournal.ProofData memory src,
+            ASCTreasuryJournal.ProofData memory confirm,
+            uint256 srcPrice,
+            uint256 confPrice
+        ) = buildHappyPathProofs(0);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        vm.prank(agent);
+        bytes32 actionKey =
+            treasury.executeArbitrage(src, confirm, nonce, keccak256("evidence test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+
+        ASCTreasuryJournal.JournalEntry memory entry = treasury.getJournalEntry(actionKey);
+        assertEq(entry.sourceChainKey, src.chainKey, "source chain key must be journaled");
+        assertEq(entry.sourceBlockHeight, src.blockHeight, "source block height must be journaled");
+        assertEq(entry.sourceTxIndex, src.transactionIndex, "source tx index must be journaled");
+        assertEq(entry.confirmBlockHeight, confirm.blockHeight, "confirm block height must be journaled");
+        assertEq(entry.confirmTxIndex, confirm.transactionIndex, "confirm tx index must be journaled");
+    }
+
+    // -------------------------------------------------------------------
     // 7. (MAX_ACTIONS_PER_EPOCH + 1)th valid call in an epoch -> reverts, even with a
     //    fully valid proof.
     // -------------------------------------------------------------------

@@ -1100,3 +1100,15 @@ tsc clean) is what actually landed. No ABI change: the reserve is a private cons
 **Deployment note:** all of this changes future factory deployments; the two live CC3 instances run
 the pre-hardening logic and stay as-is (additive-pivot model — redeploying tenants is a product
 decision, not part of this pass).
+
+## Session 18 - Task 3.6: proof/confirmation validation closes (2026-09-05)
+
+Re-verified all three review premises against the current contract first, as the plan requires - all three were real:
+
+- **Cross-chain confirmation was possible.** Each proof verified honestly on its own, but nothing required the confirmation to re-observe the SAME chain as the source fact; two honestly-attested proofs from different chains could pair up and pass the drift check. `ChainMismatch` now reverts before any verification work is spent. The test registers the impostor proof on the mock verifier so it would pass per-proof verification absent the new check.
+- **The decoder assumed the calldata shape.** `to == PRICE_CONTRACT` + 36-byte length + receipt status 1 was accepted without confirming the 4-byte selector is `observePrice(uint256)`. Now checked (`WrongObservationSelector`), read in the same assembly pass as the price word.
+- **The journal hid its own evidence.** factKey only commits to the source location as a hash, and the confirmation leg was used transiently and stored nowhere. JournalEntry now carries source chainKey/blockHeight/txIndex and confirm blockHeight/txIndex. The destination execution tx hash is deliberately NOT a struct field - the EVM cannot observe its own tx hash; it is the receipt hash of the tx emitting ActionJournaled for that actionKey (documented in the struct NatSpec, not faked on-chain).
+
+Client compatibility: the two LIVE CC3 instances run the pre-3.6 8-field struct, so the frontend decodes tolerantly (extended shape first, legacy fallback - evidence fields surface as honestly "not recorded" there); committed agent+frontend ABIs were regenerated from the forge artifact (13-field getter verified by assertion). forge 30/30, agent vitest 40/40, frontend build + oxlint clean.
+
+One honest miss during the pass: an inline python embedded in a background wrapper lost its quoting and silently skipped the ABI regeneration - caught by reading the log, redone standalone with a 13-field assertion. Lesson applied: heredocs inside background wrappers are fragile; standalone scripts with assertions are the pattern.

@@ -4,8 +4,16 @@ import type { ReplayData, ReasoningPayload, TreasuryInfo, TradeDirection } from 
 import { ActionType } from "./types";
 
 // Minimal ABI slice — only what the replay viewer needs to read.
-const TREASURY_ABI = [
+// Task 3.6: the on-chain JournalEntry struct gained 5 evidence fields; the extended
+// tuple is decoded tolerantly in fetchLiveReplayData (extended shape first, legacy
+// fallback) so pre-3.6 live instances keep working.
+const JOURNAL_ENTRY_ABI_EXTENDED = [
+  "function getJournalEntry(bytes32 actionKey) view returns (tuple(bytes32 factKey, bytes32 actionKey, uint64 attestedAt, uint64 actedAt, address agent, bytes32 decisionHash, uint8 actionType, bytes actionPayload, uint64 sourceChainKey, uint64 sourceBlockHeight, uint32 sourceTxIndex, uint64 confirmBlockHeight, uint32 confirmTxIndex))",
+];
+const JOURNAL_ENTRY_ABI_LEGACY = [
   "function getJournalEntry(bytes32 actionKey) view returns (tuple(bytes32 factKey, bytes32 actionKey, uint64 attestedAt, uint64 actedAt, address agent, bytes32 decisionHash, uint8 actionType, bytes actionPayload))",
+];
+const TREASURY_ABI = [
   // Immutable guardrails + identity (V2 multi-tenant): constructor-set immutables, so
   // these are the authoritative per-tenant bounds — reading them live from the instance
   // is what lets the viewer show WHICH rigid bounds governed a given action.
@@ -129,9 +137,14 @@ export async function fetchLiveReplayData(
     );
   }
   const provider = getProvider();
-  const treasury = new ethers.Contract(treasuryAddress, TREASURY_ABI, provider);
-
-  const raw = await treasury.getJournalEntry(actionKey);
+  // Task 3.6: extended struct first (post-3.6 instances), legacy fallback (pre-3.6
+  // live instances) — same tolerant pattern as the actionPayload word-count below.
+  let raw: ethers.Result;
+  try {
+    raw = await new ethers.Contract(treasuryAddress, JOURNAL_ENTRY_ABI_EXTENDED, provider).getJournalEntry(actionKey);
+  } catch {
+    raw = await new ethers.Contract(treasuryAddress, JOURNAL_ENTRY_ABI_LEGACY, provider).getJournalEntry(actionKey);
+  }
   if (raw.actedAt === 0n) return null;
 
   // Task 3.3: the payload gained a 6th word (trade direction). Entries journaled
@@ -204,6 +217,13 @@ export async function fetchLiveReplayData(
       confPrice: confPrice.toString(),
       arbWidthBps: Number(arbWidthBps),
       amountOut: amountOut.toString(),
+      // Task 3.6 evidence identifiers — undefined (shown as "not recorded", never
+      // invented) when the entry came from a pre-3.6 instance whose struct lacks them.
+      sourceChainKey: raw.sourceChainKey === undefined ? undefined : Number(raw.sourceChainKey),
+      sourceBlockHeight: raw.sourceBlockHeight === undefined ? undefined : Number(raw.sourceBlockHeight),
+      sourceTxIndex: raw.sourceTxIndex === undefined ? undefined : Number(raw.sourceTxIndex),
+      confirmBlockHeight: raw.confirmBlockHeight === undefined ? undefined : Number(raw.confirmBlockHeight),
+      confirmTxIndex: raw.confirmTxIndex === undefined ? undefined : Number(raw.confirmTxIndex),
     },
     reasoning,
     hashMatches,
