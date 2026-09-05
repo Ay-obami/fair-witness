@@ -65,29 +65,42 @@ forge create src/source-chain/PriceObservation.sol:PriceObservation \
 
 Note the deployed address — this is `PRICE_CONTRACT_ADDRESS` for the agent's `.env`.
 
-## Step 3 — Deploy ASCTreasuryJournal on Creditcoin testnet
+## Step 3 — Deploy the factory and tenant instances on Creditcoin testnet (canonical V2 path)
 
-Fill in the env vars documented at the top of `contracts/script/Deploy.s.sol`:
+Deployment is factory-based (see `docs/ARCHITECTURE_V2.md` §2): every tenant gets their own
+`ASCTreasuryJournal` with their guardrails baked in immutably at construction. The
+single-treasury Foundry script (`Deploy.s.sol`) and the pre-pivot `deploy-creditcoin.js` were
+removed (Task 3.11) — both were stale against the current `Guardrails` constructor and one
+referenced `isRegisteredAgent`, which the contract never exposed (`registeredAgents(address)`
+is the mapping getter). Git history keeps them if you truly need the pre-pivot shape.
 
 ```bash
-export VERIFIER_ADDRESS=0x0000000000000000000000000000000000000FD2   # confirm against real network
-export DEX_ROUTER_ADDRESS=...   # real PenguinSwap router, confirmed in Step 1
-export BASE_ASSET_ADDRESS=...   # Creditcoin-side capital the treasury actually holds (see DEVLOG's
-                                 # "BASE_ASSET is Creditcoin-side capital" design note — NOT Sepolia USDC directly)
-export QUOTE_ASSET_ADDRESS=...  # the paired token on PenguinSwap
-export PRICE_CONTRACT_ADDRESS=... # the toy Sepolia PriceObservation contract from Step 2 — the
-                                # only contract whose observePrice transactions the treasury will accept
-export OWNER_ADDRESS=...        # a multisig, ideally, for anything beyond a demo
-export PRIVATE_KEY=...          # deployer key, NEVER the agent's submit key
+cd contracts
+# 1. Deploy the factory + tenant instances (env vars documented in the script header;
+#    Stage-1 defaults come from script/.stage-tenants.env — gitignored, never commit it):
+node script/deploy-factory.js
 
-forge script script/Deploy.s.sol:Deploy --rpc-url $CREDITCOIN_RPC_URL --broadcast
+# 2. Register the platform agent submit address on EACH instance (owner-only; the script
+#    refuses a key that is not the instance owner). --fund-ctc tops up agent gas:
+node script/register-agent.js
+
+# 3. Index deployed instances into the agent + frontend registries. The factory is
+#    deliberately registry-free — enumeration is via TreasuryDeployed events, so this
+#    must be re-run after every new signup (see ROADMAP: CI job is the tracked fix):
+node script/index-tenants.js
+cp out/tenants.scanned.json ../agent/tenants.json
+cp out/tenants.scanned.json ../frontend/public/tenants.json
+
+# 4. Regenerate the committed client ABIs from the forge artifacts. Run after ANY
+#    change to contracts/src — the copies in agent/src/abi and frontend/src/abi are
+#    what the clients actually import, and the script asserts the JournalEntry field
+#    list so struct drift fails loudly instead of shipping stale:
+node script/update-abis.js
 ```
 
-Then, manually (not automated by the script, deliberately — see the script's own
-printed next-steps):
-1. `treasury.registerAgent(<agent submit address>)` as the owner.
-2. Fund the treasury directly with `BASE_ASSET` — it holds its own capital.
-3. **Confirm the agent submit key holds zero `BASE_ASSET`/`QUOTE_ASSET` balance and zero
+Then, per instance (deliberately manual):
+1. Fund the instance with `BASE_ASSET` — it holds its own capital.
+2. **Confirm the agent submit key holds zero `BASE_ASSET`/`QUOTE_ASSET` balance and zero
    approvals to anything.** This is the custody-separation claim from `DESIGN.md` — it's
    only true if you actually check it, not by construction of the code alone.
 

@@ -1135,3 +1135,27 @@ tsc BEFORE the regen landed, which is why it slipped). All 4 sites now use the a
 both packages' ABI files are standardized as bare ABI arrays with a 12-field assertion.
 
 forge 30/30 - agent tsc clean, vitest 40/40 - frontend build + oxlint clean.
+
+## Session 20 - Task 3.11: the deploy scripts could not have built (2026-09-05)
+
+Checked before deleting, as the plan requires - and the first premise was worse than stale:
+a clean `forge build` FAILED on `script/Deploy.s.sol` (error 6160: 6 constructor args vs the
+current 7-arg `Guardrails` signature). The repo could not build from fresh, and CI would fail
+on a new runner - every locally-passing `forge test` since the constructor changed was riding
+a stale cached artifact for that one file. This is exactly the failure mode the CI workflow
+(Task F) exists to catch; it just had not run on a clean runner yet.
+
+Both legacy scripts deleted (`Deploy.s.sol`, `deploy-creditcoin.js` - the latter also called
+`isRegisteredAgent(AGENT)`, an accessor the contract never exposed; `registeredAgents(address)`
+is the mapping getter). Canonical deployment path is the factory flow: `deploy-factory.js` ->
+`register-agent.js` -> `index-tenants.js` -> NEW `update-abis.js`. `docs/DEPLOYMENT.md` Step 3
+was rewritten from the legacy single-treasury walkthrough to that flow (the V2 scripts had no
+runbook section at all before this).
+
+`update-abis.js` is the deterministic ABI regeneration the plan asked for: bare ABI arrays to
+all four client copies, with loud gates - JournalEntry field-list equality (12 fields, update
+together with client decoders), executeArbitrage/createTreasury/TreasuryDeployed presence.
+First run caught real drift: the committed factory ABIs were still stale (the journal ones
+were already current from Task 3.7 - idempotency proven by the empty journal diff).
+
+forge build clean after deletion - forge 30/30 - agent vitest 40/40 - frontend build+lint clean.
