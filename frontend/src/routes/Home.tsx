@@ -4,12 +4,12 @@ import { Link } from "react-router-dom";
 const BEATS = [
   { num: "01", title: "Set your constraints once",
     desc: "You pick seven hard limits — trade size, slippage tolerance, proof drift, rate limit — at sign-up. They are baked into your own contract as immutable constants. No one, not even you, can loosen them after." },
-  { num: "02", title: "It watches for real opportunities",
-    desc: "The agent watches attested price events on a source chain, confirms them with an independent second proof, and evaluates whether a genuine arbitrage gap exists within your constraints." },
+  { num: "02", title: "It watches for arbitrage opportunities",
+    desc: "The agent watches attested price events on a source chain (Sepolia — a toy, demo-controlled PriceObservation contract, not a real market oracle), confirms them with an independent second proof, and evaluates whether an arbitrage gap exists within your constraints." },
   { num: "03", title: "It proves before it acts",
     desc: "Before any trade, the agent generates cryptographic inclusion proofs for both prices and submits them to your contract. The contract verifies the proofs independently." },
   { num: "04", title: "You check in whenever you like",
-    desc: "Every execution and every rejected attempt is journaled on-chain. The Replay & Audit Viewer lets you — or anyone — reconstruct the full chain: fact, reasoning, action — independently." },
+    desc: "Every execution is written to an on-chain journal. Rejected attempts revert on-chain and are visible as failed transactions, but aren't separately journaled — your own limits already did their job. The Replay & Audit Viewer lets you — or anyone — reconstruct the full chain: fact, reasoning, action — independently." },
 ];
 
 export default function Home() {
@@ -34,7 +34,7 @@ export default function Home() {
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ledger-400">
             Fair Witness is a custody-free arbitrage system. Your funds sit in a contract only you control.
             An AI agent decides <em>whether</em> to trade — never <em>how</em>, and never with your key.
-            Every action is backed by cryptographic proofs and journaled on-chain, independently checkable by anyone.
+            Every executed action is backed by cryptographic proofs and journaled on-chain, independently checkable by anyone.
           </p>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-alert-400">
             This is explicitly <strong>not</strong> a speed-competitive trading bot. It will not beat MEV bots

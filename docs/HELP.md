@@ -113,7 +113,9 @@ no bearing on any real deployment, now or later.
 
 **I signed up but don't see any activity yet.**
 The agent polls every ~30 seconds, but it only *acts* when a genuine arbitrage gap
-exists between the source-chain price and the destination-chain pool. Well-balanced pools
+exists between the source-chain price (a demo-controlled Sepolia `PriceObservation`
+contract — not a real market oracle; see the honest caveats in the README) and the
+destination-chain pool. Well-balanced pools
 may rarely produce a gap that clears your minimum-width guardrail. If your guardrails
 are very tight, the AI may be consistently finding gaps too narrow. Try wider values.
 

@@ -1,5 +1,7 @@
 # Fair Witness
 
+[![CI](https://github.com/Ay-obami/fair-witness/actions/workflows/ci.yml/badge.svg)](https://github.com/Ay-obami/fair-witness/actions/workflows/ci.yml)
+
 An attested custody-free arbitrage journal — BUIDL CTC 2026 Fall (Creditcoin AI track)
 submission. Now **multi-tenant**: every user gets their own independently-deployed,
 guardrail-immutable treasury contract via a permissionless factory.
@@ -99,6 +101,17 @@ Gemini key were committed to this repo early on. **Both were rotated 2026-09-03*
 (Claude excluded — no seed parameter). The contract's own independent bound-checking is
 the safety property — key-storage sophistication was a deliberately cut scope item
 (`DEVLOG.md`).
+
+**Source-price honesty:** the Sepolia-side price feed is a deliberately
+toy `PriceObservation` contract (`contracts/src/source-chain/PriceObservation.sol`) whose
+`observePrice(uint256)` is permissionless — anyone can call it with any value. This is
+**not** a real market oracle or DEX feed; Attestcoin's proofs verify that an observation
+was *recorded on Sepolia*, not that the recorded value matched any external market. The
+system's safety does not depend on the source price being truthful — it depends on the
+contract's rigid guardrails (drift bound, min width, rate limit) and the dual-proof
+confirmation that the gap persisted between the two observations. In production, a
+trust-minimized source-price adapter (e.g. a real DEX-state-derived feed) would tighten
+the evidence model — tracked as a future item in `docs/ROADMAP.md`.
 
 
 

@@ -1,10 +1,18 @@
-import type { ReplayData } from "../lib/types";
+import type { ReplayData, TradeDirection } from "../lib/types";
 import { ActionType } from "../lib/types";
 import { DataRow } from "./DataRow";
 import { VerdictBadge } from "./VerdictBadge";
 
 function formatTimestamp(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toISOString();
+}
+
+function directionLabel(direction: TradeDirection | undefined): string {
+  if (direction === "SELL_BASE_FOR_QUOTE") return "SELL base → quote";
+  if (direction === "BUY_BASE_FOR_QUOTE") return "BUY base ← quote";
+  // Pre-direction journal entries carry a 5-field payload — say so honestly rather
+  // than inferring a direction that was never recorded on-chain.
+  return "not recorded (pre-direction journal entry)";
 }
 
 function actionTypeLabel(type: ActionType): string {
@@ -74,10 +82,20 @@ export function ReplayCard({ data }: { data: ReplayData }) {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ledger-200">3. Action executed</h2>
         <dl>
           <DataRow label="Type" value={actionTypeLabel(entry.actionType)} mono={false} />
+          <DataRow label="Direction" value={directionLabel(entry.direction)} mono={false} />
           <DataRow label="Agent (submitter)" value={entry.agent} truncate />
           <DataRow label="Trade size" value={`${entry.tradeSize} (base asset, 6dp)`} />
           <DataRow label="Arb width" value={`${entry.arbWidthBps} bps`} />
-          <DataRow label="Amount out" value={`${entry.amountOut} (quote asset)`} />
+          <DataRow
+            label="Amount out"
+            value={`${entry.amountOut} ${
+              entry.direction === "BUY_BASE_FOR_QUOTE"
+                ? "(base asset — bought)"
+                : entry.direction === "SELL_BASE_FOR_QUOTE"
+                  ? "(quote asset — received)"
+                  : "(quote asset — legacy one-directional entry)"
+            }`}
+          />
           <DataRow label="Executed at" value={formatTimestamp(entry.actedAt)} mono={false} />
         </dl>
         <p className="mt-3 text-xs leading-relaxed text-ledger-400">

@@ -5,7 +5,7 @@ import type { AttestcoinClient, AttestedProof } from "./attestcoinClient.js";
 import type { DecisionEngine } from "./decisionEngine.js";
 import type { ReasoningStore } from "./reasoningStore.js";
 import { TreasurySubmitter } from "./submitter.js";
-import { DexPriceReader, bpsGap } from "./dexPriceReader.js";
+import { DexPriceReader, bpsGap, directionFor, edgeBps, TradeDirection } from "./dexPriceReader.js";
 import { factKey, deterministicNonce, actionKey } from "./keys.js";
 import { readTreasuryGuardrails, type TreasuryGuardrails } from "./treasuryGuardrails.js";
 import type { TenantConfig } from "./tenants.js";
@@ -182,11 +182,17 @@ export async function runTenantCycle(
   proofs: CycleProofs,
   log: Logger = console.log
 ): Promise<void> {
-  const { label } = runtime.config;
-  const key = actionKey(proofs.fact, proofs.agentAddress, proofs.nonce);
+  const { label, treasuryAddress } = runtime.config;
+  // Task 3.1 mirror: key = f(instance, fact, actionType) — no agent address, no
+  // nonce (see keys.ts; must match ASCTreasuryJournal.executeArbitrage exactly).
+  const key = actionKey(treasuryAddress, proofs.fact);
 
   const destPriceNow = await runtime.dexReader.currentPrice();
-  const finalGap = bpsGap(proofs.confirmObservationPrice, destPriceNow);
+  // Task 3.5 mirror: direction + edge derive from the SAME price-sign rule the
+  // contract enforces (dexPriceReader.directionFor/edgeBps mirror it exactly), so the
+  // agent's pre-flight estimate can never drift from the on-chain computation.
+  const direction = directionFor(proofs.confirmObservationPrice, destPriceNow);
+  const finalGap = direction !== null ? edgeBps(proofs.confirmObservationPrice, destPriceNow, direction) : 0;
 
   // Pre-flight replay check is PER INSTANCE — executedActions lives in each instance's
   // own storage, so the same actionKey can legitimately be executed on every tenant.
@@ -212,6 +218,10 @@ export async function runTenantCycle(
     destPrice: destPriceNow.toString(),
     rule: "R-ARB-1",
     llmRationale: decision.rationale,
+    // Task 3.3: the committed decision context now includes the proposed direction
+    // (the human-readable enum name; undefined on a zero gap, which the serializer
+    // omits so pre-direction payloads still hash-verify identically).
+    direction: direction !== null ? TradeDirection[direction] : undefined,
     timestamp: new Date().toISOString(),
   });
 
@@ -220,9 +230,23 @@ export async function runTenantCycle(
     return;
   }
 
+  // Task 3.3: a decision to act MUST carry a direction. A zero gap leaves none the
+  // evidence could support — decline defensively rather than submit something the
+  // contract would revert (WrongTradeDirection / ArbitrageWindowTooNarrow).
+  if (direction === null) {
+    log(`[${label}] Zero gap — no trade direction the evidence supports; not submitting.`);
+    return;
+  }
+
   try {
-    const result = await runtime.submitter.submit(proofs.sourceProof, proofs.confirmProof, proofs.nonce, decisionHash);
-    log(`[${label}] Executed. actionKey=${result.actionKey} tx=${result.txHash}`);
+    const result = await runtime.submitter.submit(
+      proofs.sourceProof,
+      proofs.confirmProof,
+      proofs.nonce,
+      decisionHash,
+      direction
+    );
+    log(`[${label}] Executed (${TradeDirection[direction]}) actionKey=${result.actionKey} tx=${result.txHash}`);
   } catch (err) {
     // Expected reverts (stale, too-narrow, rate-limited, replay, unregistered) are the
     // rigid business logic working as designed, not agent failures — see DEVLOG.md.

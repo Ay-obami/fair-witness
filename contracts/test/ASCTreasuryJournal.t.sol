@@ -24,9 +24,11 @@ contract ASCTreasuryJournalTest is TestBase {
         bytes32 decisionHash = keccak256(bytes("gap=1.3% width sufficient, act"));
 
         uint256 treasuryUsdcBefore = usdc.balanceOf(address(treasury));
+        uint256 treasuryQuoteBefore = quote.balanceOf(address(treasury));
 
         vm.prank(agent);
-        bytes32 actionKey = treasury.executeArbitrage(src, confirm, nonce, decisionHash);
+        bytes32 actionKey =
+            treasury.executeArbitrage(src, confirm, nonce, decisionHash, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         assertTrue(treasury.executedActions(actionKey), "action should be marked executed");
         assertEq(treasury.journalLength(), 1, "journal should have one entry");
@@ -37,10 +39,16 @@ contract ASCTreasuryJournalTest is TestBase {
         assertEq(entry.decisionHash, decisionHash);
         assertTrue(uint8(entry.actionType) == uint8(ASCTreasuryJournal.ActionType.ARBITRAGE));
 
-        // Funds moved out of the treasury (into the DEX, then quote tokens back in) —
-        // and the agent itself never touched any of it.
-        assertLt(usdc.balanceOf(address(treasury)), treasuryUsdcBefore, "treasury USDC should decrease");
-        assertGt(quote.balanceOf(address(treasury)), 0, "treasury should receive quote tokens");
+        // Round-trip (Task 3.3): the BUY leg sells quote out of the treasury and
+        // receives base — and the agent itself never touched any of it.
+        assertGt(usdc.balanceOf(address(treasury)), treasuryUsdcBefore, "treasury USDC should increase (bought base)");
+        assertLt(quote.balanceOf(address(treasury)), treasuryQuoteBefore, "treasury quote should decrease (spent)");
+        // Symmetric cap: BASE received is bounded by MAX_TRADE_SIZE regardless of direction.
+        assertLe(
+            usdc.balanceOf(address(treasury)) - treasuryUsdcBefore,
+            treasury.MAX_TRADE_SIZE(),
+            "base received within cap"
+        );
         assertEq(usdc.balanceOf(agent), 0, "agent must never hold USDC");
         assertEq(quote.balanceOf(agent), 0, "agent must never hold quote token");
     }
@@ -102,7 +110,7 @@ contract ASCTreasuryJournalTest is TestBase {
             uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
 
             vm.prank(agent);
-            treasury.executeArbitrage(src, confirm, nonce, keccak256(abi.encode("run", i)));
+            treasury.executeArbitrage(src, confirm, nonce, keccak256(abi.encode("run", i)), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
             assertEq(usdc.balanceOf(agent), 0, "agent USDC balance must stay zero after every execution");
             assertEq(quote.balanceOf(agent), 0, "agent quote balance must stay zero after every execution");
@@ -125,11 +133,11 @@ contract ASCTreasuryJournalTest is TestBase {
         bytes32 decisionHash = keccak256(bytes("first submission"));
 
         vm.prank(agent);
-        treasury.executeArbitrage(src, confirm, nonce, decisionHash);
+        treasury.executeArbitrage(src, confirm, nonce, decisionHash, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
-        treasury.executeArbitrage(src, confirm, nonce, decisionHash);
+        treasury.executeArbitrage(src, confirm, nonce, decisionHash, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -151,7 +159,7 @@ contract ASCTreasuryJournalTest is TestBase {
         uint256 nonceRun1 = deterministicNonce(factKey, srcPrice, confPrice);
         bytes32 decisionHashRun1 = keccak256(bytes("run 1 reasoning"));
         vm.prank(agent);
-        treasury.executeArbitrage(src, confirm, nonceRun1, decisionHashRun1);
+        treasury.executeArbitrage(src, confirm, nonceRun1, decisionHashRun1, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         // "Run 2": agent restarts, re-polls, re-evaluates the SAME attested fact from
         // scratch, and independently re-derives its nonce using the same deterministic
@@ -162,7 +170,7 @@ contract ASCTreasuryJournalTest is TestBase {
         bytes32 decisionHashRun2 = keccak256(bytes("run 2 reasoning (re-derived independently)"));
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
-        treasury.executeArbitrage(src, confirm, nonceRun2, decisionHashRun2);
+        treasury.executeArbitrage(src, confirm, nonceRun2, decisionHashRun2, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -180,7 +188,7 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.PriceDriftTooHigh.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("drift test"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("drift test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -200,7 +208,31 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.ArbitrageWindowTooNarrow.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("narrow window test"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("narrow window test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // 6b. Task 3.4 net-profitability guard: a window that clears the raw
+    //     MIN_ARB_WIDTH_BPS floor but not the platform MIN_NET_EDGE_BPS
+    //     reserve on top of it -> still reverts. A gross-positive gap can be
+    //     net-unprofitable once fees/slippage/gas are paid.
+    // -------------------------------------------------------------------
+
+    function test_RevertWhenGrossWindowClearsFloorButNotNetEdge() public {
+        uint256 dexPrice = currentDexPrice(); // ~997000
+        // +90bps gross: above the 80bps per-instance floor, but below the
+        // 105bps (80 + MIN_NET_EDGE_BPS) the net-profitability gate requires.
+        uint256 srcPrice = dexPrice;
+        uint256 confPrice = dexPrice + (dexPrice * 90 / 10_000);
+
+        ASCTreasuryJournal.ProofData memory src = buildVerifiedProof(4_000_000, 0, srcPrice, true);
+        ASCTreasuryJournal.ProofData memory confirm = buildVerifiedProof(4_000_003, 0, confPrice, true);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.ArbitrageWindowTooNarrow.selector);
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("net edge test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -222,7 +254,7 @@ contract ASCTreasuryJournalTest is TestBase {
             uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
 
             vm.prank(agent);
-            treasury.executeArbitrage(src, confirm, nonce, keccak256(abi.encode("epoch fill", i)));
+            treasury.executeArbitrage(src, confirm, nonce, keccak256(abi.encode("epoch fill", i)), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
         }
 
         // One more, fully valid, distinct fact — should still be rejected purely on the
@@ -238,7 +270,7 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.EpochRateLimitExceeded.selector);
-        treasury.executeArbitrage(srcN1, confirmN1, nonceN1, keccak256("one too many"));
+        treasury.executeArbitrage(srcN1, confirmN1, nonceN1, keccak256("one too many"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -263,7 +295,8 @@ contract ASCTreasuryJournalTest is TestBase {
         bytes32 decisionHash = keccak256(bytes(offchainReasoning));
 
         vm.prank(agent);
-        bytes32 actionKey = treasury.executeArbitrage(src, confirm, nonce, decisionHash);
+        bytes32 actionKey =
+            treasury.executeArbitrage(src, confirm, nonce, decisionHash, ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         ASCTreasuryJournal.JournalEntry memory entry = treasury.getJournalEntry(actionKey);
 
@@ -289,7 +322,7 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.SourceVerificationFailed.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("unverified test"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("unverified test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     function test_RevertWhenCalledByUnregisteredAgent() public {
@@ -305,7 +338,7 @@ contract ASCTreasuryJournalTest is TestBase {
         address stranger = makeAddr("stranger");
         vm.prank(stranger);
         vm.expectRevert(ASCTreasuryJournal.NotRegisteredAgent.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("unauthorized test"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("unauthorized test"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -327,7 +360,7 @@ contract ASCTreasuryJournalTest is TestBase {
         uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
 
         vm.prank(agent);
-        bytes32 actionKey = treasury.executeArbitrage(src, confirm, nonce, keccak256("legacy type0"));
+        bytes32 actionKey = treasury.executeArbitrage(src, confirm, nonce, keccak256("legacy type0"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         assertTrue(treasury.executedActions(actionKey), "type-0 encoded proof should decode and execute");
         assertEq(treasury.journalLength(), 1, "journal should record the execution");
@@ -350,7 +383,7 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.WrongObservationSource.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("wrong source contract"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("wrong source contract"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
     }
 
     // -------------------------------------------------------------------
@@ -368,6 +401,167 @@ contract ASCTreasuryJournalTest is TestBase {
 
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.UnderlyingTxNotSuccessful.selector);
-        treasury.executeArbitrage(src, confirm, nonce, keccak256("reverted underlying tx"));
+        treasury.executeArbitrage(src, confirm, nonce, keccak256("reverted underlying tx"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // Task 3.1 hardening: the actionKey binds ONLY (instance, fact, actionType) —
+    // no msg.sender, no caller-supplied decisionNonce. Same fact + a different
+    // nonce from the SAME agent must therefore also collide and revert; pre-3.1
+    // this minted a fresh key and slipped past the replay guard entirely.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnSameFactDifferentNonce() public {
+        (
+            ASCTreasuryJournal.ProofData memory src,
+            ASCTreasuryJournal.ProofData memory confirm,
+            uint256 srcPrice,
+            uint256 confPrice
+        ) = buildHappyPathProofs(0);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        vm.prank(agent);
+                treasury.executeArbitrage(src, confirm, nonce, keccak256("first nonce"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+
+        // A second run that varies ONLY the nonce — which the contract does not and
+        // cannot verify — must collide on the same fact-derived key.
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
+                treasury.executeArbitrage(src, confirm, nonce + 1, keccak256("different nonce"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // Task 3.1 hardening: two different registered agents executing against the
+    // same underlying fact must not both succeed — the caller is not part of the
+    // on-chain identity.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnSameFactDifferentRegisteredAgent() public {
+        (
+            ASCTreasuryJournal.ProofData memory src,
+            ASCTreasuryJournal.ProofData memory confirm,
+            uint256 srcPrice,
+            uint256 confPrice
+        ) = buildHappyPathProofs(0);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        address agentB = makeAddr("agentB");
+        vm.prank(owner);
+        treasury.registerAgent(agentB);
+
+        vm.prank(agent);
+                treasury.executeArbitrage(src, confirm, nonce, keccak256("agent A run"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+
+        // agentB submits the identical fact with its OWN nonce: before the 3.1
+        // hardening this minted a distinct actionKey (msg.sender was in the key) and
+        // executed a second time against the same fact. It must now revert.
+        vm.prank(agentB);
+        vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
+                treasury.executeArbitrage(src, confirm, nonce + 1, keccak256("agent B run"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+    }
+
+    // -------------------------------------------------------------------
+    // Task 3.9: renouncing ownership would leave any registered agent authorized
+    // forever, with no owner able to deregister it — permanently disabled.
+    // -------------------------------------------------------------------
+
+    function test_OwnerCannotRenounceOwnership() public {
+        vm.prank(owner);
+        vm.expectRevert(ASCTreasuryJournal.CannotRenounceOwnership.selector);
+        treasury.renounceOwnership();
+
+        // Ownership is intact: the owner can still manage the agent allowlist.
+        vm.prank(owner);
+        treasury.deregisterAgent(agent);
+        assertFalse(treasury.registeredAgents(agent), "owner still controls allowlist");
+    }
+
+    // -------------------------------------------------------------------
+    // Task 3.3: the SELL direction executes against the same DEX when the sign
+    // flips — attested reference BELOW the DEX price. Guardrails apply per
+    // direction: the BASE sold stays within MAX_TRADE_SIZE.
+    // -------------------------------------------------------------------
+
+    function test_ExecutesSellDirection() public {
+        (
+            ASCTreasuryJournal.ProofData memory src,
+            ASCTreasuryJournal.ProofData memory confirm,
+            uint256 srcPrice,
+            uint256 confPrice
+        ) = buildSellSideProofs(0);
+        bytes32 factKey = factKeyOf(src);
+        uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+        uint256 usdcBefore = usdc.balanceOf(address(treasury));
+        uint256 quoteBefore = quote.balanceOf(address(treasury));
+
+        vm.prank(agent);
+        bytes32 actionKey = treasury.executeArbitrage(
+            src, confirm, nonce, keccak256("sell direction"), ASCTreasuryJournal.TradeDirection.SellBaseForQuote
+        );
+
+        assertTrue(treasury.executedActions(actionKey), "sell-direction execution should journal");
+        // Sold base out of the treasury, received quote back — the mirror of the buy leg.
+        assertLt(usdc.balanceOf(address(treasury)), usdcBefore, "treasury USDC should decrease (sold base)");
+        assertGt(quote.balanceOf(address(treasury)), quoteBefore, "treasury should receive quote");
+        // Symmetric cap: BASE sold is bounded by MAX_TRADE_SIZE regardless of direction.
+        assertLe(
+            usdcBefore - usdc.balanceOf(address(treasury)),
+            treasury.MAX_TRADE_SIZE(),
+            "base sold within cap"
+        );
+    }
+
+    // -------------------------------------------------------------------
+    // Task 3.5: the caller's proposed direction must match the sign of
+    // (destPrice - confPrice). Proposing the opposite direction — economically a
+    // loss against the same evidence — reverts instead of executing, and the fact
+    // is NOT consumed (a revert unwinds), so a corrected retry remains possible.
+    // -------------------------------------------------------------------
+
+    function test_RevertOnWrongTradeDirection() public {
+        // Happy-path fixture: destPrice (~0.997) < confPrice (1.010) — evidence says BUY.
+        // Proposing the SELL direction must revert.
+        (
+            ASCTreasuryJournal.ProofData memory srcBuy,
+            ASCTreasuryJournal.ProofData memory confirmBuy,
+            uint256 srcPriceBuy,
+            uint256 confPriceBuy
+        ) = buildHappyPathProofs(0);
+        bytes32 factKeyBuy = factKeyOf(srcBuy);
+        uint256 nonceBuy = deterministicNonce(factKeyBuy, srcPriceBuy, confPriceBuy);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.WrongTradeDirection.selector);
+        treasury.executeArbitrage(
+            srcBuy,
+            confirmBuy,
+            nonceBuy,
+            keccak256("sell against buy evidence"),
+            ASCTreasuryJournal.TradeDirection.SellBaseForQuote
+        );
+
+        // Sell-side fixture: destPrice (~0.997) > confPrice (0.985) — evidence says SELL.
+        // Proposing the BUY direction must revert the same way.
+        (
+            ASCTreasuryJournal.ProofData memory srcSell,
+            ASCTreasuryJournal.ProofData memory confirmSell,
+            uint256 srcPriceSell,
+            uint256 confPriceSell
+        ) = buildSellSideProofs(0);
+        bytes32 factKeySell = factKeyOf(srcSell);
+        uint256 nonceSell = deterministicNonce(factKeySell, srcPriceSell, confPriceSell);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.WrongTradeDirection.selector);
+        treasury.executeArbitrage(
+            srcSell,
+            confirmSell,
+            nonceSell,
+            keccak256("buy against sell evidence"),
+            ASCTreasuryJournal.TradeDirection.BuyBaseForQuote
+        );
     }
 }

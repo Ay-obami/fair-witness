@@ -84,6 +84,9 @@ abstract contract TestBase is Test {
 
         // Fund the treasury directly — it holds its own capital, never the agent.
         usdc.mint(address(treasury), 1_000e6);
+        // Round-trip (Task 3.3): the BUY direction sells QUOTE, so the fixture also
+        // funds a quote balance — the state a treasury reaches after prior sell legs.
+        quote.mint(address(treasury), 1_000e6);
     }
 
     /// @dev The guardrail set the rest of the test-suite fixture assumes — the V1
@@ -270,8 +273,28 @@ abstract contract TestBase is Test {
     {
         srcPrice = 1_005_000; // 1.005, in 6-decimal fixed point
         confPrice = 1_010_000; // 1.010 — ~50bps drift from src, within MAX_DRIFT_BPS (100)
-        // ~1.3% gap vs the ~0.997 DEX price — comfortably above MIN_ARB_WIDTH_BPS (80)
+        // DEX price (~0.997) is BELOW the attested reference — the evidence supports
+        // BUYING BASE (Task 3.5 direction rule). ~130bps edge, above the 80bps floor.
         sourceProof = buildVerifiedProof(1_000_000 + salt, 0, srcPrice, true);
         confirmProof = buildVerifiedProof(1_000_003 + salt, 0, confPrice, true);
+    }
+
+    /// @dev SELL-side counterpart to buildHappyPathProofs: the attested reference is
+    ///      BELOW the DEX price (~0.997), so the evidence supports selling BASE for
+    ///      QUOTE (Task 3.5 direction rule). Drift and edge still pass the default
+    ///      guardrails: ~51bps drift, ~120bps edge vs the 80bps floor.
+    function buildSellSideProofs(uint32 salt)
+        internal
+        returns (
+            ASCTreasuryJournal.ProofData memory sourceProof,
+            ASCTreasuryJournal.ProofData memory confirmProof,
+            uint256 srcPrice,
+            uint256 confPrice
+        )
+    {
+        srcPrice = 980_000; // 0.980, in 6-decimal fixed point
+        confPrice = 985_000; // 0.985 — ~51bps drift from src, within MAX_DRIFT_BPS (100)
+        sourceProof = buildVerifiedProof(2_500_000 + salt, 0, srcPrice, true);
+        confirmProof = buildVerifiedProof(2_500_003 + salt, 0, confPrice, true);
     }
 }

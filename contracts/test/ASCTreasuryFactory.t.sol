@@ -143,6 +143,11 @@ function test_TreasuryDeployedEventEmittedWithAddressAndOwner() public {
         // Both tenants fund and register submitters for THEIR OWN instance only.
         usdc.mint(address(a), 100e6);
         usdc.mint(address(b), 200e6);
+        // Round-trip (Task 3.3): the happy-path fixture's evidence supports BUYING base
+        // (DEX price below the attested reference), so each instance also needs a quote
+        // balance to sell from.
+        quote.mint(address(a), 1_000e6);
+        quote.mint(address(b), 1_000e6);
         vm.prank(tenantA);
         a.registerAgent(agent);
         vm.prank(tenantB);
@@ -162,11 +167,11 @@ function test_TreasuryDeployedEventEmittedWithAddressAndOwner() public {
         uint256 bUsdcBefore = usdc.balanceOf(address(b));
 
         vm.prank(agent);
-        a.executeArbitrage(src, confirm, nonce, keccak256("tenant A run"));
+        a.executeArbitrage(src, confirm, nonce, keccak256("tenant A run"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
 
         // A moved funds and journaled; B did neither.
         assertEq(a.journalLength(), 1, "A must journal its execution");
-        assertLt(usdc.balanceOf(address(a)), aUsdcBefore, "A's funds must move");
+        assertGt(usdc.balanceOf(address(a)), aUsdcBefore, "A's funds must move (bought base)");
         assertEq(b.journalLength(), 0, "B's journal must stay empty");
         assertEq(usdc.balanceOf(address(b)), bUsdcBefore, "B's funds must stay untouched");
 
@@ -178,7 +183,7 @@ function test_TreasuryDeployedEventEmittedWithAddressAndOwner() public {
         // And a replay against A does not touch B's journal either (reverts on A only).
         vm.prank(agent);
         vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
-        a.executeArbitrage(src, confirm, nonce, keccak256("replay on A"));
+        a.executeArbitrage(src, confirm, nonce, keccak256("replay on A"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
         assertEq(b.journalLength(), 0, "B still unaffected after A's replay revert");
     }
 

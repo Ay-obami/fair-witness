@@ -1,10 +1,13 @@
 import { ethers } from "ethers";
 
-/** Mirrors ASCTreasuryJournal.ActionType enum ordering exactly. */
+/**
+ * Mirrors ASCTreasuryJournal.ActionType enum ordering exactly. The contract's enum is
+ * now ARBITRAGE-only: rejections revert and are intentionally not journaled, so the
+ * never-constructed REJECTED_STALE / REJECTED_NARROW values were removed on-chain
+ * (IMPLEMENTATION_PLAN.md Task D).
+ */
 export enum ActionType {
   ARBITRAGE = 0,
-  REJECTED_STALE = 1,
-  REJECTED_NARROW = 2,
 }
 
 /**
@@ -41,15 +44,21 @@ export function deterministicNonce(fact: string, srcPrice: bigint, destPrice: bi
 
 /**
  * Mirrors the contract's actionKey derivation exactly:
- *   keccak256(abi.encode(factKey, actionType, agent, decisionNonce))
- * Used off-chain for the pre-flight "have I already done this" check before spending
- * gas on a resubmission.
+ *   keccak256(abi.encode(address(this), factKey, actionType))
+ *
+ * Task 3.1: the key binds ONLY the instance, the fact, and the action type — the
+ * caller and its nonce no longer participate in on-chain identity, so two registered
+ * agents (or one agent varying the nonce) collide on-chain instead of each minting a
+ * fresh key for the same fact. Used off-chain for the pre-flight "have I already done
+ * this" check before spending gas on a resubmission. MUST stay in lock-step with
+ * ASCTreasuryJournal.executeArbitrage or the pre-flight silently diverges from the
+ * contract's own computation.
  */
-export function actionKey(fact: string, agentAddress: string, nonce: bigint): string {
+export function actionKey(treasuryAddress: string, fact: string): string {
   return ethers.keccak256(
     ethers.AbiCoder.defaultAbiCoder().encode(
-      ["bytes32", "uint8", "address", "uint256"],
-      [fact, ActionType.ARBITRAGE, agentAddress, nonce]
+      ["address", "bytes32", "uint8"],
+      [treasuryAddress, fact, ActionType.ARBITRAGE]
     )
   );
 }

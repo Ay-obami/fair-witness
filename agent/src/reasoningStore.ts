@@ -9,6 +9,9 @@ export interface ReasoningPayload {
   destPrice: string;
   rule: string;
   llmRationale: string;
+  /** Task 3.3: human-readable TradeDirection name ("BuyBaseForQuote" / "SellBaseForQuote").
+   *  Optional + omitted when undefined so pre-direction payloads hash identically. */
+  direction?: string;
   timestamp: string;
 }
 
@@ -28,7 +31,9 @@ export class ReasoningStore {
     await fs.mkdir(this.storeDir, { recursive: true });
   }
 
-  /** Serializes deterministically (fixed key order) so the hash is reproducible. */
+  /** Serializes deterministically (fixed key order) so the hash is reproducible. The
+   *  optional `direction` field is omitted when undefined (JSON.stringify semantics),
+   *  which keeps pre-direction payloads hashing to their original on-chain values. */
   private serialize(payload: ReasoningPayload): string {
     return JSON.stringify({
       observedGapBps: payload.observedGapBps,
@@ -37,6 +42,7 @@ export class ReasoningStore {
       destPrice: payload.destPrice,
       rule: payload.rule,
       llmRationale: payload.llmRationale,
+      direction: payload.direction,
       timestamp: payload.timestamp,
     });
   }

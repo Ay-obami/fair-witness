@@ -211,6 +211,23 @@ GH Pages with SPA fallback configured.
 - `createTreasury` is permissionless — fine; the factory has no owner/mint/AdminWithdraw
   surface to abuse.
 
+## Known limitations & longer-term items
+
+- **Demo source-price feed.** The Sepolia-side price (`PriceObservation.sol`) is a
+  toy, permissionless contract — anyone can call `observePrice(uint256)` with any
+  value. Attestcoin proves the observation was *recorded*, not that the value matched
+  any external market. Safety does not depend on the source price being truthful
+  (it depends on the contract's rigid guardrails + dual-proof confirmation), but a
+  trust-minimized adapter (e.g. a real DEX-state-derived feed) would tighten the
+  evidence model. **Status:** design noted; not scoped. See Task 3.2.
+- **One-directional DEX leg.** Execution is hardcoded `BASE_ASSET → QUOTE_ASSET` only;
+  the reverse direction is not yet available (Task 3.3).
+- **No withdrawal path.** Funds converted to `QUOTE_ASSET` have no unprivileged path
+  back to `BASE_ASSET` through the contract (Task 3.3).
+- **Proof verification scope.** `confirmProof.chainKey` is not cross-checked against
+  `sourceProof.chainKey`, and `_decodePriceObservation` does not validate the
+  `observePrice(uint256)` selector bytes (Task 3.6).
+
 ## Environment reference
 
 Frontend (`.env` / `frontend/.env.example`): `VITE_CREDITCOIN_RPC_URL` · `VITE_CHAIN_ID=102031` ·

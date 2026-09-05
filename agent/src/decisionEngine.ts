@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { config } from "./config.js";
+import { directionFor, type TradeDirection } from "./dexPriceReader.js";
 import type { TreasuryGuardrails } from "./treasuryGuardrails.js";
 
 export interface DecisionInput {
@@ -12,6 +13,14 @@ export interface DecisionInput {
 
 export interface Decision {
   act: boolean;
+  /**
+   * Task 3.3: the decision now proposes a DIRECTION, not just an act/skip boolean.
+   * It is derived deterministically from the attested/live price sign — not an LLM
+   * judgment call (the sign is arithmetic, and executeArbitrage independently
+   * re-derives and enforces the same rule on-chain). Null means the gap has no sign
+   * (zero gap): there is no direction the evidence supports.
+   */
+  direction: TradeDirection | null;
   rationale: string;
 }
 
@@ -115,6 +124,10 @@ Should the contract be recommended to act on this?`;
         if (!text) throw new Error("Gemini returned no text output");
 
         const parsed = JSON.parse(text) as Decision;
+        // Task 3.3: attach the direction derived from the price sign. The LLM is NOT
+        // asked to choose it — the sign is arithmetic, and the contract re-derives and
+        // enforces the same rule on-chain regardless of what this returns.
+        parsed.direction = directionFor(input.confPrice, input.destPrice);
         this.cache.set(key, parsed);
         return parsed;
       } catch (err) {

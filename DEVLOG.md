@@ -1067,3 +1067,36 @@ button → fund → agent cycle → `/verify` hash-match).
 
 
 
+
+## Session 17 — Part 2/3 hardening pass: protocol correctness lands (2026-09-05)
+
+Worked IMPLEMENTATION_PLAN.md in its stated priority (Part 3 first). All of it is one
+uncommitted-until-now pass, so this entry covers the whole batch:
+
+- **3.1 replay-key hardening**: on-chain `actionKey = keccak256(address(this), factKey, ARBITRAGE)` —
+  `msg.sender`/`decisionNonce` removed from identity, so one-execution-per-fact holds by construction.
+  Agent mirror (`keys.ts`, tenantRunner pre-flight) updated in lock-step; nonce kept in calldata for
+  deterministic crash/retry bookkeeping only.
+- **3.5 + 3.3 direction encoding and round-trip**: explicit `TradeDirection`, buy/sell legs chosen by
+  which way the gap runs, symmetric guardrail application, wrong-direction rejection + tests.
+- **3.4 net-profitability guard**: `MIN_NET_EDGE_BPS = 25` — the width net of the reserve must clear
+  the per-instance floor. Chose a fixed platform constant over a configurable one on purpose: fees
+  are the platform's reality, not the tenant's preference, and a tunable reserve would be a
+  loosening lever. No new journal word: net edge = gross − 25 is trivially reconstructible, and a
+  7th payload word would have churned every client for zero new information.
+- **3.8 / 3.9**: constructor now zero-checks dependencies; guardrail validation makes the
+  zero-computed-size combination unreachable at configuration time; `renounceOwnership` reverts.
+- **Part 2**: DESIGN.md §9 destination-price disclosure (verbatim from plan), rejected-attempts copy
+  corrected (PRD §1, Home.tsx — README/ARCHITECTURE_V2 were already accurate; the plan's README item
+  was a false positive, recorded as such in the plan), dead `REJECTED_*`/`ArbitrageRejected`/
+  unreachable-revert removed, OZ `ReentrancyGuard` added, CI workflow (forge + vitest + frontend
+  build) with README badge.
+
+**Pitfall, honestly:** a mid-pass script inserted the agent-side reserve block in the wrong place,
+splicing it between `export function edgeBps` and its parameter list — `tsc` caught it immediately,
+and the repair + full re-verification (forge 27/27 incl. the new net-edge revert test, vitest 40/40,
+tsc clean) is what actually landed. No ABI change: the reserve is a private constant.
+
+**Deployment note:** all of this changes future factory deployments; the two live CC3 instances run
+the pre-hardening logic and stay as-is (additive-pivot model — redeploying tenants is a product
+decision, not part of this pass).
