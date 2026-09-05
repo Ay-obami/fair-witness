@@ -308,6 +308,144 @@ contract ASCTreasuryJournalTest is TestBase {
     }
 
     // -------------------------------------------------------------------
+    // 6f. Task 3.13: every successful execution journals EXACTLY one entry.
+    //     A replay of the same fact reverts and must not add another.
+    // -------------------------------------------------------------------
+
+    function test_EverySuccessfulExecutionJournalsExactlyOneEntry() public {
+        (
+            ASCTreasuryJournal.ProofData memory src1,
+            ASCTreasuryJournal.ProofData memory confirm1,
+            uint256 srcPrice1,
+            uint256 confPrice1
+        ) = buildHappyPathProofs(10);
+        bytes32 factKey1 = factKeyOf(src1);
+        uint256 nonce1 = deterministicNonce(factKey1, srcPrice1, confPrice1);
+
+        vm.prank(agent);
+        bytes32 key1 =
+            treasury.executeArbitrage(src1, confirm1, nonce1, keccak256("invariant one"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+
+        assertEq(treasury.journalLength(), 1, "first success -> exactly one journal entry");
+        assertEq(treasury.getJournalEntry(key1).actionKey, key1, "journal stores the entry");
+
+        (
+            ASCTreasuryJournal.ProofData memory src2,
+            ASCTreasuryJournal.ProofData memory confirm2,
+            uint256 srcPrice2,
+            uint256 confPrice2
+        ) = buildHappyPathProofs(20);
+        bytes32 factKey2 = factKeyOf(src2);
+        uint256 nonce2 = deterministicNonce(factKey2, srcPrice2, confPrice2);
+
+        vm.prank(agent);
+        treasury.executeArbitrage(src2, confirm2, nonce2, keccak256("invariant two"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+        assertEq(treasury.journalLength(), 2, "second distinct success -> a second entry");
+
+        // Replay of the second fact must revert and add nothing.
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.ActionAlreadyExecuted.selector);
+        treasury.executeArbitrage(src2, confirm2, nonce2, keccak256("invariant replay"), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+        assertEq(treasury.journalLength(), 2, "replayed attempt must not add a journal entry");
+    }
+
+    // -------------------------------------------------------------------
+    // 6g. Task 3.13: trade size NEVER exceeds MAX_TRADE_SIZE and is never zero on a
+    //     valid execution (the clamp binds; the 3.8 configuration floor holds).
+    //     Slippage is enforced by the contract's own `SlippageExceeded` revert —
+    //     a swap that would breach the bound simply cannot journal.
+    // -------------------------------------------------------------------
+
+    function test_TradeSizeNeverExceedsCapAndNeverZero() public {
+        for (uint32 salt = 0; salt < 3; salt++) {
+            (
+                ASCTreasuryJournal.ProofData memory src,
+                ASCTreasuryJournal.ProofData memory confirm,
+                uint256 srcPrice,
+                uint256 confPrice
+            ) = buildHappyPathProofs(salt);
+            bytes32 factKey = factKeyOf(src);
+            uint256 nonce = deterministicNonce(factKey, srcPrice, confPrice);
+
+            vm.prank(agent);
+            bytes32 actionKey =
+                treasury.executeArbitrage(src, confirm, nonce, keccak256(abi.encode("bounds", salt)), ASCTreasuryJournal.TradeDirection.BuyBaseForQuote);
+
+            ASCTreasuryJournal.JournalEntry memory entry = treasury.getJournalEntry(actionKey);
+            (uint256 tradeSize, , , , uint256 amountOut, ) =
+                abi.decode(entry.actionPayload, (uint256, uint256, uint256, uint256, uint256, uint8));
+            assertTrue(tradeSize <= treasury.MAX_TRADE_SIZE(), "trade size must never exceed the cap");
+            assertTrue(tradeSize > 0, "trade size must never be zero on a valid execution");
+            assertTrue(amountOut > 0, "a successful execution always moves funds");
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // 6h. Task 3.8/3.13: a buy-direction execution whose input value rounds to
+    //     ZERO is rejected (ZeroTradeSize); the same minimal sizing on the SELL
+    //     leg still succeeds (size 1 > 0) — the "never zero" invariant holds
+    //     across the valid configuration space.
+    // -------------------------------------------------------------------
+
+    function test_ZeroComputedBuyInputIsRejected() public {
+        // Minimal valid guardrails where _boundedTradeSize floors to exactly 1.
+        ASCTreasuryJournal mini = new ASCTreasuryJournal(
+            address(verifier),
+            address(router),
+            address(usdc),
+            address(quote),
+            address(priceSource),
+            address(this), // owner = THIS test so registration is direct
+            ASCTreasuryJournal.Guardrails({
+                maxTradeSize: 4,
+                maxSlippageBps: 150,
+                minArbWidthBps: 100,
+                maxDriftBps: 100,
+                maxConfirmGapBlocks: 20,
+                maxActionsPerEpoch: 6,
+                epochLength: 1 days
+            })
+        );
+        mini.registerAgent(agent);
+
+        uint256 dexPrice = currentDexPrice(); // ~997000
+        usdc.mint(address(mini), 1_000_000); // fund the SELL leg
+
+        // SELL leg: conf < dex, width ~126bps >= 100 + MIN_NET_EDGE_BPS(25).
+        // Sized to tradeSize 1 (> 0), executes fine.
+        uint256 confSell = dexPrice - 12_500;
+        uint256 srcSell = confSell - 4_000; // ~40bps drift, within MAX_DRIFT_BPS
+        ASCTreasuryJournal.ProofData memory srcS = buildVerifiedProof(6_000_100, 0, srcSell, true);
+        ASCTreasuryJournal.ProofData memory confirmS = buildVerifiedProof(6_000_103, 0, confSell, true);
+        bytes32 factKeyS = factKeyOf(srcS);
+
+        vm.prank(agent);
+        bytes32 keyS = mini.executeArbitrage(
+            srcS, confirmS, deterministicNonce(factKeyS, srcSell, confSell), keccak256("sell min"),
+            ASCTreasuryJournal.TradeDirection.SellBaseForQuote
+        );
+        (uint256 sellSize, , , , , ) =
+            abi.decode(mini.getJournalEntry(keyS).actionPayload, (uint256, uint256, uint256, uint256, uint256, uint8));
+        assertEq(sellSize, 1, "minimal valid guardrails must still trade a nonzero size on the sell leg");
+
+        // BUY leg: conf > dex, width ~125bps (>= the 125 gate). size computes to 1,
+        // but the buy input is amountIn = floor(1 * destPrice / 1e6) which rounds
+        // to 0 against the ~0.997 mock DEX price -> ZeroTradeSize reverts.
+        uint256 confBuy = dexPrice + 12_500;
+        uint256 srcBuy = confBuy - 4_000;
+        ASCTreasuryJournal.ProofData memory srcB = buildVerifiedProof(6_000_200, 0, srcBuy, true);
+        ASCTreasuryJournal.ProofData memory confirmB = buildVerifiedProof(6_000_203, 0, confBuy, true);
+        bytes32 factKeyB = factKeyOf(srcB);
+
+        vm.prank(agent);
+        vm.expectRevert(ASCTreasuryJournal.ZeroTradeSize.selector);
+        mini.executeArbitrage(
+            srcB, confirmB, deterministicNonce(factKeyB, srcBuy, confBuy), keccak256("buy min"),
+            ASCTreasuryJournal.TradeDirection.BuyBaseForQuote
+        );
+    }
+
+    // -------------------------------------------------------------------
     // 7. (MAX_ACTIONS_PER_EPOCH + 1)th valid call in an epoch -> reverts, even with a
     //    fully valid proof.
     // -------------------------------------------------------------------

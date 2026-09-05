@@ -60,4 +60,14 @@ describe("ReasoningStore", () => {
     };
     expect(store.verifyHash(reordered, hashA)).toBe(true);
   });
+
+  it("commits the decision outcome (Task 3.10): with-outcome payloads hash differently from without, and both verify", async () => {
+    const hashWithout = await store.put(samplePayload);
+    const withOutcome: ReasoningPayload = { ...samplePayload, outcome: "EXECUTE" };
+    const hashWith = await store.put(withOutcome);
+    expect(hashWithout).not.toBe(hashWith);
+    expect(store.verifyHash(withOutcome, hashWith)).toBe(true);
+    // Backward-compat: a pre-3.10 payload (no outcome field) still verifies to its own hash.
+    expect(store.verifyHash(samplePayload, hashWithout)).toBe(true);
+  });
 });

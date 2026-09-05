@@ -218,6 +218,11 @@ export async function runTenantCycle(
     destPrice: destPriceNow.toString(),
     rule: "R-ARB-1",
     llmRationale: decision.rationale,
+    // Task 3.10: commit the ACT/DECLINE outcome itself, not just the inputs that
+    // led to it. (On-chain, this hash only ever sits on an execution — rejections
+    // revert and are not journaled — but the stored file now self-describes the
+    // decision, which also matters for the agent-side decline records.)
+    outcome: decision.act ? "EXECUTE" : "DECLINE",
     // Task 3.3: the committed decision context now includes the proposed direction
     // (the human-readable enum name; undefined on a zero gap, which the serializer
     // omits so pre-direction payloads still hash-verify identically).

@@ -525,7 +525,7 @@ The hashed reasoning payload currently commits to a subset of fields
 (observed gap, prices, rule, rationale, timestamp) but not the full decision
 context.
 
-- [ ] Include the ACT/DECLINE outcome itself and full decision context in
+- [x] Include the ACT/DECLINE outcome itself and full decision context in
       the committed hash, not just the inputs that led to it.
 
 ### Task 3.11 — Deployment script cleanup
@@ -566,10 +566,10 @@ underlying fix exists:
 - [x] Wrong-direction execution is rejected (Task 3.5)
 - [x] Invalid/cross-chain-mismatched confirmation proof is rejected (Task 3.6)
 - [x] Opportunity below net profitability (after fees) is rejected (Task 3.4)
-- [ ] Zero-computed trade size is rejected (Task 3.8)
-- [ ] Every successful fund movement corresponds to exactly one journal entry
-- [ ] Trade size never exceeds `maxTradeSize`; slippage never exceeds `maxSlippageBps`
-- [ ] Guardrails remain immutable across the contract's lifetime
+- [x] Zero-computed trade size is rejected (Task 3.8)
+- [x] Every successful fund movement corresponds to exactly one journal entry
+- [x] Trade size never exceeds `maxTradeSize`; slippage never exceeds `maxSlippageBps`
+- [x] Guardrails remain immutable across the contract's lifetime
 - [x] `renounceOwnership` cannot leave a registered agent permanently unremovable (Task 3.9)
 
 ## Part 3 progress log
@@ -621,7 +621,14 @@ underlying fix exists:
   `validateGuardrails` (see Task 3.8 checkbox note for the rounding analysis).
 - Task 3.9: ✅ 2026-09-05 — `renounceOwnership` overridden to revert
   (`CannotRenounceOwnership`); owner-control test added.
-- Task 3.10: not started (scoping note: the on-chain contract only ever sees
+- Task 3.10: done 2026-09-05 - re-scoped per the plan's own note: the on-chain
+  decisionHash only ever sits on an execution (rejections revert - Task B), so the
+  ACT/DECLINE outcome is now committed into the reasoning payload itself as
+  `outcome: "EXECUTE" | "DECLINE"` (stored for both act and decline paths; serialized
+  between llmRationale and direction, omitted-when-undefined so all pre-3.10 payloads
+  still hash-verify to their on-chain commitments). Frontend hash mirror updated in
+  lock-step. Tests: outcome participates in the hash (with/without differ, both verify)
+  + act/decline assertions; forge 33/33, agent vitest 41/41, frontend build+lint clean.
   executions — rejections revert — so "the ACT/DECLINE outcome in the committed
   hash" needs re-scoping to the agent-side reasoning payload first)
 - Task 3.11: done 2026-09-05 — BOTH flagged premises verified (see Task 3.11
@@ -642,7 +649,11 @@ underlying fix exists:
   frontend Help route; corrected the `/app` -> `/dashboard` route reference; amended PRD
   destination-DEX + trade-asset rows to the deployed mock reality (retaining PenguinSwap
   as the abandoned plan). Remaining PenguinSwap hits are honest historical/fallback refs.
-- Task 3.13: 4 of 10 items done (same-fact-different-nonce ✓,
-  same-fact-different-agent ✓, renounceOwnership ✓, wrong-direction
-  rejection ✓); the rest gated on their fixes
-
+- Task 3.13: 10 of 10 items done 2026-09-05 - added the three remaining
+  invariants: `test_EverySuccessfulExecutionJournalsExactlyOneEntry` (successes journal
+  1-1; replays add nothing), `test_TradeSizeNeverExceedsCapAndNeverZero` (clamp + 3.8
+  floor hold across widths; slippage enforced by the contract's SlippageExceeded
+  revert path), `test_ZeroComputedBuyInputIsRejected` (minimal valid guardrails size
+  to 1 on the SELL leg; the BUY leg's rounded-to-zero input reverts ZeroTradeSize).
+  Guardrail immutability was already covered by the existing factory test
+  `test_GuardrailsAreImmutableAndPerInstance`, and now cross-referenced.

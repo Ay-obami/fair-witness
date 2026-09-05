@@ -250,6 +250,8 @@ describe("runTenantCycle", () => {
     expect(payload.sourcePrice).toBe("1010000");
     expect(payload.confirmPrice).toBe("1011000");
     expect(payload.llmRationale).toBe("positive arb");
+    // Task 3.10: the committed payload self-describes the decision outcome.
+    expect(payload.outcome).toBe("EXECUTE");
     // Task 3.3: the reasoning payload commits to the proposed direction too, and the
     // submission carries the direction the contract will validate against the prices.
     expect(payload.direction).toBe("BuyBaseForQuote");
@@ -281,6 +283,9 @@ describe("runTenantCycle", () => {
     expect(submit).not.toHaveBeenCalled();
     // the reasoning is still stored, even for a rejection (journaled off-chain)
     expect(s.mocks.reasoningStore.put).toHaveBeenCalledTimes(1);
+    // Task 3.10: the stored decline payload self-describes the DECLINE outcome.
+    const declinePayload = s.mocks.reasoningStore.put.mock.calls[0][0] as ReasoningPayload;
+    expect(declinePayload.outcome).toBe("DECLINE");
   });
 
   it("a contract-side rejection is logged, not thrown (one tenant's revert must not stop the others)", async () => {

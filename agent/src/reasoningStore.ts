@@ -9,8 +9,12 @@ export interface ReasoningPayload {
   destPrice: string;
   rule: string;
   llmRationale: string;
-  /** Task 3.3: human-readable TradeDirection name ("BuyBaseForQuote" / "SellBaseForQuote").
-   *  Optional + omitted when undefined so pre-direction payloads hash identically. */
+  /** Task 3.10: the decision OUTCOME, not just the inputs that led to it. The on-chain
+   *  decisionHash only ever exists for executions (rejections revert — Task B), so the
+   *  outcome was previously implied by context rather than committed. New payloads now
+   *  carry it explicitly; optional + omitted when undefined so pre-3.10 payloads still
+   *  hash-verify to their original on-chain commitments (same rule as `direction`). */
+  outcome?: "EXECUTE" | "DECLINE";
   direction?: string;
   timestamp: string;
 }
@@ -42,6 +46,10 @@ export class ReasoningStore {
       destPrice: payload.destPrice,
       rule: payload.rule,
       llmRationale: payload.llmRationale,
+      // Task 3.10: outcome sits between llmRationale and direction. Optional —
+      // JSON.stringify omits it when undefined, so pre-3.10 payloads keep hashing
+      // to their original on-chain values (mirrored in frontend/contractReader).
+      outcome: payload.outcome,
       direction: payload.direction,
       timestamp: payload.timestamp,
     });
