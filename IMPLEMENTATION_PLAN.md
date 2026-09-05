@@ -470,12 +470,12 @@ Not independently verified line-by-line against the current contract in
 this session — plausible and consistent with the rest of this review's
 accuracy, but confirm against the current code before implementing.
 
-- [ ] Verify `confirmProof.chainKey` equals `sourceProof.chainKey` where
+- [x] Verify `confirmProof.chainKey` equals `sourceProof.chainKey` where
       that relationship is required.
-- [ ] Verify `_decodePriceObservation` checks `bytes4(data)` equals
+- [x] Verify `_decodePriceObservation` checks `bytes4(data)` equals
       `observePrice(uint256).selector` before decoding, rather than
       assuming the shape.
-- [ ] Expand journal/proof records to include: source chain identifier,
+- [x] Expand journal/proof records to include: source chain identifier,
       source block height, source tx hash, confirmation block height,
       confirmation tx hash, destination execution tx hash — enough to
       independently reconstruct evidence without out-of-band information.
@@ -564,7 +564,7 @@ underlying fix exists:
 - [x] Same fact + different nonce does not execute twice (Task 3.1)
 - [x] Same fact + different registered agent does not execute twice (Task 3.1)
 - [x] Wrong-direction execution is rejected (Task 3.5)
-- [ ] Invalid/cross-chain-mismatched confirmation proof is rejected (Task 3.6)
+- [x] Invalid/cross-chain-mismatched confirmation proof is rejected (Task 3.6)
 - [x] Opportunity below net profitability (after fees) is rejected (Task 3.4)
 - [ ] Zero-computed trade size is rejected (Task 3.8)
 - [ ] Every successful fund movement corresponds to exactly one journal entry
@@ -588,10 +588,18 @@ underlying fix exists:
 - Task 3.4: done 2026-09-05 — contract gate `MIN_NET_EDGE_BPS=25` (gross must clear per-instance floor + reserve); agent mirror: `netEdgeBps`/`edgeBps` return net so the LLM reasons about the tradeable edge; regression test `test_RevertWhenGrossWindowClearsFloorButNotNetEdge` (90bps gross vs 105 required); forge 27/27, vitest 40/40, tsc clean
 - Task 3.5: ✅ 2026-09-05 — direction encoded explicitly (see Task 3.5's
   checked list for the full summary).
-- Task 3.6: partially verified 2026-09-05 — `confirmProof.chainKey` is NOT
-  checked against `sourceProof.chainKey`, and `_decodePriceObservation` checks
-  `to == PRICE_CONTRACT` + calldata length but NOT the `observePrice(uint256)`
-  selector bytes. Implementation not started.
+- Task 3.6: done 2026-09-05 — premises re-verified against code first (all
+  three real, as suspected). `ChainMismatch` now reverts before any
+  verification work is spent; `_decodePriceObservation` validates
+  `OBSERVE_PRICE_SELECTOR` (length alone no longer implies shape);
+  `JournalEntry` carries source chainKey/blockHeight/txIndex + confirm
+  blockHeight/txIndex. The destination execution tx hash is deliberately NOT
+  a struct field — the EVM cannot observe its own tx hash; it is documented
+  as the receipt hash of the tx emitting `ActionJournaled` for that
+  actionKey. Frontend decodes the 13-field struct tolerantly (legacy
+  8-field fallback for the two live pre-3.6 instances); committed agent +
+  frontend ABIs regenerated from the forge artifact (13 fields asserted);
+  forge 30/30, agent vitest 40/40, frontend build + oxlint clean.
 - Task 3.7: not started (verified: `attestedAt` and `actedAt` are both set to
   `block.timestamp` at execution time)
 - Task 3.8: ✅ 2026-09-05 — constructor now mirrors the factory's zero-address

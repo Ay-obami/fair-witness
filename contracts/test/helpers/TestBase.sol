@@ -130,8 +130,22 @@ abstract contract TestBase is Test {
         pure
         returns (bytes memory)
     {
+        return _buildEncodedTransactionWithSelector(
+            price, success, to, txType, bytes4(keccak256("observePrice(uint256)"))
+        );
+    }
+
+    /// @dev Variant with an overridable selector — lets tests prove the decoder validates
+    ///      the call's SHAPE and not just its length (Task 3.6).
+    function _buildEncodedTransactionWithSelector(
+        uint256 price,
+        bool success,
+        address to,
+        uint8 txType,
+        bytes4 selector
+    ) internal pure returns (bytes memory) {
         // The underlying source tx's calldata: 4-byte selector + one ABI word.
-        bytes memory data = abi.encodePacked(bytes4(keccak256("observePrice(uint256)")), abi.encode(price));
+        bytes memory data = abi.encodePacked(selector, abi.encode(price));
 
         // Chunk 0 — common tx fields. Identical layout for every tx type in the SDK.
         bytes memory chunk0 = abi.encode(
@@ -200,7 +214,26 @@ abstract contract TestBase is Test {
         uint8 txType,
         bool registerWithVerifier
     ) internal returns (ASCTreasuryJournal.ProofData memory proof) {
-        bytes memory encodedTx = _buildEncodedTransaction(price, success, to, txType);
+        return _buildProofWithSelector(
+            blockHeight, txIndex, price, success, to, txType, registerWithVerifier,
+            bytes4(keccak256("observePrice(uint256)"))
+        );
+    }
+
+    /// @dev Selector-overridable core builder (Task 3.6 decoder tests). `chainKey` stays
+    ///      SOURCE_CHAIN_KEY — cross-chain tests override it on the returned struct and
+    ///      register the mock result for the other chain themselves.
+    function _buildProofWithSelector(
+        uint64 blockHeight,
+        uint32 txIndex,
+        uint256 price,
+        bool success,
+        address to,
+        uint8 txType,
+        bool registerWithVerifier,
+        bytes4 selector
+    ) internal returns (ASCTreasuryJournal.ProofData memory proof) {
+        bytes memory encodedTx = _buildEncodedTransactionWithSelector(price, success, to, txType, selector);
 
         INativeQueryVerifier.MerkleProofEntry[] memory siblings = new INativeQueryVerifier.MerkleProofEntry[](0);
         bytes32[] memory roots = new bytes32[](0);
@@ -244,6 +277,19 @@ abstract contract TestBase is Test {
         returns (ASCTreasuryJournal.ProofData memory proof)
     {
         return _buildProof(blockHeight, txIndex, price, true, address(0xdead), 2, false);
+    }
+
+    /// @dev A verified proof to the REAL price contract whose 36-byte calldata carries a
+    ///      WRONG function selector — proves the decoder validates the call's shape, not
+    ///      just its destination and length (Task 3.6).
+    function buildVerifiedProofWithSelector(
+        uint64 blockHeight,
+        uint32 txIndex,
+        uint256 price,
+        bool success,
+        bytes4 selector
+    ) internal returns (ASCTreasuryJournal.ProofData memory proof) {
+        return _buildProofWithSelector(blockHeight, txIndex, price, success, address(priceSource), 2, true, selector);
     }
 
     /// @dev Deterministic nonce derivation matching the off-chain agent's rule from the
