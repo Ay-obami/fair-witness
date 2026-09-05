@@ -533,14 +533,14 @@ context.
 Not independently verified in this session — check before deleting
 anything.
 
-- [ ] Check whether `Deploy.s.sol` still uses an old constructor signature
+- [x] Check whether `Deploy.s.sol` still uses an old constructor signature
       that doesn't match the current `Guardrails`-based constructor.
-- [ ] Check whether `deploy-creditcoin.js` references `isRegisteredAgent`
+- [x] Check whether `deploy-creditcoin.js` references `isRegisteredAgent`
       where the contract actually exposes `registeredAgents`.
-- [ ] Pick one canonical deployment path (likely the factory-based flow, if
+- [x] Pick one canonical deployment path (likely the factory-based flow, if
       that's the current intended architecture) and delete or clearly mark
       the others as legacy/reference-only.
-- [ ] Regenerate ABI artifacts deterministically as part of the canonical
+- [x] Regenerate ABI artifacts deterministically as part of the canonical
       deploy flow.
 
 ### Task 3.12 — Documentation reconciliation
@@ -624,10 +624,17 @@ underlying fix exists:
 - Task 3.10: not started (scoping note: the on-chain contract only ever sees
   executions — rejections revert — so "the ACT/DECLINE outcome in the committed
   hash" needs re-scoping to the agent-side reasoning payload first)
-- Task 3.11: not started, needs code re-verification first (note: the committed
-  ABI copies in `agent/src/abi/` and `frontend/src/abi/` now lag the contract —
-  the removed error/event linger as stale entries; `executeArbitrage`'s selector
-  is unchanged so nothing breaks. Regenerate per this task.)
+- Task 3.11: done 2026-09-05 — BOTH flagged premises verified (see Task 3.11
+  checkboxes; the first was worse than stale: a clean `forge build` FAILED on
+  `Deploy.s.sol` (6-arg constructor vs current 7-arg `Guardrails`), i.e. the repo
+  could not build from fresh and CI would fail on a new runner — local passes were
+  riding a stale cached artifact). Canonical path is the factory flow;
+  `Deploy.s.sol` + `deploy-creditcoin.js` deleted (git history keeps them).
+  NEW: `contracts/script/update-abis.js` — deterministic client-ABI regeneration
+  from forge artifacts with loud structural gates (JournalEntry 12-field list,
+  executeArbitrage/createTreasury/TreasuryDeployed presence); documented as step 4
+  of the DEPLOYMENT.md Step-3 runbook, which was rewritten from the legacy
+  single-treasury flow to the canonical factory flow.
 - Task 3.12: not started
 - Task 3.13: 4 of 10 items done (same-fact-different-nonce ✓,
   same-fact-different-agent ✓, renounceOwnership ✓, wrong-direction
