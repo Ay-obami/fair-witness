@@ -99,7 +99,7 @@ export default function Help() {
             content={
               <>
                 <p>
-                  The platform runs a single LLM (chosen from Gemini, OpenAI, or Mistral) that
+                  The platform runs a single LLM (Gemini; OpenAI/Mistral are the tracked direction) that
                   decides <strong>whether</strong> to propose a trade — never <strong>how</strong>
                   to execute it. The actual trade is performed by your contract, which checks
                   every guardrail independently before acting. So even if the LLM makes a

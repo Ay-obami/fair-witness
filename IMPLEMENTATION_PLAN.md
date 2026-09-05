@@ -545,13 +545,13 @@ anything.
 
 ### Task 3.12 — Documentation reconciliation
 
-- [ ] Create one short "Current Reality" doc (or a section at the top of
+- [x] Create one short "Current Reality" doc (or a section at the top of
       `README.md`) stating current, actual status: LLM provider (Gemini
       only — despite architecture/help docs mentioning OpenAI/Mistral), DEX
       (`MockDexRouter` — despite PRD language referencing PenguinSwap/real
       USDC), demo-mode default, and known limitations (link to `DESIGN.md`
       §9).
-- [ ] Align `PRD.md`, `ROADMAP.md`, `DEVLOG.md`, and the in-app Help/docs
+- [x] Align `PRD.md`, `ROADMAP.md`, `DEVLOG.md`, and the in-app Help/docs
       page against that single source of truth — fix stale `/app` route
       references in `ROADMAP.md` specifically.
 
@@ -635,7 +635,13 @@ underlying fix exists:
   executeArbitrage/createTreasury/TreasuryDeployed presence); documented as step 4
   of the DEPLOYMENT.md Step-3 runbook, which was rewritten from the legacy
   single-treasury flow to the canonical factory flow.
-- Task 3.12: not started
+- Task 3.12: done 2026-09-05 - created `docs/CURRENT_REALITY.md` as the single
+  source of truth (Gemini-only decision layer, MockDexRouter/mock tokens deployed, live
+  mode bundles, live instances, limitations). Fixed the false "Gemini/OpenAI/Mistral
+  allow-list" claim in README / ARCHITECTURE_V2 Stage-3 / ROADMAP Stage 3 / docs/HELP /
+  frontend Help route; corrected the `/app` -> `/dashboard` route reference; amended PRD
+  destination-DEX + trade-asset rows to the deployed mock reality (retaining PenguinSwap
+  as the abandoned plan). Remaining PenguinSwap hits are honest historical/fallback refs.
 - Task 3.13: 4 of 10 items done (same-fact-different-nonce ✓,
   same-fact-different-agent ✓, renounceOwnership ✓, wrong-direction
   rejection ✓); the rest gated on their fixes

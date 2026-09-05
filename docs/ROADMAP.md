@@ -84,7 +84,7 @@ Done when:
   `createTreasury`'s `InvalidGuardrails` revert (non-zero; bps bounds <= 10,000).
 - [x] Deploy: `createTreasury(owner=wallet, guardrails)`; poll `TreasuryDeployed`; persist
   mapping `wallet -> instance` (localStorage prototype; Supabase seam).
-- [x] `/app` dashboard: instance address + explorer link + live immutable-guardrail read;
+- [x] `/dashboard` route: instance address + explorer link + live immutable-guardrail read;
   "Connect existing" paste path; post-deploy buttons: register platform agent, fund
   instance.
 - [x] `npm run lint && tsc -b && vite build` clean.
@@ -130,7 +130,7 @@ Files touched (this session):
 ## Stage 3 — Multi-tenant agent service  ✅ (Session 9)
 
 Done when: agent polls every tenant each cycle against each user's own instance; LLM
-provider allow-list enforced (Gemini / OpenAI / Mistral; **Claude excluded**);
+LLM provider is **Gemini only** today (a provider allow-list incl. OpenAI Chat Completions / Mistral is the tracked direction; Claude excluded);
 per-instance guardrails in the decision prompt + cache key. Verified on-chain: Sepolia
 11622681 -> 11622685 -> tenant-a `act=true` (140 bps gap vs 80 bps floor),
 `executeArbitrage` at CC3 block 5,420,111 status `0x1`, `2,187,500` units in /
