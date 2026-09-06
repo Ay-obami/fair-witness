@@ -271,8 +271,36 @@ at all, just a scheduled script.
 _(Update this section as work lands — phase/task, date, what changed, what's
 still open.)_
 
-- Phase 0: not started
-- Phase 1: not started
+- Phase 0: ✅ 2026-09-05 — all 7 items complete. Build (`tsc` + `vite build`)
+  passes clean; oxlint 0 errors (1 acceptable `setState` in `componentDidUpdate`
+  warning in ErrorBoundary — correct for error-boundary route-clearing pattern).
+  (1) `/* Scope section */` → `{/* Scope section */}` in Home.tsx (was
+  rendering as literal text). (2) Deleted stale `src/App.tsx`. (3) `Layout.tsx`
+  provides the canonical nav + footer; adopted in Home, Dashboard, SignUpDone,
+  Verify, Help, SignUp — removed per-page nav/footer duplication. (4) Catch-all
+  `path="*"` → NotFound in main.tsx. (5) ErrorBoundary wraps `<Routes>` in
+  main.tsx. (6) favicon.svg replaced with forensic-ledger mark (dark bg,
+  copper border, blue evidence rows, teal check). (7) All CTA buttons changed
+  `bg-verified-500` → `bg-copper-500`; teal retained only for verified/status
+  elements (VerdictBadge, callout cards). Removed unused `Link` import from
+  Dashboard.tsx after nav extraction.
+- Phase 1: ✅ 2026-09-06 — all items complete, new pages from existing data
+  (no contract surface added). (8) New `/action/:actionKey` (+ optional
+  `/:instance`) Action Detail page: ReplayCard + CausalExplorer timeline with
+  live instance context and an honest not-found treatment. (9) CausalExplorer
+  extracted to its own component (routed here), replay helpers in
+  `components/replayUtils.ts`, `mockBalance`/`mockAgentRegistered` mocks,
+  `fetchNativeBalance`/`fetchAgentStatus` in the data provider. (10)
+  Rejected-action treatment: Verify no longer claims rejected actions are
+  replayable — its not-found state now explains rejections revert on-chain and
+  are intentionally not journaled (post-Task-D honesty pass). (11) New
+  `/treasury` page: TenantPanel instance switcher + on-chain index discovery,
+  guardrails read live from the instance, native balance, agent-registration
+  status, explorer links. (12) New `/architecture` page: trust-boundary
+  explainer + 5-step flow (agent → treasury → attestation → execution →
+  journal) + data-flow summary. (13) Home: NetworkIndicator on the hero, links
+  to the treasury viewer + architecture page; nav/footer carry Treasury +
+  Architecture app-wide. Gates: tsc clean, oxlint 0 errors, vite build clean.
 - Phase 2: not started
 - Part 2 Task A: ✅ 2026-09-05 — verbatim destination-price disclosure bullet
   inserted into `docs/DESIGN.md` §9, immediately after the

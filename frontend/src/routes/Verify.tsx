@@ -6,6 +6,7 @@ import { SearchBar } from "../components/SearchBar";
 import { ReplayCard } from "../components/ReplayCard";
 import { TenantPanel } from "../components/TenantPanel";
 import type { ReplayData, TreasuryInfo } from "../lib/types";
+import { Layout } from "../components/layout";
 
 export default function Verify() {
   const [data, setData] = useState<ReplayData | null>(null);
@@ -77,13 +78,13 @@ export default function Verify() {
   }
 
   return (
-    <div className="min-h-screen bg-ledger-950">
+    <Layout>
       <div className="mx-auto max-w-2xl px-6 py-12">
         <header className="mb-8">
           <p className="mb-1 text-xs uppercase tracking-widest text-verified-400">Fair Witness</p>
           <h1 className="text-2xl font-semibold text-ledger-100">Replay & Audit Viewer</h1>
           <p className="mt-2 text-sm leading-relaxed text-ledger-400">
-            Reconstructs the full attestation → decision → action chain for any executed or rejected arbitrage
+            Reconstructs the full attestation → decision → action chain for any executed arbitrage
             action, and independently re-hashes the retrieved off-chain reasoning to confirm it matches the
             on-chain commitment. In the multi-tenant shape, each treasury instance is independent with its own
             immutable guardrails — pick an instance below, then replay actions from ITS journal.
@@ -116,14 +117,24 @@ export default function Verify() {
               </p>
             )}
             {notFound && !error && (
-              <p className="rounded-md border border-ledger-700 bg-ledger-900 px-4 py-3 text-sm text-ledger-400">
-                No journal entry found for that actionKey{treasuryAddress ? " in this instance's journal" : ""}.
-              </p>
+              <div className="rounded-md border border-ledger-700 bg-ledger-900 px-4 py-3 text-sm text-ledger-400">
+                <p>
+                  No journal entry found for that actionKey
+                  {treasuryAddress ? " in this instance's journal" : ""}.
+                </p>
+                <p className="mt-2">
+                  If this key came from a <strong className="text-alert-400">rejected</strong>{" "}
+                  attempt, that's expected: rejections revert on-chain and are intentionally not
+                  journaled — your guardrails already did their job. Rejected attempts are visible
+                  only as failed transactions on the block explorer; journal entries exist for
+                  executed actions only.
+                </p>
+              </div>
             )}
             {data && <ReplayCard data={data} />}
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -2,7 +2,8 @@
 // Non-custodial: the embedded wallet signs the createTreasury tx with the user's
 // chosen guardrails baked in. The user's wallet == the instance owner.
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Layout } from "../components/layout";
+import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thirdweb";
 import { config } from "../lib/config";
@@ -139,12 +140,7 @@ export default function SignUp() {
   // --- Step 1: Email ---
   if (step === "email") {
     return (
-      <div className="min-h-screen bg-ledger-950">
-        <nav className="border-b border-ledger-800">
-          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-            <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          </div>
-        </nav>
+      <Layout>
         <div className="mx-auto max-w-2xl px-6 py-16">
           <h1 className="text-3xl font-bold text-ledger-100">Create your account</h1>
           <p className="mt-3 text-sm leading-relaxed text-ledger-400">
@@ -164,25 +160,20 @@ export default function SignUp() {
             <button
               type="submit"
               disabled={sendingCode}
-              className="mt-4 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+              className="mt-4 w-full rounded-md bg-copper-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-copper-400 transition disabled:opacity-50"
             >
               {sendingCode ? "Sending code…" : "Create wallet"}
             </button>
           </form>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   // --- Step 2: Guardrails ---
   if (step === "guardrails") {
     return (
-      <div className="min-h-screen bg-ledger-950">
-        <nav className="border-b border-ledger-800">
-          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-            <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          </div>
-        </nav>
+      <Layout>
         <div className="mx-auto max-w-2xl px-6 py-16">
           <h1 className="text-3xl font-bold text-ledger-100">Set your guardrails</h1>
           <p className="mt-3 text-sm leading-relaxed text-ledger-400">
@@ -227,24 +218,19 @@ export default function SignUp() {
 
           <button
             onClick={handleGuardrailsContinue}
-            className="mt-6 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
+            className="mt-6 w-full rounded-md bg-copper-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-copper-400 transition"
           >
             Continue — verify your email
           </button>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   // --- Step 3: Email verification code ---
   if (step === "otp") {
     return (
-      <div className="min-h-screen bg-ledger-950">
-        <nav className="border-b border-ledger-800">
-          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-            <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          </div>
-        </nav>
+      <Layout>
         <div className="mx-auto max-w-2xl px-6 py-16">
           <h1 className="text-3xl font-bold text-ledger-100">Check your email</h1>
           <p className="mt-3 text-sm leading-relaxed text-ledger-400">
@@ -265,7 +251,7 @@ export default function SignUp() {
             />
             <button
               type="submit"
-              className="mt-4 w-full rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
+              className="mt-4 w-full rounded-md bg-copper-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-copper-400 transition"
             >
               Verify &amp; deploy my contract
             </button>
@@ -277,19 +263,14 @@ export default function SignUp() {
             Didn't get it? Resend the code
           </button>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   // --- Step 4: Deploying ---
   if (step === "deploying") {
     return (
-      <div className="min-h-screen bg-ledger-950">
-        <nav className="border-b border-ledger-800">
-          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-            <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          </div>
-        </nav>
+      <Layout>
         <div className="mx-auto max-w-2xl px-6 py-16 text-center">
           <div className="mb-6 text-3xl font-bold text-verified-400">✓</div>
           <h1 className="text-2xl font-bold text-ledger-100">Wallet created — deploying your contract</h1>
@@ -299,7 +280,7 @@ export default function SignUp() {
           </p>
           {error && <p className="mt-4 text-sm text-alert-400">{error}</p>}
         </div>
-      </div>
+      </Layout>
     );
   }
 

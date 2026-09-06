@@ -115,6 +115,17 @@ export async function fetchAgentRegistered(
 }
 
 /**
+ * Reads the native CTC balance of a treasury instance on Creditcoin testnet.
+ * Simple `provider.getBalance` — no ERC20 token address needed since the
+ * treasury receives native CTC for gas + can hold MockERC20 tokens separately.
+ */
+export async function fetchNativeBalance(address: string): Promise<string> {
+  const provider = getProvider();
+  const balance = await provider.getBalance(address);
+  return ethers.formatEther(balance);
+}
+
+/**
  * Live counterpart to mockData.ts. Reads a journal entry directly from the deployed
  * ASCTreasuryJournal contract, then attempts to fetch the matching off-chain reasoning
  * payload and independently re-hash it to check against the on-chain commitment — the

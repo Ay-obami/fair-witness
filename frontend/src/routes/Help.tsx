@@ -1,19 +1,11 @@
 // Plain-language help docs for non-technical users.
 // Separate from docs/ (which is for developers) — this is the user-facing FAQ.
 import { Link } from "react-router-dom";
+import { Layout } from "../components/layout";
 
 export default function Help() {
   return (
-    <div className="min-h-screen bg-ledger-950">
-      <nav className="border-b border-ledger-800">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-          <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/verify" className="text-ledger-400 hover:text-verified-400 transition">Verify</Link>
-            <Link to="/signup" className="text-ledger-400 hover:text-verified-400 transition">Sign up</Link>
-          </div>
-        </div>
-      </nav>
+    <Layout>
       <div className="mx-auto max-w-3xl px-6 py-16 pb-32">
         <h1 className="text-3xl font-bold text-ledger-100">Help &amp; docs</h1>
         <p className="mt-3 text-sm leading-relaxed text-ledger-400">
@@ -181,7 +173,7 @@ export default function Help() {
           </p>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 

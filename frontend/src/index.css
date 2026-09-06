@@ -19,6 +19,21 @@
   --color-verified-400: #5ee6c2;
   --color-alert-500: #e8a33d;
   --color-alert-400: #f0bb66;
+
+  /* Planning Part 1, Phase 0 design tokens. The existing ledger/verified/alert tokens
+     above are untouched — these EXTEND the persisted forensic-ledger palette.
+     Copper is for actions + agent-decision UI, blue for independently-verifiable
+     external-evidence contexts (Sepolia), teal/amber stay strictly status colors. */
+  --color-background: #0B0D0F;
+  --color-surface: #15181B;
+  --color-elevated: #1D2125;
+  --color-hairline: #262B30;
+  --color-text-primary: #E8E6E1;
+  --color-text-secondary: #9BA1A8;
+  --color-copper-500: #C98A3E;
+  --color-copper-400: #E1A95F;
+  --color-external-500: #5B9BD5;
+  --color-external-400: #7FB4E3;
 }
 
 body {

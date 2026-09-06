@@ -1,6 +1,6 @@
 import { config } from "./config";
-import { MOCK_ENTRIES, mockTreasuryInfo } from "./mockData";
-import { fetchLiveReplayData, fetchTreasuryInfo } from "./contractReader";
+import { MOCK_ENTRIES, mockTreasuryInfo, mockBalance, mockAgentRegistered } from "./mockData";
+import { fetchLiveReplayData, fetchTreasuryInfo, fetchNativeBalance as fetchNativeBalanceLive, fetchAgentRegistered } from "./contractReader";
 import type { ReplayData, TreasuryInfo } from "./types";
 
 export async function fetchReplayData(
@@ -31,4 +31,27 @@ export async function fetchTreasury(treasuryAddress: string): Promise<TreasuryIn
     return mockTreasuryInfo(treasuryAddress);
   }
   return fetchTreasuryInfo(treasuryAddress);
+}
+
+/**
+ * Reads the native CTC balance of a treasury instance. Demo mode serves
+ * illustrative mock balances so the page is never empty without an RPC.
+ */
+export async function fetchNativeBalance(address: string): Promise<string> {
+  if (config.demoMode) {
+    return mockBalance(address);
+  }
+  return fetchNativeBalanceLive(address);
+}
+
+/**
+ * Checks if the configured agent submit key is allowlisted on a treasury instance.
+ * Demo mode returns the known mock state; live mode queries the contract directly.
+ */
+export async function fetchAgentStatus(treasuryAddress: string): Promise<boolean> {
+  if (config.demoMode) {
+    return mockAgentRegistered(treasuryAddress);
+  }
+  if (!config.agentSubmitAddress) return false;
+  return fetchAgentRegistered(treasuryAddress, config.agentSubmitAddress);
 }

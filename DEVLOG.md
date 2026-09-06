@@ -1175,3 +1175,23 @@ Task 3.10 (re-scoped per the plan's own note: the on-chain decisionHash only eve
 Task 3.13 (closes the invariant suite): added `test_EverySuccessfulExecutionJournalsExactlyOneEntry` (1-1 journaling, replays add nothing), `test_TradeSizeNeverExceedsCapAndNeverZero` (clamp + 3.8 floor hold; slippage enforced by the contract's own SlippageExceeded revert path), and `test_ZeroComputedBuyInputIsRejected` - a minimal-guardrail treasury sizes to exactly 1 on the SELL leg (succeeds, proving the never-zero floor) while the BUY leg's input rounds to zero and reverts `ZeroTradeSize`. Guardrail immutability was already proven by the existing factory test and is now cross-referenced in the plan.
 
 forge 33/33 - agent vitest 41/41 (new outcome-hash test) + tsc clean - frontend build + lint clean.
+
+## Session 23 - Planning Part 1, Phase 1: new pages from existing data (2026-09-06)
+
+The whole phase adds routes, not contract surface: everything the new pages show was already
+readable from the chain or the data provider. Action Detail (`/action/:actionKey`, plus an
+optional `/:instance` segment) is the deep link the Replay & Audit Viewer was missing -
+instance context (identity + immutable guardrails) above the ReplayCard + CausalExplorer
+timeline, with the not-found path explaining that a rejected attempt will never resolve here
+(rejections revert; they are not journaled). The Treasury page is the honest-limits surface:
+TenantPanel with the same on-chain index discovery as Verify, guardrails read live from the
+instance, native balance, agent-registration status, explorer links. The Architecture page is
+a plain-language trust-boundary map (inside: contract-enforced; outside: off-chain reasoning
+the contract re-checks). Home wires the NetworkIndicator and links to both new pages; nav and
+footer carry them app-wide.
+
+Craft notes: the heredoc-created ActionDetail needed a verification re-read (it was intact);
+Verify's header said "executed or rejected" actions are replayable - corrected, since post-Task-D
+only executions are journaled. oxlint flagged two redundant setBalance/setAgentRegistered resets
+in Treasury effects - removed rather than suppressed, since the dependent sections only render
+when the instance exists anyway. tsc clean - oxlint 0 errors - vite build clean.

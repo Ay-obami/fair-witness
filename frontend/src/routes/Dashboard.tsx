@@ -5,7 +5,7 @@
 // saved, so you can't claim someone else's contract). When Supabase is unconfigured the
 // page degrades gracefully to a wallet-level read (empty list + a clear note).
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Layout } from "../components/layout";
 import { ethers } from "ethers";
 import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
 import { creditcoinTestnet, wallet, client } from "../lib/thirdweb";
@@ -156,14 +156,7 @@ export default function Dashboard() {
   const explorerBase = config.explorerBaseUrl;
 
   return (
-    <div className="min-h-screen bg-ledger-950">
-      <nav className="border-b border-ledger-800">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-          <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-          <Link to="/verify" className="text-sm text-ledger-400 hover:text-verified-400 transition">Replay &amp; Audit Viewer</Link>
-        </div>
-      </nav>
-
+    <Layout>
       <div className="mx-auto max-w-3xl px-6 py-14">
         <h1 className="text-2xl font-bold text-ledger-100">Your instances</h1>
         <p className="mt-2 text-sm leading-relaxed text-ledger-400">
@@ -189,7 +182,7 @@ export default function Dashboard() {
                 <button
                   type="submit"
                   disabled={signingIn}
-                  className="rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                  className="rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
                 >
                   {signingIn ? "Sending code…" : "Send code"}
                 </button>
@@ -211,7 +204,7 @@ export default function Dashboard() {
                   <button
                     type="submit"
                     disabled={signingIn}
-                    className="rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                    className="rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
                   >
                     {signingIn ? "Verifying…" : "Verify & sign in"}
                   </button>
@@ -285,6 +278,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

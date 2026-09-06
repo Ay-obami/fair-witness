@@ -34,7 +34,7 @@ export function SearchBar({ onSearch, loading }: Props) {
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="rounded-md bg-verified-500 px-5 py-2.5 text-sm font-semibold text-ledger-950 transition hover:bg-verified-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-copper-500 px-5 py-2.5 text-sm font-semibold text-text-primary transition hover:bg-copper-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? "Loading…" : "Replay"}
         </button>

@@ -125,6 +125,32 @@ export const MOCK_TREASURIES: Record<string, TreasuryInfo> = {
 
 export const MOCK_TREASURY_ADDRESSES = Object.keys(MOCK_TREASURIES);
 
+// --- demo-mode stubs for dataProvider.ts -------------------------------------
+
+/**
+ * Illustrative native balance for demo mode so the dashboard's balance
+ * readout isn't empty without an RPC. These are illustrative figures, NOT
+ * live chain data — demoMode must be false for real values.
+ */
+export function mockBalance(_address: string): string {
+  // A representative testnet-native balance (~0.1 ETH / CTC) for mock tenants.
+  return "100000000000000000";
+}
+
+/**
+ * Illustrative agent-allowlist state for demo mode.
+ * Mirrors the real Stage-1 instances where the platform agent (the address in
+ * config.agentSubmitAddress) IS registered on both Tenant A (0x13CA…) and
+ * Tenant B (0xD66C…), and is NOT registered on unknown addresses.
+ */
+export function mockAgentRegistered(address: string): boolean {
+  return (
+    address ===
+      "0x13CACe3989b295048De47C68F32Ff3d844AC2026" ||
+    address === "0xD66C607072df7dB98A75aEe81fCA4089462c60aB"
+  );
+}
+
 export function mockTreasuryInfo(address: string): TreasuryInfo {
   const match = MOCK_TREASURIES[address];
   if (match) return match;

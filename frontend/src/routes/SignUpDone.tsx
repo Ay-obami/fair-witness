@@ -4,6 +4,7 @@
 // it, a newly deployed instance is never watched by the agent at all.
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
+import { Layout } from "../components/layout";
 import { ethers } from "ethers";
 import { ethers6Adapter } from "thirdweb/adapters/ethers6";
 import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thirdweb";
@@ -122,12 +123,7 @@ export default function SignUpDone() {
   const BASE_ASSET = "0x0bFA6eF009f8739c727b292849029608bd6b115A";
 
   return (
-    <div className="min-h-screen bg-ledger-950">
-      <nav className="border-b border-ledger-800">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-          <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
-        </div>
-      </nav>
+    <Layout>
       <div className="mx-auto max-w-3xl px-6 py-16">
         <div className="mb-6 text-4xl font-bold text-verified-400">✓</div>
         <h1 className="text-2xl font-bold text-ledger-100">Your instance is deployed</h1>
@@ -227,7 +223,7 @@ export default function SignUpDone() {
                   <button
                     onClick={handleRegisterAgent}
                     disabled={regState === "pending"}
-                    className="mt-4 rounded-md bg-verified-500 px-5 py-2 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition disabled:opacity-50"
+                    className="mt-4 rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
                   >
                     {regState === "pending" ? "Confirm in your wallet…" : "Register the agent"}
                   </button>
@@ -259,7 +255,7 @@ export default function SignUpDone() {
           </Link>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 

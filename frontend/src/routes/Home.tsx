@@ -1,5 +1,7 @@
 // Fair Witness landing page — forensic-ledger aesthetic, honest pitch, real proof.
 import { Link } from "react-router-dom";
+import { Layout } from "../components/layout";
+import { NetworkIndicator } from "../components/networkIndicator";
 
 const BEATS = [
   { num: "01", title: "Set your constraints once",
@@ -14,20 +16,12 @@ const BEATS = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-ledger-950">
-      <nav className="border-b border-ledger-800">
-        <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-          <span className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</span>
-          <div className="flex items-center gap-6 text-sm">
-            <Link to="/dashboard" className="text-ledger-400 hover:text-verified-400 transition">Dashboard</Link>
-            <Link to="/verify" className="text-ledger-400 hover:text-verified-400 transition">Verify</Link>
-            <Link to="/docs" className="text-ledger-400 hover:text-verified-400 transition">Docs</Link>
-            <Link to="/signup" className="rounded-md bg-verified-500 px-4 py-1.5 text-xs font-semibold text-ledger-950 hover:bg-verified-400 transition">Sign up</Link>
-          </div>
-        </div>
-      </nav>
+    <Layout>
       <div className="mx-auto max-w-5xl px-6">
         <section className="py-20 text-center">
+          <div className="mb-6 flex justify-center">
+            <NetworkIndicator />
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold leading-tight text-ledger-100">
             An AI agent that can't <span className="text-verified-400">lie</span> about why it traded.
           </h1>
@@ -41,7 +35,7 @@ export default function Home() {
             on execution latency, and it does not promise returns. It is a proof-of-concept for a new trust model.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Link to="/signup" className="rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition">Get started</Link>
+            <Link to="/signup" className="rounded-md bg-copper-500 px-6 py-3 text-sm font-semibold text-text-primary hover:bg-copper-400 transition">Get started</Link>
             <Link to="/verify" className="rounded-md border border-ledger-600 px-6 py-3 text-sm font-semibold text-ledger-200 hover:border-verified-500/50 hover:text-verified-400 transition">Verify an action</Link>
           </div>
         </section>
@@ -49,7 +43,14 @@ export default function Home() {
         {/* Proof section */}
         <section className="border-t border-ledger-800 py-16">
           <h2 className="text-2xl font-semibold text-ledger-100">Proof it's real</h2>
-          <p className="mt-2 text-sm text-ledger-400">Every address below is live on CC3 testnet, checkable on Blockscout.</p>
+          <p className="mt-2 text-sm text-ledger-400">
+            Every address below is live on CC3 testnet, checkable on Blockscout. Inspect the live
+            instance's immutable guardrails in the{" "}
+            <Link to="/treasury" className="text-copper-400 transition hover:text-copper-500">
+              treasury viewer
+            </Link>
+            .
+          </p>
           <div className="mt-8 grid gap-6 md:grid-cols-3">
             <div className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
               <p className="text-xs uppercase tracking-wide text-ledger-400">Live instance (Tenant A)</p>
@@ -75,7 +76,15 @@ export default function Home() {
 
         {/* How it works */}
         <section className="border-t border-ledger-800 py-16">
-          <h2 className="text-2xl font-semibold text-ledger-100">How it works</h2>
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-2xl font-semibold text-ledger-100">How it works</h2>
+            <Link
+              to="/architecture"
+              className="text-sm text-copper-400 transition hover:text-copper-500"
+            >
+              Full architecture →
+            </Link>
+          </div>
           <div className="mt-8 grid gap-6 md:grid-cols-2">
             {BEATS.map((b) => (
               <div key={b.num} className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
@@ -86,7 +95,8 @@ export default function Home() {
             ))}
           </div>
         </section>
-/* Scope section */
+
+        {/* Scope section */}
         <section className="border-t border-ledger-800 py-16">
           <h2 className="text-2xl font-semibold text-ledger-100">Honest scope</h2>
           <div className="mt-6 space-y-4 text-sm leading-relaxed text-ledger-400">
@@ -125,7 +135,7 @@ export default function Home() {
           <div className="mt-6">
             <Link
               to="/signup"
-              className="rounded-md bg-verified-500 px-6 py-3 text-sm font-semibold text-ledger-950 hover:bg-verified-400 transition"
+              className="rounded-md bg-copper-500 px-6 py-3 text-sm font-semibold text-text-primary hover:bg-copper-400 transition"
             >
               Sign up now
             </Link>
@@ -133,36 +143,6 @@ export default function Home() {
         </section>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-ledger-800 py-6 mt-16">
-        <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between px-6 text-xs text-ledger-400">
-          <p className="mb-2 sm:mb-0">
-            Fair Witness — custody-free arbitrage with on-chain proof of intent.
-          </p>
-          <div className="flex items-center gap-6">
-            <Link to="/verify" className="text-ledger-400 hover:text-verified-400 transition">
-              Verify an action
-            </Link>
-            <Link to="/dashboard" className="text-ledger-400 hover:text-verified-400 transition">
-              Your instances
-            </Link>
-            <Link
-              to="/docs"
-              className="text-ledger-400 hover:text-verified-400 transition"
-            >
-              Technical docs
-            </Link>
-            <a
-              href="https://creditcoin-testnet.blockscout.com/address/0x97c81D68BbCDb1A673b61176d60F071963Abe7f2"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ledger-400 hover:text-verified-400 transition"
-            >
-              Factory contract
-            </a>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </Layout>
   );
 }
