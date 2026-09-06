@@ -1195,3 +1195,28 @@ Verify's header said "executed or rejected" actions are replayable - corrected, 
 only executions are journaled. oxlint flagged two redundant setBalance/setAgentRegistered resets
 in Treasury effects - removed rather than suppressed, since the dependent sections only render
 when the instance exists anyway. tsc clean - oxlint 0 errors - vite build clean.
+
+## Session 24 - Post-deploy cleanups: causal-timeline dedup, title, hosting reality (2026-09-06)
+
+Production deploy went out via the Vercel CLI (Session 23's work is live at
+https://fair-witness.vercel.app). Root cause of the "push did not auto-deploy" surprise:
+the project was linked via the CLI only - the GitHub Git integration was never connected,
+so pushes never triggered builds. Cleanups that followed:
+
+- CausalExplorer: nodes 2 ("Treasury Authorization") and 3 ("Policy Checks") carried
+  duplicated bodies - node 2 repeated node 3's policy rows verbatim under a mismatched
+  title. Node 2 now describes what authorization actually is in this system (registered-
+  agent allowlist per instance, contract-enforced, per-instance scope, custody separation);
+  node 3 keeps the policy rows and inherits the "All policy checks passed" footer that had
+  drifted into the wrong node. Three stray indentation glitches fixed in passing.
+- index.html: stale pre-pivot title ("Replay & Audit Viewer") replaced with the current
+  positioning line + a meta description.
+- README: routes table gained the three new routes; the stale "redeploy is pending"
+  parenthetical and the 4d/5 status row now state hosting reality (Vercel live via CLI,
+  auto-deploy pending the dashboard Git connection, GH Pages mirror stale/broken and
+  deprioritized - Vercel is canonical).
+- CURRENT_REALITY.md: hosting row updated to the same truth; the Task 3.12 reconciliation
+  table flipped from stale "amend this" warnings to the verified post-fix states; a garbled
+  DEPLOYMENT.md pointer sentence repaired.
+
+tsc clean - oxlint 0 warnings 0 errors - vite build clean.

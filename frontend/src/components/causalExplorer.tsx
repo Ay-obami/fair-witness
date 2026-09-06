@@ -61,7 +61,7 @@ function CausalNode({
       {subtitle && (
         <p className="mb-2 text-xs text-ledger-400">{subtitle}</p>
       )}
-            {expanded && children}
+      {expanded && children}
     </div>
   );
 }
@@ -115,37 +115,39 @@ export function CausalExplorer({ data }: { data: ReplayData }) {
             The agent address above only submitted proofs and paid gas — it
             holds no balance of either asset. See docs/DESIGN.md for the
             custody-separation invariant.
-                    </p>
+          </p>
         </CausalNode>
 
         {/* Node 2: Treasury Authorization */}
         <CausalNode
           title="Treasury Authorization"
-          subtitle="Every bound independently re-checked by the contract"
+          subtitle="The submitter was an allowlisted agent on this instance — enforced on-chain"
           step={2}
           expanded={openNodes.authorization}
           onToggle={() => toggle("authorization")}
         >
           <dl className="mb-2">
             <DataRow
-              label="Replay protection"
-              value="actionKey uniqueness verified on-chain"
+              label="Authorization model"
+              value="registered-agent allowlist on this instance"
               mono={false}
             />
             <DataRow
-              label="Guardrails"
-              value="constructor-set immutables (cannot be loosened)"
+              label="Who checks it"
+              value="the contract — an unregistered caller reverts"
               mono={false}
             />
             <DataRow
-              label="Slippage"
-              value="contract-enforced via DEX revert path"
+              label="Instance scope"
+              value="per-instance; instances share no state or agent list"
+              mono={false}
+            />
+            <DataRow
+              label="Custody"
+              value="the agent holds no funds and cannot move them"
               mono={false}
             />
           </dl>
-          <div className="mt-2 text-xs text-verified-400">
-            ✓ All policy checks passed
-          </div>
         </CausalNode>
 
         {/* Node 3: Policy Checks */}
@@ -172,7 +174,10 @@ export function CausalExplorer({ data }: { data: ReplayData }) {
               value="contract-enforced via DEX revert path"
               mono={false}
             />
-                    </dl>
+          </dl>
+          <div className="mt-2 text-xs text-verified-400">
+            ✓ All policy checks passed
+          </div>
         </CausalNode>
 
         {/* Node 4: Attestation */}

@@ -63,10 +63,17 @@ and `docs/DEPLOYMENT.md`.
 | `/verify` | Replay & Audit Viewer (search-by-key, public transparency — the "verify this yourself" tool) |
 | `/docs` | Plain-language help (non-technical) |
 | `/dashboard` | **Your instances** — login-gated (embedded wallet) per-owner list from the Supabase mapping + an add-your-own-instance flow (owner verified on-chain) |
+| `/action/:actionKey` | **Action detail** — stable deep link to a single decision: ReplayCard + Causal timeline + the instance context it executed in (optional `/action/:actionKey/:instance`) |
+| `/treasury` | **Treasury viewer** — any instance's identity, immutable guardrails, native balance, and agent-registration status, read live from-chain |
+| `/architecture` | **Architecture** — plain-language trust-boundary map: what the contract enforces on-chain vs what the agent decides off-chain |
 
 The old single-tenant Replay & Audit Viewer now lives at `/verify`; the root route is
-the landing page. (The previously-listed Vercel/GH Pages mirrors were the pre-pivot
-build; the pivot's hosted frontend redeploy is pending.)
+the landing page. Hosting reality (2026-09-06): the pivot build — including the new
+action-detail, treasury, and architecture pages — is **live on Vercel**
+(https://fair-witness.vercel.app), deployed via the Vercel CLI; GitHub auto-deploy is
+not yet connected (connect it in the Vercel dashboard: Project → Settings → Git).
+The GitHub Pages mirror is currently stale/broken and deprioritized — **Vercel is
+the canonical host**.
 
 
 
@@ -75,7 +82,7 @@ build; the pivot's hosted frontend redeploy is pending.)
 ```
 contracts/   Foundry project — ASCTreasuryJournal.sol + ASCTreasuryFactory.sol + tests
 agent/       TypeScript agent runner (multi-tenant: polls every indexed instance per cycle)
-frontend/    React + Tailwind SPA (landing, sign-up, verify, help)
+frontend/    React + Tailwind SPA (landing, sign-up, verify, action detail, treasury viewer, architecture, help)
 docs/        PRD, design doc, V2 architecture, deployment guide, plain-language help
 DEVLOG.md    Running log of design decisions, pitfalls, and build status
 ```
@@ -91,7 +98,7 @@ DEVLOG.md    Running log of design decisions, pitfalls, and build status
 | 3 — Multi-tenant agent service | ✅ live-verified end-to-end (receipt-checked) |
 | 4a — On-chain tenant enumeration | ✅ shipped (`index-tenants.js` → `tenants.json`) |
 | 4b/4c — Login-gated per-user dashboard (Supabase auth ↔ address) | ✅ code built + migration committed (`frontend/supabase/migrations/0001_user_instances.sql`); apply the migration, then live-verify |
-| 4d/5 — Hosted GH Pages redeploy | 🔄 landing+help built; deploy needs the SPA fallback config (now included) and GH Pages credentials |
+| 4d/5 — Hosted redeploy | ✅ Vercel live at `https://fair-witness.vercel.app` (pivot build, CLI deploy; auto-deploy pending the dashboard Git connection). GH Pages mirror: stale/broken — deprioritized in favor of Vercel |
 
 **Honest caveats:** All funds are testnet USDC with no value. The agent submit key and a
 Gemini key were committed to this repo early on. **Both were rotated 2026-09-03**

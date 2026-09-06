@@ -1,9 +1,10 @@
 # Fair Witness — Current Reality (single source of truth)
 
-_Last verified: 2026-09-05 (Tasks 3.6, 3.7, 3.11, 3.12 — each link verified against the
-actual code/env, not copied). If anything here disagrees with a doc in this repo, this
-file is the truth until that doc is updated; if a doc says something stronger than this
-file, that doc is wrong._
+_Last verified: 2026-09-06 (frontend hosting + Phase-1 pages; earlier 2026-09-05 for
+Tasks 3.6, 3.7, 3.11, 3.12 — each link verified against the actual code/env, not
+copied). If anything here disagrees with a doc in this repo, this file is the truth
+until that doc is updated; if a doc says something stronger than this file, that doc
+is wrong._
 
 ## What this is
 
@@ -25,7 +26,7 @@ the core pitch is **"an AI agent that can't lie about why it traded."**
 | **Assets** | **`MockERC20`** (creditcoin-side USDC-like + quote token), testnet-only, no value | `contracts/src/mocks/MockERC20.sol` |
 | **Source price** | A **permissionless, demo-controlled** `PriceObservation.observePrice(uint256)` on Sepolia — **not a live market oracle**. Attestcoin proves the *observation happened*, not that the price was *real*. | `contracts/src/source-chain/PriceObservation.sol` |
 | **Frontend mode** | **Live mode** (`VITE_DEMO_MODE=false`) on the deployed bundles — reads real CC3 chain data (guardrails, journal). Some built-in demo/mock data still exists for offline dev. | `frontend/.env`, `frontend/src/lib/config.ts` |
-| **Hosting** | Live at **`https://fair-witness.vercel.app`** and **`https://ay-obami.github.io/fair-witness/`** | `frontend/` |
+| **Hosting** | **Live at `https://fair-witness.vercel.app`** (Vercel, pivot build with the Phase-1 pages; deployed via the Vercel CLI — GitHub auto-deploy not yet connected). The `ay-obami.github.io/fair-witness/` mirror is **stale/broken and deprioritized** — use Vercel. | `frontend/`, Vercel project `fair-witness` |
 
 ## Live instances
 
@@ -61,14 +62,14 @@ and the JSON-reasoning hash-verification only works when a reasoning API is conf
 
 | Doc | Status |
 |---|---|
-| `docs/ARCHITECTURE_V2.md` | ⚠️ Stage-3 row mentions provider allow-list (Gemini/OpenAI/Mistral) — amend to "Gemini only" |
-| `README.md` | ⚠️ "Gemini / OpenAI / Mistral" claim — fix to Gemini only |
-| `docs/ROADMAP.md` | ⚠️ Claims + stale `/app` route — fix |
-| `docs/HELP.md` | ⚠️ "Gemini, OpenAI, or Mistral" — fix to Gemini |
-| `frontend/src/routes/Help.tsx` | ⚠️ Same claim — fix |
-| `docs/PRD.md` | ⚠️ "PenguinSwap / Sepolia USDC" is false today; mock DEX reality — amend to reflect current reality |
-| `docs/DESIGN.md` | ⚠️ Mentions PenguinSwap — verify/amend scope claim |
-| `docs/DEPLOYMENT.md` | ⚠️ Mentions PenguinSwap — verify/amend |
+| `docs/ARCHITECTURE_V2.md` | ✅ Stage-3 says Gemini-only (fixed in Task 3.12) |
+| `README.md` | ✅ Gemini-only (Task 3.12); routes + hosting rows updated 2026-09-06 |
+| `docs/ROADMAP.md` | ✅ Gemini-only + `/dashboard` route (fixed in Task 3.12) |
+| `docs/HELP.md` | ✅ Gemini-only (fixed in Task 3.12) |
+| `frontend/src/routes/Help.tsx` | ✅ Gemini-only (fixed in Task 3.12) |
+| `docs/PRD.md` | ✅ MockDexRouter/MockERC20 reality stated (fixed in Task 3.12) |
+| `docs/DESIGN.md` | ✅ PenguinSwap scoped as the abandoned plan (verified in Task 3.12) |
+| `docs/DEPLOYMENT.md` | ✅ Factory runbook, no stale claims (rewritten in Task 3.11) |
 
 ## What's a real bug vs. a feature
 
@@ -80,4 +81,4 @@ and the JSON-reasoning hash-verification only works when a reasoning API is conf
 ## Deployment flow (canonical)
 
 `deploy-factory.js` → `register-agent.js` → `index-tenants.js` → `update-abis.js`
-(full runbood in `docs/DEPLOYMENT.md | Step-3).
+(full runbook in `docs/DEPLOYMENT.md` → Step 3).
