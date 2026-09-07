@@ -11,13 +11,14 @@ label.
 
 | File | What it covers |
 | --- | --- |
-| [PHASE-STATUS.md](PHASE-STATUS.md) | Where the master plan stands; the STOP gate before Phase 1 |
+| [PHASE-STATUS.md](PHASE-STATUS.md) | Where the master plan stands; the STOP gate before Phase 2 |
 | [CURRENT_STATE.md](CURRENT_STATE.md) | The Phase 0 audit report: structure, architecture, flows, baselines, verdicts |
 | [DEPLOYMENTS.md](DEPLOYMENTS.md) | Every VERIFIED deployed address, tx hash, block, and interface version |
 | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | Open defects + the three master-prompt STOP conditions |
 | [DECISIONS.md](DECISIONS.md) | Why the system is the way it is (decision log with rationale) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Component map, data flows, trust boundaries, interface-version drift |
-| [RESEARCH.md](RESEARCH.md) | Phase 1 research agenda: what must be verified before design freeze |
+| [PHASE-1-REPORT.md](PHASE-1-REPORT.md) | Phase 1 results + architecture-freeze decisions F1–F4, STOP status, claims inventory |
+| [RESEARCH.md](RESEARCH.md) | Phase 1 research: gate questions R1–R7 now RESOLVED with VERIFIED evidence |
 | [TEST_MATRIX.md](TEST_MATRIX.md) | Baseline test state: what is covered, what is not |
 | [ENVIRONMENT.md](ENVIRONMENT.md) | Toolchain versions, env vars, RPC endpoints, third-party services |
 

@@ -24,5 +24,8 @@ agent/.env.tenant-*
 # Stage tenant wallets (worthless testnet keys, still never commit)
 contracts/script/.stage-*
 
+# Phase-1 research scratch (raw RPC dumps, downloaded penguinswap app bundle, probe scripts)
+.phase1-research/
+
 # OS
 .DS_Store
