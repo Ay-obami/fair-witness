@@ -1,0 +1,85 @@
+# Architecture — Components, Flows, Trust Boundaries
+
+Companion to `docs/ARCHITECTURE_V2.md` (the design intent). This file records what is
+**actually deployed/running** as of 2026-09-07, including version drift between source
+and deployed contracts.
+
+## Component map
+
+```
+            SOURCE CHAIN (Sepolia, 11155111)                DESTINATION (Creditcoin testnet, 102031)
+┌──────────────────────────────────────────┐    ┌────────────────────────────────────────────────────┐
+│ PriceObservation 0x2343…00c7             │    │ Attestcoin precompile 0x…0FD2  (verify surface)    │
+│   observePrice(uint256)  ← PERMISSIONLESS│    │ MockDexRouter 0x8D40…9E5e  (constant-product)      │
+│   latestPrice / latestTimestamp          │    │ MockERC20 BASE 0x0bFA…115A (public mint)           │
+└──────────────┬───────────────────────────┘    │ MockERC20 QUOTE 0x6A97…DAA1                        │
+               │ PriceObserved events           │ ASCTreasuryFactory 0x97c8…e7f2 (permissionless)    │
+               ▼                                │   └─ ASCTreasuryJournal instances:                 │
+┌──────────────────────────────────────────┐    │      A 0x13CA…2026 (owner 0xd1D4…) — journal 6     │
+│ AGENT (Node 22, off-chain, keyless)      │    │      B 0xD66C…60aB (owner 0xa3fC…) — journal 1     │
+│  sepoliaWatcher → dexPriceReader         │    └────────────────────▲───────────────────────────┘
+│  attestcoinClient (@gluwa/usc-sdk        │                         │ executeArbitrage(proof, proof, size, key)
+│    + prover.cc3-testnet) → proofs        ├─────────────────────────┘
+│  decisionEngine (Gemini flash-latest)    │           submitter (rotated EOA 0xB1D1…654f)
+│  treasuryGuardrails (pre-flight mirror)  │
+│  reasoningStore (Supabase + file)        │──► reasoning payload (keccak == on-chain decisionHash)
+└──────────────────────────────────────────┘
+             ▲
+             │ reads journal + guardrails + balance via RPC
+┌────────────┴─────────────────────────────┐
+│ FRONTEND (React 19 + Vite, Vercel)       │   Thirdweb embedded wallets for tenant sign-up
+│  contractReader (live) | mockData (demo) │   Supabase anon key for auth↔address mapping
+│  Verify / Treasury / ActionDetail /      │
+│  Architecture / CausalExplorer routes    │
+└──────────────────────────────────────────┘
+```
+
+## End-to-end execution flow (as historically executed, VERIFIED)
+
+1. **Observe** — agent's `sepoliaWatcher` sees `observePrice(p)` on Sepolia.
+2. **Prove** — `attestcoinClient` asks the Creditcoin prover for a native-query proof
+   of that observation tx (via `@gluwa/usc-sdk`); proof verifies against precompile `0x…0FD2`.
+3. **Confirm** — a second proof re-observes the source price after a gap
+   (`CONFIRM_GAP_TARGET_BLOCKS`, target 3); drift is checked on-chain.
+4. **Decide** — Gemini recommends within rules R-ARB-1 etc.; `treasuryGuardrails`
+   pre-filters (the contract re-checks everything independently).
+5. **Execute** — `submitter` calls `executeArbitrage(sourceProof, confirmProof,
+   tradeSize, decisionHash)`; contract verifies both proofs, re-checks width/drift/
+   slippage/size/rate, swaps via `DEX_ROUTER`, journals the entry with the hash.
+6. **Journal** — `ActionJournaled(actionKey, factKey, …)`; reasoning payload stored
+   off-chain keyed by `decisionHash`.
+7. **Audit** — anyone reads the journal on-chain and the reasoning payload, re-hashes,
+   and sees match/mismatch; `replay.ts` CLI does the same offline.
+
+## Trust boundaries
+
+| Inside the boundary (contract-enforced) | Outside (off-chain, cannot move funds) |
+| --- | --- |
+| Proof verification via precompile (twice, same chain key since 3.6 source) | Gemini's rationale (advisory only) |
+| Drift, arb width, slippage, trade size, epoch rate | Agent's key custody (submitter EOA can only execute within bounds) |
+| Agent allowlist per instance | Reasoning payload storage (hash-committed on-chain) |
+| Immutable guardrails + immutable chain config | Frontend rendering (read-only, re-verifies hashes) |
+| No admin fund exit | Source-chain `observePrice` truthfulness (mitigated by re-verification, not eliminated — STOP 3) |
+
+## Interface-version drift (source vs deployed) — important for tooling
+
+| Aspect | Current source | Deployed instances (live) |
+| --- | --- | --- |
+| JournalEntry | 12 fields (evidence identifiers, no `attestedAt`) | 8 fields, includes `attestedAt` |
+| `executeArbitrage` | `0xd5aa9654` (6-arg, direction byte in payload) | `0xc296ff5e` (pre-3.10) |
+| actionPayload | 6 fields (…amountOut, direction) | 5 fields (…amountOut) |
+| Chain-mismatch / selector checks | present | absent |
+| ABI encoding gotcha | `getJournalEntry` returns tuple **wrapped with dynamic offset 0x20** on live instances — decode with `['tuple(...)']`, not a flat type list (pitfall proven this session) | same |
+
+The frontend (`contractReader.ts`) already handles both shapes; new agent tooling must
+use the committed ABI JSONs in `contracts/out/` (regenerated by `update-abis.js`) or
+tolerant decoding.
+
+## Registries (three, deliberately different)
+
+- `agent/tenants.json` — labels `tenant-a`/`tenant-b`, treasury addresses only.
+- `frontend/public/tenants.json` — labels `tenant-1`/`tenant-2`, adds `owner` (extra
+  field is ignored by the agent's parser — harmless by design).
+- On-chain truth — `TreasuryDeployed` events from the factory; `index-tenants.js`
+  regenerates agent-compatible JSON (currently broken on full block range — see
+  KNOWN_ISSUES #4).
