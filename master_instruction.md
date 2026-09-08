@@ -4,11 +4,11 @@ Last updated: 2026-09-08
 
 Architecture status: **LOCKED**
 
-Current implementation phase: **Phase 2 — Canonical Proposal and Hash Parity — COMPLETE**
+Current implementation phase: **Phase 3 — Generic Treasury and Universal Policy — COMPLETE**
 
-Completed phases: **Phase 0, Phase 1, Phase 2**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3**
 
-Next implementation phase: **Phase 3 — Generic Treasury and Policy Skeleton**
+Next implementation phase: **Phase 4 — Arbitrage Migration**
 
 This file is persistent project memory for a fresh implementation agent. Read it completely before acting, then read every file in `docs/architecture/`. Code remains the primary truth for implementation state; this file defines the authorized target architecture and handoff protocol.
 
@@ -85,7 +85,7 @@ React/Vite provides signup via Thirdweb embedded wallet, treasury deployment/age
 
 Supabase must be kept. Current implementation has only `user_instances` and permissive PoC browser policies. Reasoning currently uses `.reasoning-store`, not Supabase. There is no backend indexer or audit schema yet.
 
-### Current implementation state after Phase 2
+### Current implementation state after Phase 3
 
 Phase 1 added a side-by-side domain layer under `agent/src/domain/` and strategy layer under `agent/src/strategies/`. The live legacy arbitrage runner does not import them yet, by design.
 
@@ -112,7 +112,13 @@ Implemented:
 - a durable per-agent `uint64` nonce input contract for later orchestration; Phase 3 must enforce used nonces on-chain;
 - cross-language golden vectors and hash domain/field-sensitivity tests.
 
-No concrete arbitrage, rebalance, or risk arithmetic was implemented; those remain Phases 4–6. No policy authorization, replay storage, submission integration, ABI publication, runtime migration, database, frontend, deployment script, environment variable, address, or chain state changed.
+No concrete arbitrage, rebalance, or risk arithmetic was implemented in Phases 1–2; those remain Phases 4–6. Phase 3 adds the universal authorization and replay skeleton described below, while runtime agent/frontend migration, database work, deployment configuration, addresses, and chain state remain unchanged.
+
+Phase 3 migrated the local undeployed `FairWitnessTreasury` and its factory to the schema-v1 generic boundary. It now stores an immutable-by-interface mandate, starts paused, hashes mode and epoch into policy identity, accepts typed proposals, applies universal schema/pair/venue/deadline/slippage/policy/replay checks, bounds journal attempts, and durably records normal rejections. First-use structurally valid proposals consume their per-agent nonce and proposal ID even when the strategy branch rejects. Unauthorized callers and attempt-cap overflow revert.
+
+The owner can register agents, pause/resume with epoch invalidation, and withdraw only WCTC/stable to the owner. Strategy evaluation deliberately fails closed until Phases 4–6. An `onlySelf` execution subcall establishes atomic replay/counter/approval rollback; a test-only derived harness proves caught adapter failure leaves no execution residue while recording `EXECUTION_FAILED`. The factory deploys the exact generic mandate. New client ABIs are generated, but no agent/frontend runtime imports them yet.
+
+No contracts were deployed. Attestcoin proof submission and deterministic arbitrage policy are Phase 4 work; production `FairWitnessTreasury` cannot autonomously execute in the Phase 3 state.
 
 Phase 1 files added:
 
@@ -142,7 +148,7 @@ Phase 2 also exports the proposal package from `agent/src/domain/index.ts`.
 
 ### Current test state
 
-- `forge test`: 108 passed, 0 failed.
+- `forge test`: 99 passed, 0 failed.
 - agent focused Phase 2 proposal tests: 8 passed, 0 failed.
 - agent full Vitest: 75 passed, 0 failed.
 - agent TypeScript build: passed.

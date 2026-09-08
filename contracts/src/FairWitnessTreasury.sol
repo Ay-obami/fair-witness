@@ -1,0 +1,272 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IFairWitnessTypes as T} from "./interfaces/IFairWitnessTypes.sol";
+import {FairWitnessHashing} from "./libraries/FairWitnessHashing.sol";
+import {VerifiedMarketFactValidator} from "./VerifiedMarketFactValidator.sol";
+import {PenguinV3Adapter} from "./PenguinV3Adapter.sol";
+
+/// @notice Generic schema-v1 custody and universal-policy boundary.
+/// @dev Strategy branches deliberately fail closed until Phases 4-6.
+contract FairWitnessTreasury is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    uint16 public constant BPS = 10_000;
+    uint16 public constant MAX_ALLOWED_SLIPPAGE_BPS = 1_000;
+    uint32 public constant MIN_EPOCH_LENGTH = 60;
+    uint32 public constant MAX_EPOCH_LENGTH = 30 days;
+    uint64 public constant MAX_PROPOSAL_HORIZON = 1 hours;
+
+    VerifiedMarketFactValidator public immutable FACT_VALIDATOR;
+    PenguinV3Adapter public immutable DEX_ADAPTER;
+    address public immutable WCTC;
+    address public immutable STABLE;
+    address public immutable VENUE;
+
+    T.UniversalPolicy private _universal;
+    T.ArbitragePolicy private _arbitrage;
+    T.RebalancePolicy private _rebalance;
+    T.RiskPolicy private _risk;
+    T.AutomationMode public automationMode;
+    uint64 public policyEpoch;
+
+    mapping(address => bool) public registeredAgents;
+    mapping(address => mapping(uint64 => bool)) public usedNonces;
+    mapping(bytes32 => bool) public processedProposals;
+    mapping(bytes32 => bool) public executedEvidence;
+    mapping(uint256 => uint16) public attemptsInEpoch;
+    mapping(uint64 => T.AttemptRecord) private _attempts;
+    uint64 public attemptCount;
+    uint64 public executionCount;
+
+    error InvalidConfiguration();
+    error InvalidPolicy();
+    error NotRegisteredAgent();
+    error AttemptRateLimitExceeded();
+    error CannotRenounceOwnership();
+    error OnlySelf();
+    error AssetNotAllowed();
+    error AmountOutOverflow();
+
+    event AgentRegistered(address indexed agent);
+    event AgentDeregistered(address indexed agent);
+    event AutomationModeChanged(
+        T.AutomationMode oldMode, T.AutomationMode newMode, uint64 policyEpoch, bytes32 policyHash
+    );
+    event AttemptResolved(
+        uint64 indexed attemptId, bytes32 indexed proposalId, address indexed agent,
+        T.AttemptResult result, T.ReasonCode reason
+    );
+    event OwnerExit(address indexed asset, uint256 amount, address indexed recipient);
+
+    constructor(
+        address validator_,
+        address adapter_,
+        address owner_,
+        T.UniversalPolicy memory universal_,
+        T.ArbitragePolicy memory arbitrage_,
+        T.RebalancePolicy memory rebalance_,
+        T.RiskPolicy memory risk_
+    ) Ownable(owner_) {
+        if (
+            validator_ == address(0) || adapter_ == address(0) || owner_ == address(0)
+                || validator_.code.length == 0 || adapter_.code.length == 0
+        ) revert InvalidConfiguration();
+        _validatePolicy(universal_, arbitrage_, rebalance_, risk_);
+        PenguinV3Adapter adapter = PenguinV3Adapter(adapter_);
+        FACT_VALIDATOR = VerifiedMarketFactValidator(validator_);
+        DEX_ADAPTER = adapter;
+        WCTC = adapter.WCTC();
+        STABLE = adapter.STABLE();
+        VENUE = adapter_;
+        _universal = universal_;
+        _arbitrage = arbitrage_;
+        _rebalance = rebalance_;
+        _risk = risk_;
+        automationMode = T.AutomationMode.Paused;
+    }
+
+    function universalPolicy() external view returns (T.UniversalPolicy memory) { return _universal; }
+    function arbitragePolicy() external view returns (T.ArbitragePolicy memory) { return _arbitrage; }
+    function rebalancePolicy() external view returns (T.RebalancePolicy memory) { return _rebalance; }
+    function riskPolicy() external view returns (T.RiskPolicy memory) { return _risk; }
+
+    function currentPolicyHash() public view returns (bytes32) {
+        T.PolicyHashInput memory input = T.PolicyHashInput({
+            wctc: WCTC,
+            stable: STABLE,
+            venue: VENUE,
+            universal: _universal,
+            arbitrage: _arbitrage,
+            rebalance: _rebalance,
+            risk: _risk,
+            automationMode: automationMode,
+            policyEpoch: policyEpoch
+        });
+        return FairWitnessHashing.policyHash(block.chainid, address(this), input);
+    }
+
+    function registerAgent(address agent) external onlyOwner {
+        if (agent == address(0)) revert InvalidConfiguration();
+        registeredAgents[agent] = true;
+        emit AgentRegistered(agent);
+    }
+
+    function deregisterAgent(address agent) external onlyOwner {
+        registeredAgents[agent] = false;
+        emit AgentDeregistered(agent);
+    }
+
+    function setAutomationMode(T.AutomationMode mode) external onlyOwner {
+        if (mode == automationMode) return;
+        T.AutomationMode oldMode = automationMode;
+        automationMode = mode;
+        policyEpoch++;
+        emit AutomationModeChanged(oldMode, mode, policyEpoch, currentPolicyHash());
+    }
+
+    function renounceOwnership() public pure override { revert CannotRenounceOwnership(); }
+
+    function submitProposal(T.Proposal calldata proposal)
+        external
+        nonReentrant
+        returns (uint64 attemptId, T.ReasonCode reason)
+    {
+        if (!registeredAgents[msg.sender]) revert NotRegisteredAgent();
+        uint256 epoch = block.timestamp / _universal.epochLength;
+        if (attemptsInEpoch[epoch] >= _universal.maxAttemptsPerEpoch) revert AttemptRateLimitExceeded();
+        attemptsInEpoch[epoch]++;
+        attemptId = ++attemptCount;
+        bytes32 proposalId = FairWitnessHashing.proposalId(block.chainid, address(this), proposal);
+        bytes32 executionKey = FairWitnessHashing.executionKey(address(this), proposal);
+        reason = _universalReason(proposal, proposalId, executionKey);
+        if (reason == T.ReasonCode.None) {
+            processedProposals[proposalId] = true;
+            usedNonces[msg.sender][proposal.nonce] = true;
+            (bool approved, uint128 minimumOut, T.ReasonCode strategyReason) = _evaluateStrategy(proposal);
+            reason = strategyReason;
+            if (approved) {
+                _record(attemptId, proposal, proposalId, executionKey, T.ReasonCode.None);
+                try this.executeApproved(proposal, minimumOut) returns (uint256 amountOut) {
+                    T.AttemptRecord storage executed = _attempts[attemptId];
+                    executed.result = T.AttemptResult.Executed;
+                    executed.amountInActual = proposal.amountIn;
+                    executed.amountOutActual = uint128(amountOut);
+                    emit AttemptResolved(attemptId, proposalId, msg.sender, T.AttemptResult.Executed, T.ReasonCode.None);
+                    return (attemptId, T.ReasonCode.None);
+                } catch {
+                    reason = T.ReasonCode.ExecutionReverted;
+                    T.AttemptRecord storage failed = _attempts[attemptId];
+                    failed.result = T.AttemptResult.ExecutionFailed;
+                    failed.reason = reason;
+                    emit AttemptResolved(attemptId, proposalId, msg.sender, T.AttemptResult.ExecutionFailed, reason);
+                    return (attemptId, reason);
+                }
+            }
+        }
+        _record(attemptId, proposal, proposalId, executionKey, reason);
+        emit AttemptResolved(attemptId, proposalId, msg.sender, T.AttemptResult.Rejected, reason);
+    }
+
+    function _evaluateStrategy(T.Proposal calldata proposal)
+        internal view virtual returns (bool, uint128, T.ReasonCode)
+    {
+        if (proposal.strategy == T.StrategyType.Arbitrage) return (false, 0, T.ReasonCode.ArbitrageEdgeTooLow);
+        if (proposal.strategy == T.StrategyType.Rebalance) return (false, 0, T.ReasonCode.RebalanceWithinTolerance);
+        return (false, 0, T.ReasonCode.RiskThresholdNotBreached);
+    }
+
+    function _universalReason(T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey)
+        private view returns (T.ReasonCode)
+    {
+        if (p.schemaVersion != 1) return T.ReasonCode.UnsupportedSchema;
+        if (p.evidenceHash == 0 || p.observationHash == 0 || p.decisionHash == 0 || p.policyHash == 0) {
+            return T.ReasonCode.InvalidCommitment;
+        }
+        if (automationMode != T.AutomationMode.Autonomous) return T.ReasonCode.PolicyPaused;
+        if ((_universal.enabledStrategies & (uint8(1) << uint8(p.strategy))) == 0) return T.ReasonCode.StrategyDisabled;
+        if (p.action != T.ActionType.SwapExactIn) return T.ReasonCode.ActionNotAllowed;
+        bool pair = (p.assetIn == WCTC && p.assetOut == STABLE) || (p.assetIn == STABLE && p.assetOut == WCTC);
+        if (!pair) return T.ReasonCode.AssetNotAllowed;
+        if (p.venue != VENUE) return T.ReasonCode.VenueNotAllowed;
+        if (p.deadline < block.timestamp) return T.ReasonCode.ProposalExpired;
+        if (p.deadline > block.timestamp + MAX_PROPOSAL_HORIZON) return T.ReasonCode.DeadlineTooFar;
+        if (p.maxSlippageBps > _universal.maxSlippageBps) return T.ReasonCode.SlippageExceedsPolicy;
+        if (p.policyHash != currentPolicyHash()) return T.ReasonCode.PolicyHashMismatch;
+        if (processedProposals[proposalId]) return T.ReasonCode.ReplayProposal;
+        if (usedNonces[msg.sender][p.nonce]) return T.ReasonCode.NonceAlreadyUsed;
+        if (executedEvidence[executionKey]) return T.ReasonCode.EvidenceAlreadyExecuted;
+        if (p.amountIn == 0) return T.ReasonCode.ZeroExecutableAmount;
+        return T.ReasonCode.None;
+    }
+
+    function _record(
+        uint64 id, T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey, T.ReasonCode reason
+    ) private {
+        T.AttemptRecord storage a = _attempts[id];
+        a.attemptId = id;
+        a.nonce = p.nonce;
+        a.submittedAt = uint64(block.timestamp);
+        a.resolvedAt = uint64(block.timestamp);
+        a.agent = msg.sender;
+        a.assetIn = p.assetIn;
+        a.assetOut = p.assetOut;
+        a.venue = p.venue;
+        a.strategy = p.strategy;
+        a.action = p.action;
+        a.result = T.AttemptResult.Rejected;
+        a.evidenceStatus = T.EvidenceStatus.NotChecked;
+        a.reason = reason;
+        a.proposedAmountIn = p.amountIn;
+        a.proposalId = proposalId;
+        a.executionKey = executionKey;
+        a.evidenceHash = p.evidenceHash;
+        a.observationHash = p.observationHash;
+        a.decisionHash = p.decisionHash;
+        a.policyHash = p.policyHash;
+    }
+
+    function ownerExit(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (asset != WCTC && asset != STABLE) revert AssetNotAllowed();
+        IERC20(asset).safeTransfer(owner(), amount);
+        emit OwnerExit(asset, amount, owner());
+    }
+
+    function getAttempt(uint64 id) external view returns (T.AttemptRecord memory) { return _attempts[id]; }
+
+    /// @dev Installed for the locked atomic pattern; unreachable from proposals until a strategy approves.
+    function executeApproved(T.Proposal calldata p, uint128 amountOutMinimum) external returns (uint256 amountOut) {
+        if (msg.sender != address(this)) revert OnlySelf();
+        bytes32 key = FairWitnessHashing.executionKey(address(this), p);
+        executedEvidence[key] = true;
+        executionCount++;
+        IERC20 input = IERC20(p.assetIn);
+        input.forceApprove(VENUE, p.amountIn);
+        PenguinV3Adapter.TradeDirection direction = p.assetIn == WCTC
+            ? PenguinV3Adapter.TradeDirection.SellWctcForStable
+            : PenguinV3Adapter.TradeDirection.BuyWctcWithStable;
+        amountOut = DEX_ADAPTER.swapExactInput(direction, p.amountIn, amountOutMinimum, p.deadline);
+        if (amountOut > type(uint128).max) revert AmountOutOverflow();
+        input.forceApprove(VENUE, 0);
+    }
+
+    function _validatePolicy(
+        T.UniversalPolicy memory u, T.ArbitragePolicy memory a,
+        T.RebalancePolicy memory r, T.RiskPolicy memory k
+    ) private pure {
+        if (
+            u.enabledStrategies == 0 || (u.enabledStrategies & ~uint8(7)) != 0 || u.maxActionValueE6 == 0
+                || u.maxSlippageBps > MAX_ALLOWED_SLIPPAGE_BPS || u.maxExecutionsPerEpoch == 0
+                || u.maxAttemptsPerEpoch < u.maxExecutionsPerEpoch || u.epochLength < MIN_EPOCH_LENGTH
+                || u.epochLength > MAX_EPOCH_LENGTH
+        ) revert InvalidPolicy();
+        if ((u.enabledStrategies & 1) != 0 && (a.minNetEdgeBps == 0 || a.maxArbitrageValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 2) != 0 && (r.targetWctcBps > BPS || r.toleranceBps == 0 || r.maxRebalanceValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 4) != 0 && (k.maxWctcExposureBps > BPS || k.maxRiskReductionValueE6 == 0 || k.dailyRiskReductionValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 6) == 6 && uint256(k.maxWctcExposureBps) <= uint256(r.targetWctcBps) + r.toleranceBps) revert InvalidPolicy();
+    }
+}

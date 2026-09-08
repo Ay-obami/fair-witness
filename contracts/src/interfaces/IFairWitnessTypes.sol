@@ -19,6 +19,20 @@ interface IFairWitnessTypes {
         Autonomous
     }
 
+    enum AttemptResult { Rejected, Executed, ExecutionFailed }
+    enum EvidenceStatus { NotChecked, Invalid, Verified }
+    enum ReasonCode {
+        None, UnsupportedSchema, InvalidCommitment, PolicyPaused, StrategyDisabled,
+        ActionNotAllowed, AssetNotAllowed, VenueNotAllowed, ProposalExpired, DeadlineTooFar,
+        SlippageExceedsPolicy, PolicyHashMismatch, ReplayProposal, NonceAlreadyUsed,
+        EvidenceAlreadyExecuted, InvalidEvidence, EvidenceStale, EvidenceHashMismatch,
+        SourceDriftTooHigh, SourceLiquidityTooLow, DestinationMarketInvalid,
+        DestinationLiquidityTooLow, DestinationDeviationTooHigh, WrongDirection,
+        ArbitrageEdgeTooLow, RebalanceWithinTolerance, RiskThresholdNotBreached,
+        ZeroExecutableAmount, AmountExceedsPolicy, AmountMismatch, DailyRiskLimit,
+        InsufficientBalance, ExecutionRateLimit, ExecutionReverted
+    }
+
     struct Proposal {
         uint8 schemaVersion;
         StrategyType strategy;
@@ -92,5 +106,18 @@ interface IFairWitnessTypes {
         RiskPolicy risk;
         AutomationMode automationMode;
         uint64 policyEpoch;
+    }
+
+    struct AttemptRecord {
+        uint64 attemptId; uint64 nonce; uint64 submittedAt; uint64 resolvedAt;
+        uint64 sourceChainKey; uint64 sourceBlockHeight; uint64 sourceTxIndex;
+        uint64 confirmBlockHeight; uint64 confirmTxIndex;
+        address agent; address assetIn; address assetOut; address venue;
+        StrategyType strategy; ActionType action; AttemptResult result;
+        EvidenceStatus evidenceStatus; ReasonCode reason;
+        uint128 proposedAmountIn; uint128 permittedValueE6; uint128 amountInActual; uint128 amountOutActual;
+        uint16 currentWctcBps; uint16 referenceBps;
+        bytes32 proposalId; bytes32 executionKey; bytes32 evidenceHash; bytes32 observationHash;
+        bytes32 decisionHash; bytes32 policyHash; bytes32 evaluatedStateHash;
     }
 }

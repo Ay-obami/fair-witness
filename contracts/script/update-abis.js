@@ -19,12 +19,20 @@ const readArtifact = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8
 
 const journalAbi = readArtifact("contracts/out/ASCTreasuryJournal.sol/ASCTreasuryJournal.json");
 const factoryAbi = readArtifact("contracts/out/ASCTreasuryFactory.sol/ASCTreasuryFactory.json");
+const policyTreasuryAbi = readArtifact("contracts/out/FairWitnessTreasury.sol/FairWitnessTreasury.json");
+const policyFactoryAbi = readArtifact("contracts/out/FairWitnessTreasuryFactory.sol/FairWitnessTreasuryFactory.json");
 
 // --- Sanity gates: fail loudly if the ABI no longer matches what clients rely on. ---
 
 const journalFn = (name) => journalAbi.find((e) => e.type === "function" && e.name === name);
 if (!journalFn("executeArbitrage")) throw new Error("journal ABI has no executeArbitrage");
 if (!journalFn("getJournalEntry")) throw new Error("journal ABI has no getJournalEntry");
+if (!policyTreasuryAbi.some((e) => e.type === "function" && e.name === "submitProposal")) {
+  throw new Error("policy treasury ABI has no submitProposal");
+}
+if (!policyTreasuryAbi.some((e) => e.type === "function" && e.name === "getAttempt")) {
+  throw new Error("policy treasury ABI has no getAttempt");
+}
 
 // JournalEntry field list — update THIS LIST (and the client decoders) together when
 // the struct legitimately changes; the point is that drift must be a loud failure.
@@ -65,6 +73,10 @@ const targets = [
   ["frontend/src/abi/ASCTreasuryJournal.json", journalAbi],
   ["agent/src/abi/ASCTreasuryFactory.json", factoryAbi],
   ["frontend/src/abi/ASCTreasuryFactory.json", factoryAbi],
+  ["agent/src/abi/FairWitnessTreasury.json", policyTreasuryAbi],
+  ["frontend/src/abi/FairWitnessTreasury.json", policyTreasuryAbi],
+  ["agent/src/abi/FairWitnessTreasuryFactory.json", policyFactoryAbi],
+  ["frontend/src/abi/FairWitnessTreasuryFactory.json", policyFactoryAbi],
 ];
 for (const [rel, abi] of targets) {
   const abs = path.join(root, rel);
