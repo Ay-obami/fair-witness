@@ -166,6 +166,19 @@
   },
   {
     "type": "function",
+    "name": "EXECUTION_RESERVE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "FACT_VALIDATOR",
     "inputs": [],
     "outputs": [
@@ -488,6 +501,25 @@
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "executionsInEpoch",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "stateMutability": "view"
@@ -923,6 +955,152 @@
             "internalType": "bytes32"
           }
         ]
+      },
+      {
+        "name": "sourceProof",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.ProofData",
+        "components": [
+          {
+            "name": "chainKey",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "encodedTransaction",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.MerkleProof",
+            "components": [
+              {
+                "name": "root",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "siblings",
+                "type": "tuple[]",
+                "internalType": "struct INativeQueryVerifier.MerkleProofEntry[]",
+                "components": [
+                  {
+                    "name": "hash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "isLeft",
+                    "type": "bool",
+                    "internalType": "bool"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "continuityProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.ContinuityProof",
+            "components": [
+              {
+                "name": "lowerEndpointDigest",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "roots",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "confirmProof",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.ProofData",
+        "components": [
+          {
+            "name": "chainKey",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "encodedTransaction",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.MerkleProof",
+            "components": [
+              {
+                "name": "root",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "siblings",
+                "type": "tuple[]",
+                "internalType": "struct INativeQueryVerifier.MerkleProofEntry[]",
+                "components": [
+                  {
+                    "name": "hash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "isLeft",
+                    "type": "bool",
+                    "internalType": "bool"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "continuityProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.ContinuityProof",
+            "components": [
+              {
+                "name": "lowerEndpointDigest",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "roots",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
+          }
+        ]
       }
     ],
     "outputs": [
@@ -1040,6 +1218,245 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifyEvidence",
+    "inputs": [
+      {
+        "name": "sourceProof",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.ProofData",
+        "components": [
+          {
+            "name": "chainKey",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "encodedTransaction",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.MerkleProof",
+            "components": [
+              {
+                "name": "root",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "siblings",
+                "type": "tuple[]",
+                "internalType": "struct INativeQueryVerifier.MerkleProofEntry[]",
+                "components": [
+                  {
+                    "name": "hash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "isLeft",
+                    "type": "bool",
+                    "internalType": "bool"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "continuityProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.ContinuityProof",
+            "components": [
+              {
+                "name": "lowerEndpointDigest",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "roots",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "confirmProof",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.ProofData",
+        "components": [
+          {
+            "name": "chainKey",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "encodedTransaction",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.MerkleProof",
+            "components": [
+              {
+                "name": "root",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "siblings",
+                "type": "tuple[]",
+                "internalType": "struct INativeQueryVerifier.MerkleProofEntry[]",
+                "components": [
+                  {
+                    "name": "hash",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "isLeft",
+                    "type": "bool",
+                    "internalType": "bool"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "continuityProof",
+            "type": "tuple",
+            "internalType": "struct INativeQueryVerifier.ContinuityProof",
+            "components": [
+              {
+                "name": "lowerEndpointDigest",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "roots",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.VerifiedObservation",
+        "components": [
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "reporter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "arithmeticMeanTick",
+            "type": "int24",
+            "internalType": "int24"
+          },
+          {
+            "name": "spotSqrtPriceX96",
+            "type": "uint160",
+            "internalType": "uint160"
+          },
+          {
+            "name": "liquidity",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "priceE6",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct VerifiedMarketFactValidator.VerifiedObservation",
+        "components": [
+          {
+            "name": "blockHeight",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "transactionIndex",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "reporter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "arithmeticMeanTick",
+            "type": "int24",
+            "internalType": "int24"
+          },
+          {
+            "name": "spotSqrtPriceX96",
+            "type": "uint160",
+            "internalType": "uint160"
+          },
+          {
+            "name": "liquidity",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "priceE6",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",

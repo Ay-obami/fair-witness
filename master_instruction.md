@@ -4,11 +4,11 @@ Last updated: 2026-09-08
 
 Architecture status: **LOCKED**
 
-Current implementation phase: **Phase 3 — Generic Treasury and Universal Policy — COMPLETE**
+Current implementation phase: **Phase 4 — Arbitrage Migration — COMPLETE**
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4**
 
-Next implementation phase: **Phase 4 — Arbitrage Migration**
+Next implementation phase: **Phase 5 — Rebalancing**
 
 This file is persistent project memory for a fresh implementation agent. Read it completely before acting, then read every file in `docs/architecture/`. Code remains the primary truth for implementation state; this file defines the authorized target architecture and handoff protocol.
 
@@ -85,7 +85,7 @@ React/Vite provides signup via Thirdweb embedded wallet, treasury deployment/age
 
 Supabase must be kept. Current implementation has only `user_instances` and permissive PoC browser policies. Reasoning currently uses `.reasoning-store`, not Supabase. There is no backend indexer or audit schema yet.
 
-### Current implementation state after Phase 3
+### Current implementation state after Phase 4
 
 Phase 1 added a side-by-side domain layer under `agent/src/domain/` and strategy layer under `agent/src/strategies/`. The live legacy arbitrage runner does not import them yet, by design.
 
@@ -118,7 +118,11 @@ Phase 3 migrated the local undeployed `FairWitnessTreasury` and its factory to t
 
 The owner can register agents, pause/resume with epoch invalidation, and withdraw only WCTC/stable to the owner. Strategy evaluation deliberately fails closed until Phases 4–6. An `onlySelf` execution subcall establishes atomic replay/counter/approval rollback; a test-only derived harness proves caught adapter failure leaves no execution residue while recording `EXECUTION_FAILED`. The factory deploys the exact generic mandate. New client ABIs are generated, but no agent/frontend runtime imports them yet.
 
-No contracts were deployed. Attestcoin proof submission and deterministic arbitrage policy are Phase 4 work; production `FairWitnessTreasury` cannot autonomously execute in the Phase 3 state.
+Phase 4 activates only the arbitrage branch. `submitProposal` now accepts typed source/confirmation proofs, invokes the immutable validator through a catchable self-call, derives the locked evidence hash from verified facts, classifies stale/invalid evidence, reads the immutable adapter market, enforces source/destination liquidity and drift/deviation, derives direction, fee/slippage/reserve/net edge, calculates an edge-scaled balance/universal/strategy-capped exact input, and computes minimum output. Only an exact matching proposal can reach the atomic execution subcall. Attempt records contain claimed proof positions, verified status, permitted value, net edge, and evaluated-state hash.
+
+The TypeScript side now has a deterministic `ArbitrageStrategy`, canonical closed-response prompt builder, and schema-v1 `PolicySubmitter`. These are side-by-side with the configured legacy runner: no existing deployed legacy address is silently repointed. Rebalancing and risk reduction still fail closed pending Phases 5 and 6.
+
+No contracts were deployed and no chain state changed.
 
 Phase 1 files added:
 
@@ -148,9 +152,9 @@ Phase 2 also exports the proposal package from `agent/src/domain/index.ts`.
 
 ### Current test state
 
-- `forge test`: 99 passed, 0 failed.
+- `forge test`: 105 passed, 0 failed.
 - agent focused Phase 2 proposal tests: 8 passed, 0 failed.
-- agent full Vitest: 75 passed, 0 failed.
+- agent full Vitest: 78 passed, 0 failed.
 - agent TypeScript build: passed.
 - frontend lint: passed.
 - frontend production build: passed with the pre-existing large-chunk warning.

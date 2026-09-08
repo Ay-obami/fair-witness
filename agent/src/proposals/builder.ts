@@ -44,6 +44,9 @@ export function buildProposal(
   if (envelope.maxSlippageBps > mandate.universal.maxSlippageBps) {
     throw new RangeError("maxSlippageBps exceeds the mandate ceiling");
   }
+  if (candidate.strategy === 0 && envelope.maxSlippageBps !== candidate.metrics.effectiveSlippageBps) {
+    throw new Error("arbitrage proposal slippage differs from the evaluated candidate");
+  }
   uint(candidate.deterministicAmountIn, UINT128_MAX, "amountIn");
   if (candidate.deterministicAmountIn === 0n) throw new RangeError("amountIn must be positive");
   uint(envelope.deadline, UINT64_MAX, "deadline");

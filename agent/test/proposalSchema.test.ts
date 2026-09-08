@@ -135,7 +135,7 @@ describe("deterministic proposal builder", () => {
     direction: TradeDirection.SELL_WCTC,
     deterministicAmountIn: proposal.amountIn,
     permittedValueE6: 425_000n,
-    metrics: { kind: StrategyType.ARBITRAGE },
+    metrics: { kind: StrategyType.ARBITRAGE, effectiveSlippageBps: 75 },
   } as Candidate;
 
   it("derives assets and venue without accepting AI output", () => {
@@ -146,16 +146,16 @@ describe("deterministic proposal builder", () => {
 
   it("rejects policy mismatch, excessive slippage, zero amount, and width overflow", () => {
     expect(() => buildProposal({ ...candidate, policyHash: `0x${"cc".repeat(32)}` }, mandate, {
-      nonce: 1n, deadline: 2n, maxSlippageBps: 1, decisionHash: proposal.decisionHash,
+      nonce: 1n, deadline: 2n, maxSlippageBps: 75, decisionHash: proposal.decisionHash,
     })).toThrow(/different policy/);
     expect(() => buildProposal(candidate, mandate, {
       nonce: 1n, deadline: 2n, maxSlippageBps: 101, decisionHash: proposal.decisionHash,
     })).toThrow(/mandate ceiling/);
     expect(() => buildProposal({ ...candidate, deterministicAmountIn: 0n }, mandate, {
-      nonce: 1n, deadline: 2n, maxSlippageBps: 1, decisionHash: proposal.decisionHash,
+      nonce: 1n, deadline: 2n, maxSlippageBps: 75, decisionHash: proposal.decisionHash,
     })).toThrow(/positive/);
     expect(() => buildProposal(candidate, mandate, {
-      nonce: 1n << 64n, deadline: 2n, maxSlippageBps: 1, decisionHash: proposal.decisionHash,
+      nonce: 1n << 64n, deadline: 2n, maxSlippageBps: 75, decisionHash: proposal.decisionHash,
     })).toThrow(/canonical width/);
   });
 });

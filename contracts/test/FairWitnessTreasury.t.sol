@@ -6,8 +6,23 @@ import {IFairWitnessTypes as T} from "../src/interfaces/IFairWitnessTypes.sol";
 import {FairWitnessTreasury} from "../src/FairWitnessTreasury.sol";
 import {FairWitnessTreasuryFactory} from "../src/FairWitnessTreasuryFactory.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
+import {VerifiedMarketFactValidator} from "../src/VerifiedMarketFactValidator.sol";
+import {FairWitnessHashing} from "../src/libraries/FairWitnessHashing.sol";
 
-contract Phase3ValidatorStub {}
+contract Phase3ValidatorStub {
+    address public constant MARKET_OBSERVER = address(0x1111);
+    address public constant SOURCE_POOL = address(0x2222);
+    function verifyPair(
+        VerifiedMarketFactValidator.ProofData calldata sourceProof,
+        VerifiedMarketFactValidator.ProofData calldata confirmProof
+    ) external pure returns (
+        VerifiedMarketFactValidator.VerifiedObservation memory source,
+        VerifiedMarketFactValidator.VerifiedObservation memory confirmation
+    ) {
+        source = VerifiedMarketFactValidator.VerifiedObservation(sourceProof.blockHeight, sourceProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6);
+        confirmation = VerifiedMarketFactValidator.VerifiedObservation(confirmProof.blockHeight, confirmProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6);
+    }
+}
 contract Phase3AdapterStub {
     address public immutable WCTC;
     address public immutable STABLE;
@@ -20,8 +35,12 @@ contract Phase3ApprovedHarness is FairWitnessTreasury {
             validator, adapter, owner, universal, T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6), T.RiskPolicy(6_000, 1_000e6, 2_500e6)
         ) {}
-    function _evaluateStrategy(T.Proposal calldata) internal pure override returns (bool, uint128, T.ReasonCode) {
-        return (true, 1, T.ReasonCode.None);
+    function _evaluateStrategy(
+        T.Proposal calldata,
+        VerifiedMarketFactValidator.VerifiedObservation memory,
+        VerifiedMarketFactValidator.VerifiedObservation memory
+    ) internal pure override returns (StrategyEvaluation memory result) {
+        result = StrategyEvaluation(true, T.ReasonCode.None, 1, 1, 1, bytes32(uint256(1)));
     }
 }
 
@@ -50,7 +69,7 @@ contract FairWitnessTreasuryTest is Test {
         T.Proposal memory p = _proposal(1);
         uint256 beforeBalance = wctc.balanceOf(address(treasury));
         vm.prank(agent);
-        (uint64 id, T.ReasonCode reason) = treasury.submitProposal(p);
+        (uint64 id, T.ReasonCode reason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(reason), uint8(T.ReasonCode.PolicyPaused));
         assertEq(uint8(treasury.getAttempt(id).result), uint8(T.AttemptResult.Rejected));
         assertEq(wctc.balanceOf(address(treasury)), beforeBalance);
@@ -61,10 +80,10 @@ contract FairWitnessTreasuryTest is Test {
         vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
         T.Proposal memory p = _proposal(7);
         p.policyHash = treasury.currentPolicyHash();
-        vm.prank(agent); (, T.ReasonCode first) = treasury.submitProposal(p);
-        assertEq(uint8(first), uint8(T.ReasonCode.ArbitrageEdgeTooLow));
+        vm.prank(agent); (, T.ReasonCode first) = treasury.submitProposal(p, _proof(), _proof());
+        assertEq(uint8(first), uint8(T.ReasonCode.DestinationMarketInvalid));
         assertTrue(treasury.usedNonces(agent, 7));
-        vm.prank(agent); (, T.ReasonCode replay) = treasury.submitProposal(p);
+        vm.prank(agent); (, T.ReasonCode replay) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(replay), uint8(T.ReasonCode.ReplayProposal));
         assertEq(treasury.executionCount(), 0);
     }
@@ -72,23 +91,23 @@ contract FairWitnessTreasuryTest is Test {
     function test_WrongVenueAndOverslippageCannotMoveFunds() public {
         vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
         T.Proposal memory p = _proposal(2); p.policyHash = treasury.currentPolicyHash(); p.venue = address(0xBEEF);
-        vm.prank(agent); (, T.ReasonCode venueReason) = treasury.submitProposal(p);
+        vm.prank(agent); (, T.ReasonCode venueReason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(venueReason), uint8(T.ReasonCode.VenueNotAllowed));
         p = _proposal(3); p.policyHash = treasury.currentPolicyHash(); p.maxSlippageBps = 101;
-        vm.prank(agent); (, T.ReasonCode slipReason) = treasury.submitProposal(p);
+        vm.prank(agent); (, T.ReasonCode slipReason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(slipReason), uint8(T.ReasonCode.SlippageExceedsPolicy));
     }
 
     function test_UnauthorizedCallerAndAttemptCapRevert() public {
         T.Proposal memory unauthorized = _proposal(1);
-        vm.expectRevert(FairWitnessTreasury.NotRegisteredAgent.selector); treasury.submitProposal(unauthorized);
+        vm.expectRevert(FairWitnessTreasury.NotRegisteredAgent.selector); treasury.submitProposal(unauthorized, _proof(), _proof());
         for (uint64 i = 0; i < 6; i++) {
             T.Proposal memory bounded = _proposal(i);
-            vm.prank(agent); treasury.submitProposal(bounded);
+            vm.prank(agent); treasury.submitProposal(bounded, _proof(), _proof());
         }
         T.Proposal memory overflowAttempt = _proposal(9);
         vm.prank(agent); vm.expectRevert(FairWitnessTreasury.AttemptRateLimitExceeded.selector);
-        treasury.submitProposal(overflowAttempt);
+        treasury.submitProposal(overflowAttempt, _proof(), _proof());
     }
 
     function test_ModeChangeInvalidatesOldPolicyHash() public {
@@ -97,7 +116,7 @@ contract FairWitnessTreasuryTest is Test {
         vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
         assertNotEq(pausedHash, treasury.currentPolicyHash());
         p.policyHash = pausedHash;
-        vm.prank(agent); (, T.ReasonCode reason) = treasury.submitProposal(p);
+        vm.prank(agent); (, T.ReasonCode reason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(reason), uint8(T.ReasonCode.PolicyHashMismatch));
     }
 
@@ -137,7 +156,7 @@ contract FairWitnessTreasuryTest is Test {
         p.venue = address(adapter); p.policyHash = harness.currentPolicyHash();
         bytes32 key = keccak256(abi.encode(address(harness), p.strategy, p.action, p.evidenceHash));
         uint256 balanceBefore = wctc.balanceOf(address(harness));
-        vm.prank(agent); (uint64 id, T.ReasonCode reason) = harness.submitProposal(p);
+        vm.prank(agent); (uint64 id, T.ReasonCode reason) = harness.submitProposal(p, _proof(), _proof());
         assertEq(uint8(reason), uint8(T.ReasonCode.ExecutionReverted));
         assertEq(uint8(harness.getAttempt(id).result), uint8(T.AttemptResult.ExecutionFailed));
         assertFalse(harness.executedEvidence(key));
@@ -149,10 +168,25 @@ contract FairWitnessTreasuryTest is Test {
     function _proposal(uint64 nonce) internal view returns (T.Proposal memory) {
         return T.Proposal(1, T.StrategyType.Arbitrage, T.ActionType.SwapExactIn, address(wctc), address(stable),
             address(treasury.DEX_ADAPTER()), 1e18, 50, uint64(block.timestamp + 60), nonce,
-            keccak256("evidence"), keccak256("observation"), keccak256("decision"), keccak256("policy"));
+            _evidenceHash(), keccak256("observation"), keccak256("decision"), keccak256("policy"));
     }
 
     function _universal() internal pure returns (T.UniversalPolicy memory) {
         return T.UniversalPolicy(7, 10_000e6, 100, 100, 50, 1, 1, 2, 1 days, 6);
+    }
+
+    function _proof() internal pure returns (VerifiedMarketFactValidator.ProofData memory proof) {
+        proof.chainKey = 1;
+        proof.blockHeight = 1;
+    }
+
+    function _evidenceHash() internal pure returns (bytes32) {
+        return FairWitnessHashing.evidenceHash(T.EvidenceHashInput({
+            sourceChainKey: 1, sourceBlockHeight: 1, sourceTxIndex: 0,
+            confirmBlockHeight: 1, confirmTxIndex: 0,
+            immutableObserver: address(0x1111), immutableSourcePool: address(0x2222),
+            sourcePriceE6: 1e6, confirmPriceE6: 1e6, sourceMeanTick: 0, confirmMeanTick: 0,
+            sourceLiquidity: 10, confirmLiquidity: 10
+        }));
     }
 }
