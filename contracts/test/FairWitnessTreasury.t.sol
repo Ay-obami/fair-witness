@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {IFairWitnessTypes as T} from "../src/interfaces/IFairWitnessTypes.sol";
 import {FairWitnessTreasury} from "../src/FairWitnessTreasury.sol";
 import {FairWitnessTreasuryFactory} from "../src/FairWitnessTreasuryFactory.sol";
+import {TreasuryBytecodeStore} from "../src/TreasuryBytecodeStore.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {VerifiedMarketFactValidator} from "../src/VerifiedMarketFactValidator.sol";
 import {FairWitnessHashing} from "../src/libraries/FairWitnessHashing.sol";
@@ -16,14 +17,10 @@ contract Phase3ValidatorStub {
     function verifyPair(
         VerifiedMarketFactValidator.ProofData calldata sourceProof,
         VerifiedMarketFactValidator.ProofData calldata confirmProof
-    )
-        external
-        pure
-        returns (
-            VerifiedMarketFactValidator.VerifiedObservation memory source,
-            VerifiedMarketFactValidator.VerifiedObservation memory confirmation
-        )
-    {
+    ) external pure returns (
+        VerifiedMarketFactValidator.VerifiedObservation memory source,
+        VerifiedMarketFactValidator.VerifiedObservation memory confirmation
+    ) {
         source = VerifiedMarketFactValidator.VerifiedObservation(
             sourceProof.blockHeight, sourceProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6
         );
@@ -36,20 +33,13 @@ contract Phase3ValidatorStub {
 contract Phase3AdapterStub {
     address public immutable WCTC;
     address public immutable STABLE;
-
-    constructor(address wctc, address stable) {
-        WCTC = wctc;
-        STABLE = stable;
-    }
+    constructor(address wctc, address stable) { WCTC = wctc; STABLE = stable; }
 }
 
 contract Phase3ApprovedHarness is FairWitnessTreasury {
     constructor(address validator, address adapter, address owner, T.UniversalPolicy memory universal)
         FairWitnessTreasury(
-            validator,
-            adapter,
-            owner,
-            universal,
+            validator, adapter, owner, universal,
             T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6),
             T.RiskPolicy(6_000, 1_000e6, 2_500e6)
@@ -79,10 +69,7 @@ contract FairWitnessTreasuryTest is Test {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
         treasury = new FairWitnessTreasury(
-            address(validator),
-            address(adapter),
-            owner,
-            _universal(),
+            address(validator), address(adapter), owner, _universal(),
             T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6),
             T.RiskPolicy(6_000, 1_000e6, 2_500e6)
@@ -201,11 +188,9 @@ contract FairWitnessTreasuryTest is Test {
     function test_DemoFactoryBlocksWithdrawalAndCloseRecyclesAssets() public {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
-        FairWitnessTreasuryFactory factory =
-            new FairWitnessTreasuryFactory(address(validator), address(adapter), demoReserve);
+        FairWitnessTreasuryFactory factory = _newFactory(address(validator), address(adapter), demoReserve);
         FairWitnessTreasury demoTreasury = factory.createTreasury(
-            owner,
-            _universal(),
+            owner, _universal(),
             T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6),
             T.RiskPolicy(6_000, 1_000e6, 2_500e6)
@@ -229,6 +214,20 @@ contract FairWitnessTreasuryTest is Test {
         assertEq(stable.balanceOf(owner), 0);
     }
 
+    function test_FactoryRejectsTamperedCreationCodeStores() public {
+        Phase3ValidatorStub validator = new Phase3ValidatorStub();
+        Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
+        bytes memory code = type(FairWitnessTreasury).creationCode;
+        (bytes memory a, bytes memory b) = _split(code);
+        a[0] = bytes1(uint8(a[0]) ^ 1);
+        TreasuryBytecodeStore storeA = new TreasuryBytecodeStore(a);
+        TreasuryBytecodeStore storeB = new TreasuryBytecodeStore(b);
+        vm.expectRevert(FairWitnessTreasuryFactory.CreationCodeMismatch.selector);
+        new FairWitnessTreasuryFactory(
+            address(validator), address(adapter), demoReserve, address(storeA), address(storeB), keccak256(code), uint32(code.length)
+        );
+    }
+
     function test_ExecutionHelperRejectsDirectCall() public {
         T.Proposal memory p = _proposal(1);
         vm.expectRevert(FairWitnessTreasury.OnlySelf.selector);
@@ -238,10 +237,9 @@ contract FairWitnessTreasuryTest is Test {
     function test_FactoryCreatesIndependentMandateTreasury() public {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
-        FairWitnessTreasuryFactory factory = new FairWitnessTreasuryFactory(address(validator), address(adapter), address(0));
+        FairWitnessTreasuryFactory factory = _newFactory(address(validator), address(adapter), address(0));
         FairWitnessTreasury created = factory.createTreasury(
-            owner,
-            _universal(),
+            owner, _universal(),
             T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6),
             T.RiskPolicy(6_000, 1_000e6, 2_500e6)
@@ -256,8 +254,7 @@ contract FairWitnessTreasuryTest is Test {
     function test_FailedExecutionRollsBackReplayAndExecutionCountButJournalsFailure() public {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
-        Phase3ApprovedHarness harness =
-            new Phase3ApprovedHarness(address(validator), address(adapter), owner, _universal());
+        Phase3ApprovedHarness harness = new Phase3ApprovedHarness(address(validator), address(adapter), owner, _universal());
         vm.startPrank(owner);
         harness.registerAgent(agent);
         harness.setAutomationMode(T.AutomationMode.Autonomous);
@@ -278,22 +275,32 @@ contract FairWitnessTreasuryTest is Test {
         assertEq(wctc.allowance(address(harness), address(adapter)), 0);
     }
 
+    function _newFactory(address validator, address adapter, address reserve)
+        internal returns (FairWitnessTreasuryFactory factory)
+    {
+        bytes memory code = type(FairWitnessTreasury).creationCode;
+        (bytes memory a, bytes memory b) = _split(code);
+        TreasuryBytecodeStore storeA = new TreasuryBytecodeStore(a);
+        TreasuryBytecodeStore storeB = new TreasuryBytecodeStore(b);
+        factory = new FairWitnessTreasuryFactory(
+            validator, adapter, reserve, address(storeA), address(storeB), keccak256(code), uint32(code.length)
+        );
+    }
+
+    function _split(bytes memory code) internal pure returns (bytes memory a, bytes memory b) {
+        uint256 cut = code.length / 2;
+        a = new bytes(cut);
+        b = new bytes(code.length - cut);
+        for (uint256 i = 0; i < cut; i++) a[i] = code[i];
+        for (uint256 i = cut; i < code.length; i++) b[i - cut] = code[i];
+    }
+
     function _proposal(uint64 nonce) internal view returns (T.Proposal memory) {
         return T.Proposal(
-            1,
-            T.StrategyType.Arbitrage,
-            T.ActionType.SwapExactIn,
-            address(wctc),
-            address(stable),
-            address(treasury.DEX_ADAPTER()),
-            1e18,
-            50,
-            uint64(block.timestamp + 60),
-            nonce,
-            _evidenceHash(),
-            keccak256("observation"),
-            keccak256("decision"),
-            keccak256("policy")
+            1, T.StrategyType.Arbitrage, T.ActionType.SwapExactIn,
+            address(wctc), address(stable), address(treasury.DEX_ADAPTER()), 1e18, 50,
+            uint64(block.timestamp + 60), nonce, _evidenceHash(), keccak256("observation"),
+            keccak256("decision"), keccak256("policy")
         );
     }
 
@@ -309,19 +316,11 @@ contract FairWitnessTreasuryTest is Test {
     function _evidenceHash() internal pure returns (bytes32) {
         return FairWitnessHashing.evidenceHash(
             T.EvidenceHashInput({
-                sourceChainKey: 1,
-                sourceBlockHeight: 1,
-                sourceTxIndex: 0,
-                confirmBlockHeight: 1,
-                confirmTxIndex: 0,
-                immutableObserver: address(0x1111),
-                immutableSourcePool: address(0x2222),
-                sourcePriceE6: 1e6,
-                confirmPriceE6: 1e6,
-                sourceMeanTick: 0,
-                confirmMeanTick: 0,
-                sourceLiquidity: 10,
-                confirmLiquidity: 10
+                sourceChainKey: 1, sourceBlockHeight: 1, sourceTxIndex: 0,
+                confirmBlockHeight: 1, confirmTxIndex: 0,
+                immutableObserver: address(0x1111), immutableSourcePool: address(0x2222),
+                sourcePriceE6: 1e6, confirmPriceE6: 1e6, sourceMeanTick: 0, confirmMeanTick: 0,
+                sourceLiquidity: 10, confirmLiquidity: 10
             })
         );
     }
