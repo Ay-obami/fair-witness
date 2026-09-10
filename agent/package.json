@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/schemaV1ProductRunner.ts",
-    "start": "node dist/schemaV1ProductRunner.js",
+    "dev": "tsx watch src/productService.ts",
+    "start": "node dist/productService.js",
     "start:legacy": "node dist/index.js",
     "dev:legacy": "tsx watch src/index.ts",
     "replay": "tsx src/replay.ts",
