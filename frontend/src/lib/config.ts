@@ -1,14 +1,12 @@
 export const config = {
-  // Production-shaped by default. Mock data must be explicitly requested.
   demoMode: import.meta.env.VITE_DEMO_MODE === "true",
   creditcoinRpcUrl: import.meta.env.VITE_CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network",
-
-  // Schema-v1 controlled public-testnet deployment. Environment variables may
-  // override these when a newer factory/treasury is promoted.
   treasuryAddress: import.meta.env.VITE_TREASURY_ADDRESS ?? "0x7fF88afF5D8AEA666582730AD81F49b3C303A3d3",
   factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS ?? "0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd",
   agentSubmitAddress: import.meta.env.VITE_AGENT_SUBMIT_ADDRESS ?? "0xB1D19F71d68c4e7065749e8593D338E9A30D654f",
-
+  // Set after ControlledDemoFaucet is deployed and funded. Empty means the UI
+  // honestly falls back to manual controlled-token funding.
+  faucetAddress: import.meta.env.VITE_DEMO_FAUCET_ADDRESS ?? "",
   reasoningApiUrl: import.meta.env.VITE_REASONING_API_URL ?? "",
   explorerBaseUrl: import.meta.env.VITE_EXPLORER_BASE_URL ?? "https://creditcoin-testnet.blockscout.com",
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL ?? "",
