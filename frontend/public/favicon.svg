@@ -1,9 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" aria-label="Fair Witness">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fair Witness">
+  <defs>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2FE6E3"/>
+      <stop offset="1" stop-color="#0E7F8C"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC36F"/>
+      <stop offset="1" stop-color="#B96A2C"/>
+    </linearGradient>
+  </defs>
   <rect width="64" height="64" rx="14" fill="#0B0D0F"/>
-  <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#262B30" stroke-width="2"/>
-  <!-- the ledger page: a copper-bordered sheet with external-evidence rows -->
-  <rect x="16" y="17" width="32" height="30" rx="3" fill="#15181B" stroke="#C98A3E" stroke-width="2.5"/>
-  <path d="M22 27 h18 M22 33 h18 M22 39 h10" stroke="#5B9BD5" stroke-width="2" fill="none" opacity="0.8"/>
-  <!-- the verified check: teal is status-only even in the mark -->
-  <path d="M40 28 l8 8 3 -8" stroke="#4CAF6D" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M32 8 54 20 48 27 32 18 16 27 10 20Z" fill="url(#teal)"/>
+  <path d="M10 20 16 27 24 36 19 44 6 32Z" fill="#0A6670"/>
+  <path d="M54 20 48 27 40 36 45 44 58 32Z" fill="#0A6670"/>
+  <path d="M19 44 32 35 45 44 39 53 32 49 25 53Z" fill="url(#copper)"/>
+  <path d="M32 24 35 30 42 32 35 35 32 42 29 35 22 32 29 30Z" fill="url(#copper)"/>
 </svg>
