@@ -41,8 +41,10 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return <div className="flex min-h-screen flex-col bg-background">
     <nav className="shrink-0 border-b border-hairline">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
-        <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-3 sm:flex-row sm:justify-between sm:px-6">
+        <Link to="/" aria-label="Fair Witness home" className="flex shrink-0 items-center">
+          <img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-10 w-auto sm:h-11" />
+        </Link>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-sm sm:gap-x-4">
           {NAV_ITEMS.map(({to,label}) => {
             const active = location.pathname === to || (to === "/dashboard" && location.pathname.startsWith("/dashboard/"));
@@ -68,7 +70,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="mx-auto max-w-6xl px-6 py-10 md:py-12">
         <div className="grid gap-10 md:grid-cols-[1.4fr_.8fr_.8fr]">
           <section>
-            <Link to="/" className="text-sm font-semibold uppercase tracking-[0.2em] text-verified-400">Fair Witness</Link>
+            <Link to="/" aria-label="Fair Witness home" className="inline-flex">
+              <img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-12 w-auto" />
+            </Link>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-ledger-400">Trust-minimized execution for autonomous financial agents on Creditcoin. AI proposes. Deterministic policy authorizes. Treasury executes.</p>
             <div className="mt-5 flex flex-wrap gap-2 text-xs text-ledger-500">
               <span className="rounded-full border border-ledger-800 px-3 py-1">Non-custodial</span>
