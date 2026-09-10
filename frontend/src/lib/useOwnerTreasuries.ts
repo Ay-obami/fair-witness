@@ -14,6 +14,14 @@ export interface ActivityItem {
   submittedAt: number;
   resolvedAt: number;
   proposalId: string;
+  proposedAmountIn: bigint;
+  permittedValueE6: bigint;
+  amountInActual: bigint;
+  amountOutActual: bigint;
+  currentWctcBps: number;
+  referenceBps: number;
+  assetIn: string;
+  assetOut: string;
 }
 
 export interface TreasuryView {
@@ -64,6 +72,14 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
         submittedAt: Number(r.submittedAt),
         resolvedAt: Number(r.resolvedAt),
         proposalId: String(r.proposalId),
+        proposedAmountIn: BigInt(r.proposedAmountIn),
+        permittedValueE6: BigInt(r.permittedValueE6),
+        amountInActual: BigInt(r.amountInActual),
+        amountOutActual: BigInt(r.amountOutActual),
+        currentWctcBps: Number(r.currentWctcBps),
+        referenceBps: Number(r.referenceBps),
+        assetIn: String(r.assetIn),
+        assetOut: String(r.assetOut),
       }));
     } catch {
       return [];
@@ -105,7 +121,8 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       }
 
       const latest = await provider.getBlockNumber();
-      const configured = Number(import.meta.env.VITE_FACTORY_DEPLOYMENT_BLOCK ?? DEFAULT_FACTORY_DEPLOYMENT_BLOCK);
+      const raw = import.meta.env.VITE_FACTORY_DEPLOYMENT_BLOCK?.trim();
+      const configured = raw ? Number(raw) : DEFAULT_FACTORY_DEPLOYMENT_BLOCK;
       const first = Math.min(Number.isFinite(configured) ? configured : DEFAULT_FACTORY_DEPLOYMENT_BLOCK, latest);
       const filter = factory.filters.TreasuryCreated(null, owner, null);
       for (let from = first; from <= latest; from += LOG_CHUNK_SIZE) {
