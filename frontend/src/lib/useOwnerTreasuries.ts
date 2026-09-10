@@ -46,6 +46,7 @@ export interface TreasuryView {
 
 const DEFAULT_FACTORY_DEPLOYMENT_BLOCK = 5_456_821;
 const LOG_CHUNK_SIZE = 25_000;
+const ACTIVITY_BATCH_SIZE = 20;
 const cache = new Map<string, TreasuryView[]>();
 
 export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | null) {
@@ -61,8 +62,18 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
   const readActivities = useCallback(async (c: ethers.Contract): Promise<ActivityItem[]> => {
     try {
       const count = Number(await c.attemptCount());
-      const ids = Array.from({ length: Math.min(10, count) }, (_, i) => count - i);
-      const records = await Promise.all(ids.map((id) => c.getAttempt(id)));
+      if (count === 0) return [];
+
+      // Attempt records are append-only on-chain. Read the complete journal instead of
+      // silently replacing older entries with a fixed latest-10 window. Batch RPC calls
+      // so a long-lived treasury does not create one huge request burst.
+      const records: any[] = [];
+      for (let newest = count; newest >= 1; newest -= ACTIVITY_BATCH_SIZE) {
+        const oldest = Math.max(1, newest - ACTIVITY_BATCH_SIZE + 1);
+        const ids = Array.from({ length: newest - oldest + 1 }, (_, i) => newest - i);
+        records.push(...await Promise.all(ids.map((id) => c.getAttempt(id))));
+      }
+
       return records.map((r: any) => ({
         attemptId: String(r.attemptId),
         result: Number(r.result),
