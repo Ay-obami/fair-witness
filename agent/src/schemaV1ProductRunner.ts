@@ -19,6 +19,7 @@ import {
   AutomationMode,
   DecisionOutcome,
   type Address,
+  type Candidate,
   type Hex32,
   type MandateSnapshot,
   type VerifiedContext,
@@ -30,18 +31,21 @@ import type { AttestedProof } from "./attestcoinClient.js";
  * Production-shaped schema-v1 service.
  *
  * Security properties:
- * - discovers user treasuries from permissionless factory events, not a database;
+ * - discovers user treasuries incrementally from permissionless factory events, not a database;
+ * - rotates fairly through large treasury sets instead of permanently serving only the newest accounts;
+ * - serializes submissions that mutate the same destination market;
  * - publishes pool-derived source observations (when the source reporter key is configured);
  * - builds and locally verifies genuine Attestcoin proofs;
  * - derives strategy candidates deterministically before asking the AI;
- * - AI returns only EXECUTE/WAIT + rationale;
+ * - re-reads mutable destination/portfolio state immediately before submission;
+ * - AI returns only EXECUTE/WAIT + rationale and cannot choose execution fields;
  * - ProposalBuilder controls every execution field;
  * - FairWitnessTreasury re-verifies proof, market state, portfolio state and policy on-chain.
  */
 
 const repo = resolve(process.cwd(), "..");
 const manifest = JSON.parse(readFileSync(resolve(repo, "contracts/deployments/controlled-demo-schema-v1.json"), "utf8"));
-const SOURCE_CHAIN_KEY = Number(process.env.SOURCE_CHAIN_KEY ?? "1"); // Sepolia in the controlled public-testnet deployment.
+const SOURCE_CHAIN_KEY = Number(process.env.SOURCE_CHAIN_KEY ?? "1");
 const SOURCE_CHAIN_ID = Number(process.env.SOURCE_CHAIN_ID ?? "11155111");
 const DEST_CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? "102031");
 const SOURCE_RPC = process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com";
@@ -54,7 +58,12 @@ const PROOF_BUILDER_URL = process.env.CREDITCOIN_PROOF_BUILDER_URL;
 const POLL_MS = Number(process.env.POLL_INTERVAL_MS ?? "45000");
 const CONFIRM_DELAY_MS = Number(process.env.CONFIRM_OBSERVATION_DELAY_MS ?? "15000");
 const FACTORY_FROM_BLOCK = Number(process.env.FACTORY_DEPLOYMENT_BLOCK ?? "0");
-const MAX_TENANTS = Number(process.env.MAX_TENANTS_PER_CYCLE ?? "50");
+const MAX_TENANTS = Math.max(1, Number(process.env.MAX_TENANTS_PER_CYCLE ?? "50"));
+const FACTORY_LOG_CHUNK = Math.max(1, Number(process.env.FACTORY_LOG_CHUNK_SIZE ?? "25000"));
+const MAX_JIT_REBUILDS = 3;
+const REASON_NONE = 0;
+const REASON_AMOUNT_EXCEEDS_POLICY = 28;
+const REASON_AMOUNT_MISMATCH = 29;
 
 if (!process.env.AGENT_SUBMIT_PRIVATE_KEY) throw new Error("AGENT_SUBMIT_PRIVATE_KEY is required");
 if (!PROOF_BUILDER_URL) throw new Error("CREDITCOIN_PROOF_BUILDER_URL is required");
@@ -81,6 +90,11 @@ const proofBuilder = new proofProvider.service.ProofBuilder(
 );
 const chainInfo = new chainInfoNs.PrecompileChainInfoProvider(destinationProvider as never);
 const blockProver = new blockProverNs.PrecompileBlockProver(destinationProvider as never);
+
+const treasuryIndex: Address[] = [];
+const indexedTreasuries = new Set<string>();
+let nextFactoryBlock = FACTORY_FROM_BLOCK;
+let tenantCursor = 0;
 
 const log = (message: string, extra?: unknown) => {
   const prefix = `[schema-v1 ${new Date().toISOString()}] ${message}`;
@@ -142,20 +156,34 @@ async function proofFor(observation: Observation): Promise<AttestedProof> {
   return proof;
 }
 
-async function discoverTreasuries(): Promise<Address[]> {
+async function refreshTreasuryIndex(): Promise<void> {
   const latest = await destinationProvider.getBlockNumber();
-  const events = await factory.queryFilter(factory.filters.TreasuryCreated(), FACTORY_FROM_BLOCK, latest);
-  const seen = new Set<string>();
-  const addresses: Address[] = [];
-  for (let i = events.length - 1; i >= 0 && addresses.length < MAX_TENANTS; i--) {
-    const event = events[i] as ethers.EventLog;
-    const address = asAddress(event.args.treasury);
-    const key = address.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (await factory.isFactoryTreasury(address)) addresses.push(address);
+  if (nextFactoryBlock > latest) return;
+
+  for (let from = nextFactoryBlock; from <= latest; from += FACTORY_LOG_CHUNK) {
+    const to = Math.min(latest, from + FACTORY_LOG_CHUNK - 1);
+    const events = await factory.queryFilter(factory.filters.TreasuryCreated(), from, to);
+    for (const entry of events) {
+      const event = entry as ethers.EventLog;
+      const address = asAddress(event.args.treasury);
+      const key = address.toLowerCase();
+      if (indexedTreasuries.has(key)) continue;
+      if (!(await factory.isFactoryTreasury(address))) continue;
+      indexedTreasuries.add(key);
+      treasuryIndex.push(address);
+    }
+    nextFactoryBlock = to + 1;
   }
-  return addresses.reverse();
+}
+
+async function discoverTreasuryBatch(): Promise<Address[]> {
+  await refreshTreasuryIndex();
+  if (treasuryIndex.length === 0) return [];
+
+  const count = Math.min(MAX_TENANTS, treasuryIndex.length);
+  const batch = Array.from({ length: count }, (_, i) => treasuryIndex[(tenantCursor + i) % treasuryIndex.length]);
+  tenantCursor = (tenantCursor + count) % treasuryIndex.length;
+  return batch;
 }
 
 function policyTuple(result: any) {
@@ -236,7 +264,14 @@ async function makeContext(
   };
 }
 
-async function decide(candidate: unknown, strategy: number) {
+function deriveCandidate(context: VerifiedContext, mandate: MandateSnapshot): Candidate | null {
+  const coordinator = new StrategyCoordinator([
+    new RiskReductionStrategy(), new RebalancingStrategy(), new ArbitrageStrategy(mandate.universal.maxSlippageBps),
+  ]);
+  return selectHighestPriorityCandidate(coordinator.evaluate(context, mandate));
+}
+
+async function decide(candidate: Candidate, strategy: number) {
   const response = await ai.models.generateContent({
     model: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite",
     contents: `A deterministic Fair Witness strategy engine produced this policy-bounded candidate from Attestcoin-verified cross-chain evidence:\n${JSON.stringify(candidate, bigintJson)}\nReturn EXECUTE only if acting now is sensible. You cannot change strategy, amount, direction, asset, venue, slippage, route, deadline or recipient.`,
@@ -255,6 +290,19 @@ async function decide(candidate: unknown, strategy: number) {
   return parsed;
 }
 
+function sameExecutionIntent(a: Candidate, b: Candidate): boolean {
+  return a.strategy === b.strategy && a.direction === b.direction;
+}
+
+function makeProposal(candidate: Candidate, mandate: MandateSnapshot, decisionHash: Hex32, nonceOffset = 0n) {
+  return buildProposal(candidate, mandate, {
+    maxSlippageBps: candidate.strategy === 0 ? candidate.metrics.effectiveSlippageBps : mandate.universal.maxSlippageBps,
+    deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
+    nonce: BigInt(Date.now()) + nonceOffset,
+    decisionHash,
+  });
+}
+
 async function runTenant(
   mandate: MandateSnapshot,
   source: Observation,
@@ -262,29 +310,112 @@ async function runTenant(
   sourceProof: AttestedProof,
   confirmationProof: AttestedProof,
 ) {
-  const context = await makeContext(mandate, source, confirmation, sourceProof, confirmationProof);
-  const coordinator = new StrategyCoordinator([
-    new RiskReductionStrategy(), new RebalancingStrategy(), new ArbitrageStrategy(mandate.universal.maxSlippageBps),
-  ]);
-  const candidate = selectHighestPriorityCandidate(coordinator.evaluate(context, mandate));
-  if (!candidate) {
-    log("WAIT no deterministic candidate", { treasury: mandate.treasuryAddress, evidenceHash: context.evidence.evidenceHash });
+  const initialContext = await makeContext(mandate, source, confirmation, sourceProof, confirmationProof);
+  const initialCandidate = deriveCandidate(initialContext, mandate);
+  if (!initialCandidate) {
+    log("WAIT no deterministic candidate", { treasury: mandate.treasuryAddress, evidenceHash: initialContext.evidence.evidenceHash });
     return;
   }
-  const decision = await decide(candidate, candidate.strategy);
-  const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ candidate, decision }, bigintJson))));
+
+  const decision = await decide(initialCandidate, initialCandidate.strategy);
   if (decision.decision !== DecisionOutcome.EXECUTE) {
-    log("AI WAIT", { treasury: mandate.treasuryAddress, strategy: candidate.strategy, rationale: decision.rationale, decisionHash });
+    const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ candidate: initialCandidate, decision }, bigintJson))));
+    log("AI WAIT", { treasury: mandate.treasuryAddress, strategy: initialCandidate.strategy, rationale: decision.rationale, decisionHash });
     return;
   }
-  const nonce = BigInt(Date.now());
-  const proposal = buildProposal(candidate, mandate, {
-    maxSlippageBps: candidate.strategy === 0 ? candidate.metrics.effectiveSlippageBps : mandate.universal.maxSlippageBps,
-    deadline: BigInt(Math.floor(Date.now() / 1000) + 600), nonce, decisionHash,
-  });
+
   const submitter = new PolicySubmitter(mandate.treasuryAddress, agent);
+  let executionCandidate = initialCandidate;
+  let executionContext = initialContext;
+
+  for (let rebuild = 0; rebuild < MAX_JIT_REBUILDS; rebuild++) {
+    executionContext = await makeContext(mandate, source, confirmation, sourceProof, confirmationProof);
+    const refreshed = deriveCandidate(executionContext, mandate);
+    if (!refreshed) {
+      log("WAIT candidate disappeared before submission", {
+        treasury: mandate.treasuryAddress,
+        originalStrategy: initialCandidate.strategy,
+        destinationBlock: executionContext.destination.readBlockNumber,
+      });
+      return;
+    }
+    if (!sameExecutionIntent(initialCandidate, refreshed)) {
+      log("WAIT execution intent changed before submission", {
+        treasury: mandate.treasuryAddress,
+        originalStrategy: initialCandidate.strategy,
+        refreshedStrategy: refreshed.strategy,
+        originalDirection: initialCandidate.direction,
+        refreshedDirection: refreshed.direction,
+      });
+      return;
+    }
+    executionCandidate = refreshed;
+
+    const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({
+      initialCandidate,
+      executionCandidate,
+      decision,
+      destinationBlock: executionContext.destination.readBlockNumber,
+    }, bigintJson))));
+    const proposal = makeProposal(executionCandidate, mandate, decisionHash, BigInt(rebuild));
+    const preview = await submitter.preview(proposal, sourceProof, confirmationProof);
+
+    if (preview.reason === REASON_AMOUNT_EXCEEDS_POLICY || preview.reason === REASON_AMOUNT_MISMATCH) {
+      log("JIT state changed; rebuilding proposal", {
+        treasury: mandate.treasuryAddress,
+        strategy: executionCandidate.strategy,
+        previewReason: preview.reason,
+        rebuild: rebuild + 1,
+        destinationBlock: executionContext.destination.readBlockNumber,
+      });
+      continue;
+    }
+
+    const result = await submitter.submit(proposal, sourceProof, confirmationProof);
+    log("proposal resolved", {
+      treasury: mandate.treasuryAddress,
+      strategy: executionCandidate.strategy,
+      decision: decision.decision,
+      rationale: decision.rationale,
+      preflightReason: preview.reason,
+      destinationBlock: executionContext.destination.readBlockNumber,
+      ...result,
+    });
+    return;
+  }
+
+  const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({
+    initialCandidate,
+    executionCandidate,
+    decision,
+    destinationBlock: executionContext.destination.readBlockNumber,
+    jitRebuildsExhausted: true,
+  }, bigintJson))));
+  const proposal = makeProposal(executionCandidate, mandate, decisionHash, BigInt(MAX_JIT_REBUILDS));
   const result = await submitter.submit(proposal, sourceProof, confirmationProof);
-  log("proposal resolved", { treasury: mandate.treasuryAddress, strategy: candidate.strategy, decision: decision.decision, rationale: decision.rationale, ...result });
+  log("proposal resolved after JIT rebuild limit", {
+    treasury: mandate.treasuryAddress,
+    strategy: executionCandidate.strategy,
+    decision: decision.decision,
+    rationale: decision.rationale,
+    ...result,
+  });
+}
+
+async function runMarketQueue(
+  mandates: MandateSnapshot[],
+  source: Observation,
+  confirmation: Observation,
+  sourceProof: AttestedProof,
+  confirmationProof: AttestedProof,
+) {
+  for (const mandate of mandates) {
+    try {
+      await runTenant(mandate, source, confirmation, sourceProof, confirmationProof);
+    } catch (error) {
+      log("tenant cycle failed; continuing", { treasury: mandate.treasuryAddress, error: String(error) });
+    }
+  }
 }
 
 async function cycle() {
@@ -294,12 +425,17 @@ async function cycle() {
   const supported = await chainInfo.getSupportedChainByKey(SOURCE_CHAIN_KEY);
   if (!supported) throw new Error(`Attestcoin source chain key ${SOURCE_CHAIN_KEY} is not supported`);
 
-  const treasuries = await discoverTreasuries();
+  const treasuries = await discoverTreasuryBatch();
   const mandates = (await Promise.all(treasuries.map(async (address) => {
     try { return await readMandate(address); }
     catch (error) { log("treasury read failed", { address, error: String(error) }); return null; }
   }))).filter((value): value is MandateSnapshot => value !== null);
-  log("eligible autonomous treasuries", { discovered: treasuries.length, eligible: mandates.length });
+  log("eligible autonomous treasuries", {
+    discovered: treasuryIndex.length,
+    scheduled: treasuries.length,
+    eligible: mandates.length,
+    nextCursor: tenantCursor,
+  });
   if (mandates.length === 0) return;
 
   const source = await publishObservation();
@@ -308,14 +444,19 @@ async function cycle() {
   if (confirmation.blockHeight <= source.blockHeight) throw new Error("confirmation observation did not advance the source chain");
   const [sourceProof, confirmationProof] = await Promise.all([proofFor(source), proofFor(confirmation)]);
 
-  for (const mandate of mandates) {
-    try { await runTenant(mandate, source, confirmation, sourceProof, confirmationProof); }
-    catch (error) { log("tenant cycle failed; continuing", { treasury: mandate.treasuryAddress, error: String(error) }); }
-  }
+  // One queue per mutable destination market. This deployment has one configured adapter/pool,
+  // so writes are intentionally serialized: each treasury observes the state left by the prior one.
+  await runMarketQueue(mandates, source, confirmation, sourceProof, confirmationProof);
 }
 
 async function main() {
-  log("starting schema-v1 product runner", { agent: agent.address, factory: FACTORY, observer: SOURCE_OBSERVER, sourceChainKey: SOURCE_CHAIN_KEY });
+  log("starting schema-v1 product runner", {
+    agent: agent.address,
+    factory: FACTORY,
+    observer: SOURCE_OBSERVER,
+    sourceChainKey: SOURCE_CHAIN_KEY,
+    maxTenantsPerCycle: MAX_TENANTS,
+  });
   while (true) {
     try { await cycle(); } catch (error) { log("cycle failed; will retry", { error: String(error) }); }
     await sleep(POLL_MS);
