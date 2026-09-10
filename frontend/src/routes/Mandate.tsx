@@ -10,6 +10,7 @@ import { ethers6Adapter } from "thirdweb/adapters/ethers6";
 import { ethers } from "ethers";
 import { useNavigate } from "react-router-dom";
 import { saveInstanceMapping } from "../lib/instanceStore";
+import { humanError } from "../lib/humanError";
 
 const ONBOARDING_KEY = "fair-witness:onboarding";
 
@@ -20,14 +21,14 @@ export default function Mandate() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errors = useMemo(() => validateMandate(draft), [draft]);
-  const onboarding = useMemo(() => { try { return JSON.parse(sessionStorage.getItem(ONBOARDING_KEY) ?? "null") as {email:string;walletAddress:string}|null; } catch { return null; } }, []);
+  const onboarding = useMemo(() => { try { return JSON.parse(sessionStorage.getItem(ONBOARDING_KEY) ?? "null") as {email?:string;walletAddress:string;authMethod?:string}|null; } catch { return null; } }, []);
 
   const setNumber = (field: keyof MandateDraft, value: string) => setDraft(prev => ({...prev, [field]: Number(value)}));
 
   async function deploy() {
     setError(null);
     if (errors.length) return setError(errors[0]);
-    if (!onboarding) return setError("Your onboarding session expired. Return to Launch Fair Witness and verify your email again.");
+    if (!onboarding) return setError("Your onboarding session expired. Return to Launch Fair Witness and sign in again.");
     const account = wallet.getAccount();
     if (!account || account.address.toLowerCase() !== onboarding.walletAddress.toLowerCase()) return setError("Wallet session is not connected. Return to Launch Fair Witness and sign in again.");
     const factoryAddress = config.factoryAddress || CONTROLLED_DEMO.destination.factory;
@@ -43,10 +44,10 @@ export default function Mandate() {
       if (!created) throw new Error("TreasuryCreated event was not found in the deployment receipt.");
       const treasury = ethers.getAddress(created.args.treasury);
       if (!await factory.isFactoryTreasury(treasury)) throw new Error("Factory did not recognize the new treasury.");
-      try { await saveInstanceMapping({email:onboarding.email,walletAddress:account.address,instanceAddress:treasury}); } catch { /* optional projection */ }
+      try { await saveInstanceMapping({email:onboarding.email ?? onboarding.authMethod ?? "social",walletAddress:account.address,instanceAddress:treasury}); } catch { /* optional projection */ }
       sessionStorage.setItem("fair-witness:new-treasury", treasury);
       navigate(`/signup/done?address=${treasury}`);
-    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    } catch (err) { setError(humanError(err, "Treasury deployment failed. Please retry or review the transaction configuration.")); }
     finally { setBusy(false); }
   }
 
@@ -89,9 +90,10 @@ export default function Mandate() {
       <p className="mt-2 text-sm text-ledger-400">Owner: <span className="font-data break-all text-ledger-200">{onboarding?.walletAddress ?? "Not connected"}</span></p>
       <p className="mt-1 text-sm text-ledger-400">Factory: <span className="font-data break-all text-ledger-200">{config.factoryAddress || CONTROLLED_DEMO.destination.factory}</span></p>
       <p className="mt-1 text-sm text-ledger-400">Venue and assets are fixed by the factory adapter. New treasuries start PAUSED.</p>
+      <p className="mt-1 text-sm text-ledger-400">Deployment gas is sponsored through the authenticated Thirdweb smart account.</p>
       {errors.length > 0 && <ul className="mt-4 list-disc pl-5 text-sm text-alert-400">{errors.map(e=><li key={e}>{e}</li>)}</ul>}
-      {error && <p className="mt-4 text-sm text-alert-400">{error}</p>}
-      <button type="button" disabled={busy || errors.length>0 || !onboarding} onClick={()=>void deploy()} className="mt-5 rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Deploying…" : "Deploy my Fair Witness treasury"}</button>
+      {error && <p className="mt-4 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
+      <button type="button" disabled={busy || errors.length>0 || !onboarding} onClick={()=>void deploy()} className="mt-5 rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Deploying sponsored transaction…" : "Deploy my Fair Witness treasury"}</button>
     </section>
   </main></Layout>;
 }
