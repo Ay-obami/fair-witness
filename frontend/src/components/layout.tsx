@@ -35,7 +35,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {active && <span className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded bg-copper-400" />}
             </Link>;
           })}
-          <Link to="/signup" className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/signup" || location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
+          <Link to="/signup?intent=new" className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
         </div>
       </div>
     </nav>
