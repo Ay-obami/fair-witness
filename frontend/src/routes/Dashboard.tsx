@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/layout";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
 import { ethers6Adapter } from "thirdweb/adapters/ethers6";
@@ -8,6 +8,7 @@ import { creditcoinTestnet, wallet, client, thirdwebConfigured } from "../lib/th
 import { config } from "../lib/config";
 import { FAIR_WITNESS_FACTORY_ABI, FAIR_WITNESS_TREASURY_ABI } from "../lib/abi";
 import { fetchInstancesForWallet } from "../lib/instanceStore";
+import { humanError } from "../lib/humanError";
 
 interface TreasuryView {
   address: string;
@@ -25,7 +26,19 @@ interface TreasuryView {
   risk: any;
 }
 
+const DEFAULT_FACTORY_DEPLOYMENT_BLOCK = 5_456_821;
+const LOG_CHUNK_SIZE = 25_000;
+
+function configuredFactoryBlock(): number {
+  const raw = import.meta.env.VITE_FACTORY_DEPLOYMENT_BLOCK?.trim();
+  if (!raw) return DEFAULT_FACTORY_DEPLOYMENT_BLOCK;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_FACTORY_DEPLOYMENT_BLOCK;
+}
+
 export default function Dashboard() {
+  const [params] = useSearchParams();
+  const requestedTreasury = params.get("treasury");
   const provider = useMemo(()=>new ethers.JsonRpcProvider(config.creditcoinRpcUrl),[]);
   const factory = useMemo(()=>new ethers.Contract(config.factoryAddress, FAIR_WITNESS_FACTORY_ABI, provider),[provider]);
   const [account,setAccount] = useState(()=>wallet.getAccount());
@@ -41,39 +54,83 @@ export default function Dashboard() {
   useEffect(()=>{ if (!thirdwebConfigured) return; wallet.autoConnect({client}).then(a=>{if(a)setAccount(a)}).catch(()=>{}); },[]);
 
   async function readTreasury(address:string):Promise<TreasuryView> {
-    const c = new ethers.Contract(address, FAIR_WITNESS_TREASURY_ABI, provider);
+    const normalized = ethers.getAddress(address);
+    const c = new ethers.Contract(normalized, FAIR_WITNESS_TREASURY_ABI, provider);
     const [owner,mode,hash,epoch,registered,wctc,stable,u,risk,rebalance] = await Promise.all([
       c.owner(),c.automationMode(),c.currentPolicyHash(),c.policyEpoch(),c.registeredAgents(config.agentSubmitAddress),c.WCTC(),c.STABLE(),c.universalPolicy(),c.riskPolicy(),c.rebalancePolicy(),
     ]);
     const tokenAbi=["function balanceOf(address) view returns(uint256)"];
     const [wctcBalance,stableBalance]=await Promise.all([
-      new ethers.Contract(wctc,tokenAbi,provider).balanceOf(address),new ethers.Contract(stable,tokenAbi,provider).balanceOf(address),
+      new ethers.Contract(wctc,tokenAbi,provider).balanceOf(normalized),new ethers.Contract(stable,tokenAbi,provider).balanceOf(normalized),
     ]);
-    return {address:ethers.getAddress(address),owner,automationMode:Number(mode),policyHash:hash,policyEpoch:BigInt(epoch),registered:Boolean(registered),wctc,stable,wctcBalance:BigInt(wctcBalance),stableBalance:BigInt(stableBalance),universal:u,risk,rebalance};
+    return {address:normalized,owner,automationMode:Number(mode),policyHash:hash,policyEpoch:BigInt(epoch),registered:Boolean(registered),wctc,stable,wctcBalance:BigInt(wctcBalance),stableBalance:BigInt(stableBalance),universal:u,risk,rebalance};
+  }
+
+  async function queryOwnerTreasuries(owner:string):Promise<string[]> {
+    const latest = await provider.getBlockNumber();
+    const first = Math.min(configuredFactoryBlock(), latest);
+    const filter = factory.filters.TreasuryCreated(null, owner, null);
+    const addresses = new Set<string>();
+
+    // Chunk eth_getLogs calls because the public CC3 RPC times out on wide ranges.
+    for (let from = first; from <= latest; from += LOG_CHUNK_SIZE) {
+      const to = Math.min(latest, from + LOG_CHUNK_SIZE - 1);
+      const events = await factory.queryFilter(filter, from, to);
+      for (const e of events) {
+        if (e instanceof ethers.EventLog) addresses.add(ethers.getAddress(e.args.treasury));
+      }
+    }
+    return [...addresses];
   }
 
   async function discover(owner:string) {
     setLoading(true); setError(null);
     try {
-      const latest = await provider.getBlockNumber();
-      const fromBlock = Number(import.meta.env.VITE_FACTORY_DEPLOYMENT_BLOCK ?? Math.max(0,latest-500_000));
-      const filter = factory.filters.TreasuryCreated(null,owner,null);
-      let events: ethers.Log[] = [];
-      try { events = await factory.queryFilter(filter,fromBlock,latest); } catch { events = []; }
       const addresses = new Set<string>();
-      for (const e of events) if (e instanceof ethers.EventLog) addresses.add(ethers.getAddress(e.args.treasury));
-      const cached = await fetchInstancesForWallet(owner);
-      for (const row of cached ?? []) addresses.add(ethers.getAddress(row.instanceAddress));
-      const views = (await Promise.all([...addresses].map(async a=>{try{return await readTreasury(a)}catch{return null}}))).filter((v):v is TreasuryView=>v!==null && v.owner.toLowerCase()===owner.toLowerCase());
+
+      // A treasury passed by the activation flow is checked directly first. This
+      // avoids making a just-created treasury wait on event indexing/discovery.
+      if (requestedTreasury && ethers.isAddress(requestedTreasury)) {
+        const direct = ethers.getAddress(requestedTreasury);
+        try {
+          if (await factory.isFactoryTreasury(direct)) addresses.add(direct);
+        } catch { /* fall through to indexed discovery */ }
+      }
+
+      try {
+        for (const address of await queryOwnerTreasuries(owner)) addresses.add(address);
+      } catch (eventError) {
+        console.warn("Factory event discovery failed; using direct/cache fallbacks", eventError);
+      }
+
+      try {
+        const cached = await fetchInstancesForWallet(owner);
+        for (const row of cached ?? []) {
+          if (ethers.isAddress(row.instanceAddress)) addresses.add(ethers.getAddress(row.instanceAddress));
+        }
+      } catch (cacheError) {
+        console.warn("Optional instance cache unavailable", cacheError);
+      }
+
+      const views = (await Promise.all([...addresses].map(async a=>{
+        try { return await readTreasury(a); } catch (readError) {
+          console.warn("Treasury read failed", a, readError); return null;
+        }
+      }))).filter((v):v is TreasuryView=>v!==null && v.owner.toLowerCase()===owner.toLowerCase());
+
       setTreasuries(views);
       try { setSignedEmail(await getUserEmail({client})); } catch { /* optional */ }
-    } catch(e){ setError(e instanceof Error?e.message:String(e)); }
+
+      if (addresses.size > 0 && views.length === 0) {
+        setError("A treasury was found, but its on-chain owner does not match the currently signed-in wallet. Reopen the activation link with the wallet that created it.");
+      }
+    } catch(e){ setError(humanError(e,"Treasury discovery failed. Please retry.")); }
     finally{setLoading(false)}
   }
-  useEffect(()=>{ if(account) void discover(account.address); },[account]);
+  useEffect(()=>{ if(account) void discover(account.address); },[account,requestedTreasury]);
 
-  async function sendCode(e:React.FormEvent){e.preventDefault();if(!thirdwebConfigured)return setError("VITE_THIRDWEB_CLIENT_ID is not configured.");setBusy(true);setError(null);try{await preAuthenticate({client,strategy:"email",email});setAwaitingOtp(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
-  async function verify(e:React.FormEvent){e.preventDefault();setBusy(true);setError(null);try{const a=await wallet.connect({client,chain:creditcoinTestnet,strategy:"email",email,verificationCode:otp});setAccount(a);setAwaitingOtp(false)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+  async function sendCode(e:React.FormEvent){e.preventDefault();if(!thirdwebConfigured)return setError("VITE_THIRDWEB_CLIENT_ID is not configured.");setBusy(true);setError(null);try{await preAuthenticate({client,strategy:"email",email});setAwaitingOtp(true)}catch(e){setError(humanError(e))}finally{setBusy(false)}}
+  async function verify(e:React.FormEvent){e.preventDefault();setBusy(true);setError(null);try{const a=await wallet.connect({client,chain:creditcoinTestnet,strategy:"email",email,verificationCode:otp});setAccount(a);setAwaitingOtp(false)}catch(e){setError(humanError(e))}finally{setBusy(false)}}
 
   async function setAutomation(view:TreasuryView,next:number){
     if(!account)return;
@@ -83,7 +140,7 @@ export default function Dashboard() {
       const c=new ethers.Contract(view.address,FAIR_WITNESS_TREASURY_ABI,signer);
       await (await c.setAutomationMode(next)).wait();
       await discover(account.address);
-    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}
+    }catch(e){setError(humanError(e))}finally{setBusy(false)}
   }
 
   return <Layout><main className="mx-auto max-w-5xl px-6 py-12">
@@ -97,7 +154,7 @@ export default function Dashboard() {
     {account && <>
       <section className="mt-7 rounded-lg border border-ledger-700 bg-ledger-900 p-5"><p className="text-xs uppercase text-ledger-500">Signed in</p><p className="mt-1 text-sm text-verified-400">{signedEmail??"embedded wallet"}</p><code className="mt-1 block break-all text-xs text-ledger-400">{account.address}</code></section>
       {loading && <p className="mt-6 text-sm text-ledger-400">Discovering factory treasuries…</p>}
-      {!loading && treasuries.length===0 && <section className="mt-6 rounded-lg border border-ledger-700 bg-ledger-900 p-6"><p className="text-sm text-ledger-300">No schema-v1 treasury found for this wallet in the indexed factory range.</p><Link to="/mandate" className="mt-4 inline-block text-sm text-copper-400">Create your first treasury →</Link></section>}
+      {!loading && treasuries.length===0 && !error && <section className="mt-6 rounded-lg border border-ledger-700 bg-ledger-900 p-6"><p className="text-sm text-ledger-300">No schema-v1 treasury found for this wallet.</p><Link to="/mandate" className="mt-4 inline-block text-sm text-copper-400">Create your first treasury →</Link></section>}
       <div className="mt-7 space-y-5">{treasuries.map(view=><TreasuryCard key={view.address} view={view} busy={busy} onMode={setAutomation}/>)}</div>
     </>}
     {error&&<p className="mt-5 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
