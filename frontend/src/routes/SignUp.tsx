@@ -5,13 +5,14 @@ import { preAuthenticate } from "thirdweb/wallets/in-app";
 import { creditcoinTestnet, wallet, thirdwebClient, thirdwebConfigured } from "../lib/thirdweb";
 import { SecurityBoundaryNotice } from "../components/SecurityBoundaryNotice";
 import { humanError } from "../lib/humanError";
+import { useAuthSession } from "../lib/authSession";
 
 const ONBOARDING_KEY = "fair-witness:onboarding";
-
 type SocialStrategy = "google" | "apple";
 
 export default function SignUp() {
   const navigate = useNavigate();
+  const { setSessionAccount } = useAuthSession();
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -28,6 +29,7 @@ export default function SignUp() {
     setBusy(true); setError(null);
     try {
       const account = await wallet.connect({ client: thirdwebClient, chain: creditcoinTestnet, strategy });
+      setSessionAccount(account);
       completeOnboarding(account.address, strategy);
     } catch (err) {
       setError(humanError(err, `${strategy === "google" ? "Google" : "Apple"} sign-in could not be completed.`));
@@ -53,6 +55,7 @@ export default function SignUp() {
     setBusy(true); setError(null);
     try {
       const account = await wallet.connect({ client: thirdwebClient, chain: creditcoinTestnet, strategy: "email", email, verificationCode: otp });
+      setSessionAccount(account);
       completeOnboarding(account.address, "email", email);
     } catch (err) {
       setError(humanError(err, "The verification code could not be confirmed."));
