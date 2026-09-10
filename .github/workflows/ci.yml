@@ -17,7 +17,8 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: stable
-      # lib/ is committed as plain files (no submodules), so no `forge install` needed.
+      - name: Install Foundry dependencies
+        run: ./install-deps.sh
       - run: forge test -vvv
       - run: forge build --sizes
 
