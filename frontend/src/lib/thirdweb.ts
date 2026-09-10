@@ -10,31 +10,23 @@ export const creditcoinTestnet = defineChain({
   testnet: true,
 });
 
-// A missing public client id must never take down the read-only landing page.
-// Routes that need authentication check `thirdwebConfigured` before making calls.
 const configuredClientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID?.trim();
 export const thirdwebConfigured = Boolean(configuredClientId);
 export const thirdwebClient = createThirdwebClient({
-  // Non-empty inert fallback prevents Thirdweb from throwing at module-import time.
-  // It is never used for auth because SignUp gates on thirdwebConfigured.
   clientId: configuredClientId || "fair-witness-unconfigured-client",
 });
 
-// The authenticated account is a Thirdweb smart account owned by the user's in-app
-// wallet. Thirdweb's paymaster sponsors its transactions, so a new user does not
-// need CC3 CTC merely to deploy/activate a Fair Witness treasury.
+// Creditcoin CC3 does not currently expose the default Thirdweb ERC-4337 factory
+// expected by the SDK, so social authentication stays on the user's in-app EOA.
+// Fair Witness sponsors onboarding gas from its backend without taking ownership:
+// every treasury/activation transaction is still signed by this user-controlled EOA.
 export const wallet = inAppWallet({
   auth: {
     mode: "popup",
     options: ["google", "apple", "email"],
   },
-  smartAccount: {
-    chain: creditcoinTestnet,
-    sponsorGas: true,
-  },
-  metadata: {
-    name: "Fair Witness",
-  },
+  executionMode: { mode: "EOA" },
+  metadata: { name: "Fair Witness" },
 });
 
 export { thirdwebClient as client };
