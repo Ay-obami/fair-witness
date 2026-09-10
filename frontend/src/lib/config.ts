@@ -1,30 +1,16 @@
 export const config = {
-  // When true (the default in this sandbox-built repo, since there's no live RPC to
-  // point at), the app serves illustrative mock data instead of reading a real chain.
-  // Set VITE_DEMO_MODE=false and fill in the vars below to point at a real deployment.
-  demoMode: import.meta.env.VITE_DEMO_MODE !== "false",
+  // Production-shaped by default. Mock data must be explicitly requested.
+  demoMode: import.meta.env.VITE_DEMO_MODE === "true",
+  creditcoinRpcUrl: import.meta.env.VITE_CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network",
 
-  creditcoinRpcUrl: import.meta.env.VITE_CREDITCOIN_RPC_URL ?? "",
-  // The DEFAULT treasury instance to query. In the V2 multi-tenant shape, instances are
-  // independent — the viewer can point at ANY factory-deployed instance (see the
-  // instance switcher in TenantPanel), and each instance's immutable guardrails are read
-  // live from the instance itself, so this value is only a starting default.
-  treasuryAddress: import.meta.env.VITE_TREASURY_ADDRESS ?? "",
-  // The permissionless factory that deployed the instances. Display-only for now: the
-  // factory holds the canonical chain config but deliberately keeps NO tenant registry,
-  // so instances can't be enumerated from it — an instance address must be supplied
-  // (e.g. from the deploy manifest or Blockscout) to view that tenant.
-  factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS ?? "",
-  // Reasoning payloads are read from wherever the agent published them. This demo's
-  // agent runner uses a local file store (agent/src/reasoningStore.ts) which isn't
-  // reachable from a browser — a real deployment needs this pointed at something
-  // fetchable (IPFS gateway, a small API, etc.). See docs/DEPLOYMENT.md.
+  // Schema-v1 controlled public-testnet deployment. Environment variables may
+  // override these when a newer factory/treasury is promoted.
+  treasuryAddress: import.meta.env.VITE_TREASURY_ADDRESS ?? "0x7fF88afF5D8AEA666582730AD81F49b3C303A3d3",
+  factoryAddress: import.meta.env.VITE_FACTORY_ADDRESS ?? "0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd",
+  agentSubmitAddress: import.meta.env.VITE_AGENT_SUBMIT_ADDRESS ?? "0xB1D19F71d68c4e7065749e8593D338E9A30D654f",
+
   reasoningApiUrl: import.meta.env.VITE_REASONING_API_URL ?? "",
   explorerBaseUrl: import.meta.env.VITE_EXPLORER_BASE_URL ?? "https://creditcoin-testnet.blockscout.com",
-  agentSubmitAddress: import.meta.env.VITE_AGENT_SUBMIT_ADDRESS ?? "",
-  // Stage 4c: optional Supabase auth<->address mapping (dashboard "your instances").
-  // ANON/publishable key only — never the service-role key. When unset, the dashboard
-  // degrades to on-chain enumeration (owner == wallet) gracefully.
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL ?? "",
   supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? "",
 } as const;
