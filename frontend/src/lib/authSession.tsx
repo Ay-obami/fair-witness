@@ -7,6 +7,7 @@ type AuthSessionValue = {
   resolving: boolean;
   setSessionAccount: (account: WalletAccount | undefined) => void;
   refreshSession: () => Promise<WalletAccount | undefined>;
+  logout: () => Promise<void>;
 };
 
 const AuthSessionContext = createContext<AuthSessionValue | null>(null);
@@ -40,6 +41,17 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function logout() {
+    setResolving(true);
+    try {
+      await wallet.disconnect();
+      sessionStorage.removeItem("fair-witness:onboarding");
+      setAccount(undefined);
+    } finally {
+      setResolving(false);
+    }
+  }
+
   useEffect(() => { void refreshSession(); }, []);
 
   const value = useMemo<AuthSessionValue>(() => ({
@@ -47,6 +59,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     resolving,
     setSessionAccount: setAccount,
     refreshSession,
+    logout,
   }), [account, resolving]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
