@@ -11,6 +11,7 @@ import { ethers } from "ethers";
 import { useNavigate } from "react-router-dom";
 import { saveInstanceMapping } from "../lib/instanceStore";
 import { humanError } from "../lib/humanError";
+import { ensureSponsoredGas } from "../lib/sponsor";
 
 const ONBOARDING_KEY = "fair-witness:onboarding";
 
@@ -34,6 +35,7 @@ export default function Mandate() {
     const factoryAddress = config.factoryAddress || CONTROLLED_DEMO.destination.factory;
     setBusy(true);
     try {
+      await ensureSponsoredGas(account.address);
       const signer = await ethers6Adapter.signer.toEthers({client:thirdwebClient, chain:creditcoinTestnet, account});
       const factory = new ethers.Contract(factoryAddress, FAIR_WITNESS_FACTORY_ABI, signer);
       const policies = toContractPolicies(draft);
@@ -90,10 +92,10 @@ export default function Mandate() {
       <p className="mt-2 text-sm text-ledger-400">Owner: <span className="font-data break-all text-ledger-200">{onboarding?.walletAddress ?? "Not connected"}</span></p>
       <p className="mt-1 text-sm text-ledger-400">Factory: <span className="font-data break-all text-ledger-200">{config.factoryAddress || CONTROLLED_DEMO.destination.factory}</span></p>
       <p className="mt-1 text-sm text-ledger-400">Venue and assets are fixed by the factory adapter. New treasuries start PAUSED.</p>
-      <p className="mt-1 text-sm text-ledger-400">Deployment gas is sponsored through the authenticated Thirdweb smart account.</p>
+      <p className="mt-1 text-sm text-ledger-400">Fair Witness tops up only onboarding gas on CC3; this user-controlled wallet still signs the deployment transaction.</p>
       {errors.length > 0 && <ul className="mt-4 list-disc pl-5 text-sm text-alert-400">{errors.map(e=><li key={e}>{e}</li>)}</ul>}
       {error && <p className="mt-4 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
-      <button type="button" disabled={busy || errors.length>0 || !onboarding} onClick={()=>void deploy()} className="mt-5 rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Deploying sponsored transaction…" : "Deploy my Fair Witness treasury"}</button>
+      <button type="button" disabled={busy || errors.length>0 || !onboarding} onClick={()=>void deploy()} className="mt-5 rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Preparing sponsored deployment…" : "Deploy my Fair Witness treasury"}</button>
     </section>
   </main></Layout>;
 }
