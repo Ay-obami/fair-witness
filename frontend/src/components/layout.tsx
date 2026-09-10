@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
-import type { ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState, type ReactNode } from "react";
+import { useAuthSession } from "../lib/authSession";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard" },
@@ -20,8 +21,23 @@ const TECH_LINKS = [
   { to: "/docs", label: "Technical docs" },
 ];
 
+const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
+
 export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { account, resolving, logout } = useAuthSession();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/");
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return <div className="flex min-h-screen flex-col bg-background">
     <nav className="shrink-0 border-b border-hairline">
@@ -35,6 +51,12 @@ export function Layout({ children }: { children: ReactNode }) {
               {active && <span className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded bg-copper-400" />}
             </Link>;
           })}
+
+          {!resolving && account ? <>
+            <span className="hidden rounded-md border border-ledger-700 px-3 py-1.5 font-data text-xs text-ledger-400 lg:inline">{short(account.address)}</span>
+            <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-alert-500/50 hover:text-alert-400 disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
+          </> : !resolving ? <Link to="/signup" className="rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-copper-500 hover:text-ledger-100">Sign in</Link> : null}
+
           <Link to="/signup?intent=new" className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
         </div>
       </div>
