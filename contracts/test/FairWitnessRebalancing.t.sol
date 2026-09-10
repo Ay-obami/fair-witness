@@ -134,7 +134,7 @@ contract FairWitnessRebalancingTest is Test {
         assertEq(uint8(zero), uint8(T.ReasonCode.ZeroExecutableAmount));
     }
 
-    function test_WrongDirectionOversizedAndSmallerAmountReject() public {
+    function test_WrongDirectionAndOversizedReject() public {
         _fund(80e18, 20e6);
         uint256 wctcBefore = wctc.balanceOf(address(treasury));
         uint256 stableBefore = stable.balanceOf(address(treasury));
@@ -146,14 +146,23 @@ contract FairWitnessRebalancingTest is Test {
         vm.prank(agent);
         (, T.ReasonCode above) = treasury.submitProposal(p, _source(), _confirm());
         assertEq(uint8(above), uint8(T.ReasonCode.AmountExceedsPolicy));
-        p = _proposal(7, address(wctc), address(stable), 29e18);
-        vm.prank(agent);
-        (, T.ReasonCode below) = treasury.submitProposal(p, _source(), _confirm());
-        assertEq(uint8(below), uint8(T.ReasonCode.AmountMismatch));
         assertEq(wctc.balanceOf(address(treasury)), wctcBefore);
         assertEq(stable.balanceOf(address(treasury)), stableBefore);
         assertEq(wctc.allowance(address(treasury), address(adapter)), 0);
         assertEq(treasury.executionCount(), 0);
+    }
+
+    function test_SmallerRebalanceAmountExecutesWithinCeiling() public {
+        _fund(80e18, 20e6);
+        uint256 beforeStable = stable.balanceOf(address(treasury));
+        T.Proposal memory p = _proposal(7, address(wctc), address(stable), 29e18);
+        vm.prank(agent);
+        (uint64 id, T.ReasonCode reason) = treasury.submitProposal(p, _source(), _confirm());
+        assertEq(uint8(reason), uint8(T.ReasonCode.None));
+        assertEq(treasury.getAttempt(id).amountInActual, 29e18);
+        assertEq(treasury.getAttempt(id).permittedValueE6, 30e6);
+        assertGt(stable.balanceOf(address(treasury)), beforeStable);
+        assertEq(treasury.executionCount(), 1);
     }
 
     function _newTreasury() internal returns (FairWitnessTreasury result) {
