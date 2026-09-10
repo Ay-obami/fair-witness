@@ -19,6 +19,7 @@ jobs:
           version: stable
       # lib/ is committed as plain files (no submodules), so no `forge install` needed.
       - run: forge test -vvv
+      - run: forge build --sizes
 
   agent:
     name: vitest (agent)
@@ -35,9 +36,10 @@ jobs:
           cache-dependency-path: agent/package-lock.json
       - run: npm ci
       - run: npm test
+      - run: npm run build
 
   frontend:
-    name: build (frontend)
+    name: test, lint and build (frontend)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,4 +52,27 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm test
+      - run: npm run lint
       - run: npm run build
+
+  release-audit:
+    name: release documentation and secret hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require release source-of-truth files and complete handoff chain
+        run: |
+          test -f master_instruction.md
+          test -f docs/RELEASE_AUDIT.md
+          test -f docs/architecture/ARCHITECTURE_LOCK.md
+          test -f contracts/deployments/controlled-demo-schema-v1.json
+          for phase in $(seq 1 13); do
+            test -f "docs/handoffs/PHASE_${phase}_HANDOFF.md"
+          done
+      - name: Reject tracked private environment files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '\.env\.example$'; then
+            echo "Tracked private environment file detected"
+            exit 1
+          fi

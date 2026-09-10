@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { config } from "./config.js";
-import { SepoliaWatcher } from "./sepoliaWatcher.js";
+import { EthereumMarketWatcher } from "./ethereumMarketWatcher.js";
 import { AttestcoinClient } from "./attestcoinClient.js";
 import { DecisionEngine } from "./decisionEngine.js";
 import { ReasoningStore } from "./reasoningStore.js";
@@ -42,7 +42,7 @@ async function resolveTenantRoster(): Promise<TenantConfig[]> {
 async function main() {
   log("Starting agent runner (no funds held — see DEVLOG.md custody-separation notes)");
 
-  const watcher = new SepoliaWatcher();
+  const watcher = new EthereumMarketWatcher();
   const attestcoin = new AttestcoinClient();
   const decisionEngine = new DecisionEngine();
   const reasoningStore = new ReasoningStore();

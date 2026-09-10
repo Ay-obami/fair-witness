@@ -1,36 +1,50 @@
 import { describe, it, expect, vi } from "vitest";
-import { SepoliaWatcher, type SepoliaEndpoint } from "../src/sepoliaWatcher.js";
+import { EthereumMarketWatcher, type EthereumEndpoint } from "../src/ethereumMarketWatcher.js";
 
-// Coverage for the endpoint failover added after Sepolia public RPCs degraded in waves
+// Coverage for endpoint failover after public source RPCs degraded in waves
 // on 2026-09-02 (bogus eth_getLogs range errors, request timeouts) and repeatedly stalled
 // every evaluation cycle even though a backup endpoint was healthy at the same moment.
 
 function stubEndpoint(name: string, impl: {
   getBlockNumber?: () => Promise<number>;
   queryFilter?: () => Promise<unknown[]>;
-}): SepoliaEndpoint & { name: string } {
+}): EthereumEndpoint & { name: string } {
   return {
     name,
-    provider: { getBlockNumber: impl.getBlockNumber ?? vi.fn(async () => 42) },
+    provider: {
+      getBlockNumber: impl.getBlockNumber ?? vi.fn(async () => 42),
+      getNetwork: vi.fn(async () => ({ chainId: 1n })),
+    },
     contract: {
-      filters: { PriceObserved: () => "filter" },
+      filters: { MarketPriceObserved: () => "filter" },
       queryFilter: impl.queryFilter ?? vi.fn(async () => []),
     },
-  } as unknown as SepoliaEndpoint & { name: string };
+  } as unknown as EthereumEndpoint & { name: string };
 }
 
 function makeEvent(block: number, price: bigint) {
-  return { blockNumber: block, transactionIndex: 0, transactionHash: `0x${block}`, args: { price } };
+  return {
+    blockNumber: block,
+    transactionIndex: 0,
+    transactionHash: `0x${block}`,
+    args: {
+      priceE6: price,
+      arithmeticMeanTick: 0n,
+      spotSqrtPriceX96: 1n << 96n,
+      liquidity: 1n,
+      reporter: "0x0000000000000000000000000000000000000002",
+    },
+  };
 }
 
-describe("SepoliaWatcher endpoint failover", () => {
+describe("EthereumMarketWatcher endpoint failover", () => {
   it("falls through to a healthy backup when the pinned primary read fails, and pins the backup", async () => {
     const a = stubEndpoint("a", { getBlockNumber: vi.fn(async () => { throw new Error("boom"); }) });
     const b = stubEndpoint("b", {
       getBlockNumber: vi.fn(async () => 100),
       queryFilter: vi.fn(async () => [makeEvent(99, 1_010_000n)]),
     });
-    const w = new SepoliaWatcher([a, b]);
+    const w = new EthereumMarketWatcher([a, b]);
 
     const obs = await w.pollLatest(20);
     expect(obs?.blockHeight).toBe(99);
@@ -46,7 +60,7 @@ describe("SepoliaWatcher endpoint failover", () => {
   it("throws the last endpoint's error only after every endpoint failed", async () => {
     const a = stubEndpoint("a", { getBlockNumber: vi.fn(async () => { throw new Error("a down"); }) });
     const b = stubEndpoint("b", { getBlockNumber: vi.fn(async () => { throw new Error("b down"); }) });
-    const w = new SepoliaWatcher([a, b]);
+    const w = new EthereumMarketWatcher([a, b]);
 
     await expect(w.currentBlockNumber()).rejects.toThrow("b down");
   });
@@ -56,7 +70,7 @@ describe("SepoliaWatcher endpoint failover", () => {
       getBlockNumber: vi.fn(async () => 100),
       queryFilter: vi.fn(async () => [makeEvent(98, 1_011_000n)]),
     });
-    const w = new SepoliaWatcher([good]);
+    const w = new EthereumMarketWatcher([good]);
 
     // first call succeeds and pins the scan cursor at 101
     await w.pollLatest(20);
@@ -78,14 +92,20 @@ describe("SepoliaWatcher endpoint failover", () => {
   });
 
   it("rejects construction with zero endpoints", () => {
-    expect(() => new SepoliaWatcher([])).toThrow("at least one RPC endpoint");
+    expect(() => new EthereumMarketWatcher([])).toThrow("at least one RPC endpoint");
+  });
+
+  it("rejects an endpoint whose actual chain is not Ethereum mainnet", async () => {
+    const wrong = stubEndpoint("wrong-chain", {});
+    wrong.provider.getNetwork = vi.fn(async () => ({ chainId: 11155111n })) as never;
+    const w = new EthereumMarketWatcher([wrong]);
+    await expect(w.currentBlockNumber()).rejects.toThrow("chainId 1");
   });
 
   it("keeps working with injected stubs shaped like the real endpoint slice", async () => {
     // guards the narrow structural contract (Pick<...>) the tests rely on
-    const e: SepoliaEndpoint = stubEndpoint("real-shaped", {}) as unknown as SepoliaEndpoint;
-    const w = new SepoliaWatcher([e]);
+    const e: EthereumEndpoint = stubEndpoint("real-shaped", {}) as unknown as EthereumEndpoint;
+    const w = new EthereumMarketWatcher([e]);
     await expect(w.currentBlockNumber()).resolves.toBe(42);
   });
 });
-

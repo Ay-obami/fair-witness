@@ -1,5 +1,30 @@
 # Architecture — Components, Flows, Trust Boundaries
 
+> **ARCHITECTURE REOPENED (2026-09-08):** Source must be Sepolia-only. The
+> Ethereum-mainnet observer/chain-key-3 path below is no longer selected. A comparable
+> Sepolia USDC/WCTC pool has not yet been found; Phase 1 is blocked before a replacement
+> freeze. See SEPOLIA-ONLY-REASSESSMENT.md.
+
+> **Local target architecture checkpoint (2026-09-08):** The new path composes
+> `VerifiedMarketFactValidator -> FairWitnessTreasury -> PenguinV3Adapter` and uses
+> `FairWitnessTreasuryFactory` for isolated tenant instances. The treasury accepts
+> an advisory decision hash/direction, then deterministically enforces proof,
+> freshness, direction, drift, destination TWAP/spot, cost-adjusted edge, size,
+> slippage, replay, authorization, and rate limits. This architecture is verified by
+> local tests but is NOT DEPLOYED. The legacy live diagram below remains historical
+> deployment reality until a verified additive deployment occurs.
+
+> **Freeze V2 notice (2026-09-08):** The source/destination/Attestcoin architecture in
+> [PHASE-1-FREEZE-V2.md](PHASE-1-FREEZE-V2.md) supersedes conflicting historical
+> descriptions in this file. The observer, proof validator, and fixed destination
+> adapter are implemented locally; this is not evidence of deployment or live execution.
+
+> **Security checkpoint (2026-09-08):** Same-proof/different-index replay reproduced locally; source now binds both indices to verified Merkle positions. See [PROOF-IDENTITY-FIX.md](PROOF-IDENTITY-FIX.md). Deployed instances unchanged; live exploit/execution not tested. Phase 1 market acceptance remains blocked.
+
+> **Continuation checkpoint (2026-09-07):** Phase 1 reassessment is BLOCKED. Read [PHASE-1-REASSESSMENT.md](PHASE-1-REASSESSMENT.md) for fresh RPC evidence, invalid historical pool address, mandatory source correction, asset-comparability blocker and proof-index replay concern. This supersedes prior completion claims; no functional changes or transactions performed.
+
+> **Repair notice (2026-09-07):** Deployment claims are historical. Reasoning store is local JSON only; Supabase label is incorrect. Submitter has an ethers Wallet; keyless does not describe the whole agent. Source has inherited local observer ACL. Master governs required architecture. See REPAIR_AUDIT.md.
+
 Companion to `docs/ARCHITECTURE_V2.md` (the design intent). This file records what is
 **actually deployed/running** as of 2026-09-07, including version drift between source
 and deployed contracts.

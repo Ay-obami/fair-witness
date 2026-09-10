@@ -2,6 +2,7 @@
 // Separate from docs/ (which is for developers) — this is the user-facing FAQ.
 import { Link } from "react-router-dom";
 import { Layout } from "../components/layout";
+import { ControlledDemoNotice } from "../components/ControlledDemoNotice";
 
 export default function Help() {
   return (
@@ -10,8 +11,9 @@ export default function Help() {
         <h1 className="text-3xl font-bold text-ledger-100">Help &amp; docs</h1>
         <p className="mt-3 text-sm leading-relaxed text-ledger-400">
           Plain-language answers to the questions we get most often. If you're looking for
-          the technical whitepaper, see docs/ARCHITECTURE_V2.md.
+          the locked technical architecture, see docs/architecture/ARCHITECTURE_LOCK.md.
         </p>
+        <div className="mt-5"><ControlledDemoNotice /></div>
 
         <div className="mt-12 space-y-12">
           <Section
@@ -19,10 +21,9 @@ export default function Help() {
             content={
               <>
                 <p>
-                  Guardrails are seven hard limits you set once, at sign-up: how big a trade
-                  can be, how much slippage is tolerable, the minimum gap the AI looks for,
-                  how much prices can drift, how quickly it can act again, and how many trades
-                  per day. They are written into your treasury contract as immutable code —
+                  The schema-v1 mandate fixes enabled strategies, assets, venue, action size,
+                  slippage, evidence/market limits, target allocation, risk exposure and rate
+                  limits. They are written into your treasury contract as immutable state —
                   meaning no one can change them after deployment, including you, including
                   Fair Witness, including the AI.
                 </p>
@@ -42,10 +43,10 @@ export default function Help() {
               <>
                 <p>
                   <strong>Your funds stay in your own contract.</strong> When you deposit test
-                  USDC into your treasury instance, it goes to an address you control — not a
+                  fwUSD or fwWCTC into the controlled treasury, it goes to a contract you own — not a
                   shared pool, not a platform account. The Fair Witness agent can request trades
                   from your contract, but only if the trade fits entirely within your guardrails.
-                  If it doesn't, the contract rejects the transaction on-chain, and your funds
+                  If it doesn't, schema-v1 policy journals the rejected attempt on-chain, and your funds
                   stay put.
                 </p>
                 <p>
@@ -70,17 +71,16 @@ export default function Help() {
                   cryptographically verified truth.
                 </p>
                 <p>
-                  <strong>A "rejected" or "reported" attempt</strong> means the AI decided
-                  <em>not</em> to act — perhaps the gap was too narrow, or the facts were stale,
-                  or the rate limit was hit. There is no on-chain execution to verify, so these
-                  rows show an amber warning icon and are clearly labeled "agent-reported." They
-                  are corroborated only by the reverted transaction on-chain, not by a success.
+                  <strong>A schema-v1 rejected attempt</strong> means deterministic policy refused
+                  a submitted proposal. Its reason-coded attempt record is on-chain and the treasury
+                  remains untouched. An AI decision to WAIT is separate off-chain decision history.
                 </p>
                 <p>
                   The two look visibly different — and they should. A verified execution is
                   on-chain truth that anyone can check. A rejection is the agent's honest report
                   of why it <em>didn't</em> act, and that honesty matters too, but it carries a
-                  different kind of credibility.
+                  different outcome. Legacy entries are labeled separately because the older deployed
+                  contract does not have the schema-v1 attempt journal.
                 </p>
               </>
             }
@@ -111,10 +111,10 @@ export default function Help() {
             content={
               <>
                 <p>
-                  <strong>Everything on Fair Witness right now uses TESTNET funds with no real
-                  value.</strong> The USDC you deposit is fake — it's minted freely from a public
-                  faucet on the Creditcoin CC3 testnet. The trades the AI makes have no financial
-                  outcome. Do not deposit or trade with the expectation of profit or loss.
+                  <strong>Everything in the controlled demonstration uses fixed-supply TESTNET tokens
+                  with no represented economic value.</strong> fwUSD and fwWCTC are independently issued
+                  on each chain; they are not bridged, redeemable, collateralized, or economically pegged.
+                  Do not interpret testnet outputs as profit or loss.
                 </p>
                 <p>
                   When (and if) Fair Witness moves to mainnet, the testnet contracts will be
@@ -132,18 +132,17 @@ export default function Help() {
               <>
                 <p>
                   <strong>I signed up but don't see any activity yet.</strong> The agent polls on
-                  a fixed interval (every 30 seconds). It only acts when a genuine arbitrage gap
-                  exists between the source-chain price and the destination-chain pool — which may
-                  be rare if the pools are well-balanced. If your guardrails are very tight (small
-                  max drift, high min arb width), the AI may be consistently finding the gaps too
-                  narrow. Try widening your guardrails slightly.
+                  the schema-v1 continuous runner is not the legacy `npm start` entrypoint. Controlled
+                  rehearsals follow the operator runbook and keep the treasury paused except during a
+                  supervised submission. Attestcoin proof readiness can take several minutes or time out;
+                  the safe result is WAIT/no submission.
                 </p>
                 <p>
                   <strong>I deposited funds but the deposit isn't showing up.</strong> Check the
                   block explorer for your contract address. The agent only sees funds that the
                   contract's internal accounting reflects — if the deposit transaction is
                   confirmed on-chain, the balance should appear within one polling cycle. If it
-                  doesn't, verify you sent USDC to the correct contract address (not the factory,
+                  doesn't, verify you sent the correct controlled token to the treasury address (not the factory,
                   not the agent).
                 </p>
                 <p>
@@ -162,7 +161,7 @@ export default function Help() {
             Need more? Read the <Link to="/" className="text-verified-400 hover:underline">landing page</Link>,{" "}
             the{" "}
             <a
-              href="https://creditcoin-testnet.blockscout.com/address/0x97c81D68BbCDb1A673b61176d60F071963Abe7f2"
+              href="https://creditcoin-testnet.blockscout.com/address/0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd"
               target="_blank"
               rel="noopener noreferrer"
               className="text-verified-400 hover:underline"

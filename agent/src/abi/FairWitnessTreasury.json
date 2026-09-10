@@ -462,6 +462,11 @@
         "name": "amountOutMinimum",
         "type": "uint128",
         "internalType": "uint128"
+      },
+      {
+        "name": "permittedValueE6",
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "outputs": [
@@ -858,6 +863,25 @@
             "internalType": "uint128"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "riskReductionUsedByDay",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "stateMutability": "view"

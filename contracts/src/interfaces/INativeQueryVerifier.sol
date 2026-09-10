@@ -30,6 +30,11 @@ interface INativeQueryVerifier {
         bytes32[] roots;
     }
 
+    /// @notice Derives the transaction position from the Merkle sibling path.
+    /// @dev Matches calculateTxIndex in the installed USC SDK 0.18.0 ABI (uint64).
+    ///      This calculation alone does NOT verify inclusion; verify the same proof too.
+    function calculateTxIndex(MerkleProof calldata merkleProof) external view returns (uint64);
+
     /// @notice Verify that `encodedTransaction` was included at `blockHeight` on the chain
     ///         identified by `chainKey`, and that block is part of an attested, continuous
     ///         chain of blocks. Read-only, one-directional: proves a fact about another

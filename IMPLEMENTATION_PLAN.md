@@ -1,5 +1,7 @@
 # Fair Witness — Implementation Plan
 
+> **HISTORICAL LEGACY PLAN.** Superseded by `docs/architecture/MIGRATION_PLAN.md`; retained only for provenance.
+
 Status: living handoff document. Update this file as phases complete so any
 agent picking up the work mid-stream knows what's done and what's next.
 

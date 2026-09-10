@@ -1,5 +1,7 @@
 # Project: Fair Witness
 
+> **HISTORICAL DESIGN.** Retained for provenance of the arbitrage-only generation. It is superseded by `docs/architecture/ARCHITECTURE_LOCK.md` and the controlled-demo amendment. Statements below about the legacy journal, mock destination, spot pricing, or strategy scope are not schema-v1 behavior.
+
 **One-liner:** An autonomous cross-chain arbitrage system where the AI agent never holds funds and never executes anything directly — it only generates cross-chain proofs. All capital sits in an ASC treasury that enforces rigid, pre-committed business logic and executes exclusively through a single, replay-safe, journaled entry point. Every fund movement is therefore both *structurally bounded* (custody separation) and *fully reconstructable after the fact* (the journal) — and the design is explicit that it targets manipulation-resistant execution, not MEV-speed execution.
 
 ---

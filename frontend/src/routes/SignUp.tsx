@@ -12,6 +12,8 @@ import type { GuardrailsInput } from "../lib/types";
 import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
 import { ethers6Adapter } from "thirdweb/adapters/ethers6";
 import { saveInstanceMapping } from "../lib/instanceStore";
+import { Link } from "react-router-dom";
+import { SecurityBoundaryNotice } from "../components/SecurityBoundaryNotice";
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -143,6 +145,10 @@ export default function SignUp() {
       <Layout>
         <div className="mx-auto max-w-2xl px-6 py-16">
           <h1 className="text-3xl font-bold text-ledger-100">Create your account</h1>
+          <div className="mt-5"><SecurityBoundaryNotice /></div>
+          <p className="mt-4 rounded-md border border-alert-500/30 bg-alert-500/5 p-3 text-xs text-alert-400">
+            Legacy arbitrage deployment: this live signup uses the currently deployed legacy factory. For the three-strategy schema-v1 mandate, <Link className="underline" to="/mandate">review the mandate planner</Link>. It will not deploy until Phase 10.
+          </p>
           <p className="mt-3 text-sm leading-relaxed text-ledger-400">
             Enter your email to create a non-custodial embedded wallet. No seed phrase, no
             MetaMask — your wallet is created invisibly and only you can sign with it.

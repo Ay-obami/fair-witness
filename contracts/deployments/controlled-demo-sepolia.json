@@ -1,0 +1,79 @@
+{
+  "label": "Controlled demonstration markets and liquidity. Token equivalence and price conditions are configured for demonstration and do not represent a production bridge, natural arbitrage, or economic profitability.",
+  "mode": "BROADCAST",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "deployer": "0xB1D19F71d68c4e7065749e8593D338E9A30D654f",
+  "treasuryOwner": "0xF40003d36567478489BcCF1a1fEd094f87EeC9a5",
+  "ownerAgentSeparated": true,
+  "startingNonce": 0,
+  "factory": "0x0227628f3F023bb0B980b67D528571c95c6DaC1c",
+  "router": null,
+  "fee": 3000,
+  "initialHumanPrice": "1 fwUSD per fwWCTC",
+  "fullRangeLiquidity": "10000000000000000",
+  "seedTarget": "approximately 10,000 units of each token; actual debit determined by V3 math",
+  "predictedTokens": {
+    "stable": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+    "wctc": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c"
+  },
+  "requiredToken0": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+  "requiredToken1": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c",
+  "observationCardinalityNext": 16,
+  "automationMode": "PAUSED",
+  "pool": "0xB88deB0436eAD37A6Dd625e9140AE45D5024424f",
+  "liquidityProvider": "0x14594008d5D8e8C3c1E7e9DC9b17699b6611eDE7",
+  "observed": {
+    "sqrtPriceX96": "79228162514264337593543950336000000",
+    "observationCardinality": "16",
+    "observationCardinalityNext": "16",
+    "liquidity": "10000000000000000"
+  },
+  "transactions": [
+    {
+      "action": "deploy-stable",
+      "transactionHash": "0xd4c8ee5fb29a7fff60d23ac79682a46f31f15653fa980b0cc849807aeef38d6b",
+      "blockNumber": 11666784
+    },
+    {
+      "action": "deploy-wctc",
+      "transactionHash": "0xe32f44e132a8b8439e3614e390b60d6ea4d480488a72489478889936e5f9f9d4",
+      "blockNumber": 11666785
+    },
+    {
+      "action": "create-pool",
+      "transactionHash": "0x9c46c9c5d8c5c81490d447b45c3dcbe04de7ee0f169711dde3fa9fd7c2531047",
+      "blockNumber": 11666787
+    },
+    {
+      "action": "initialize-pool",
+      "transactionHash": "0xf2deaf61a09afd9d915bf185795ed1ab97b233d24f07622012f4c7044ecc622d",
+      "blockNumber": 11666788
+    },
+    {
+      "action": "increase-cardinality",
+      "transactionHash": "0x0fbe70365669d3cf0401cae5dc31947707764f86a2a924b164d9a38ca1cebfc8",
+      "blockNumber": 11666789
+    },
+    {
+      "action": "deploy-liquidity-provider",
+      "transactionHash": "0x0185a85edee21d5595d4649b87b437072958c37bd834073fb3ce7d55762dd64c",
+      "blockNumber": 11666791
+    },
+    {
+      "action": "approve-stable",
+      "transactionHash": "0x01c4bb3a90f59c9c2c145ba00d61104bd873e0f49307a2729d8936c223a3dfad",
+      "blockNumber": 11666792
+    },
+    {
+      "action": "approve-wctc",
+      "transactionHash": "0xe04339ef4c068aebdb3f94b40925590fdaedc010feb00e89d8ba5a8db2f155c3",
+      "blockNumber": 11666793
+    },
+    {
+      "action": "seed-liquidity",
+      "transactionHash": "0x207c432c5c6c535b1b37c0ebb9f4bba2e7f3b7953cd4662bdf74c53e8364a1aa",
+      "blockNumber": 11666794
+    }
+  ]
+}

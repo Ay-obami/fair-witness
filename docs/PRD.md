@@ -1,5 +1,7 @@
 # PRD: Fair Witness
 
+> **HISTORICAL PRD.** Retained for provenance; superseded by `docs/architecture/ARCHITECTURE_LOCK.md`. The current product supports Arbitrage, Rebalancing, and Risk Reduction through schema-v1 policy and journals rejected attempts. Legacy mock/public-mint and success-only-journal statements below are not current schema-v1 claims.
+
 *(an attested custody-free arbitrage journal)*
 
 **BUIDL CTC 2026 Fall — Creditcoin AI Track**

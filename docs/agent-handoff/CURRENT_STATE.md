@@ -1,5 +1,66 @@
 # Phase 0 Audit Report — Repository Current State (2026-09-07)
 
+> **Newest common-asset checkpoint (2026-09-08):** A global Sepolia NTT peer-event
+> scan found the correct representation of PenguinSwap WCTC:
+> `0x9cE462d2B56C385d0B15AEFc74413896AEa34F2d`, through Sepolia manager
+> `0x84bE…aA41` and Creditcoin manager `0x7f31…B1ECc`. The peer link is exact and
+> bidirectional. However, the Sepolia token has zero supply and its current minter is
+> the external owner, not its burn/mint NTT manager, so inbound bridge completion
+> would fail at `mint`. No source pool exists. This supersedes the earlier conclusion
+> that no representation exists, but Phase 1 remains BLOCKED. See decision #30.
+
+> **Sepolia-only architecture checkpoint (2026-09-08):** The user explicitly
+> replaced the Ethereum-mainnet source with Sepolia for a testnet-only build. Phase 1
+> is reopened. Chain key 1 and Sepolia WCTC/USDC contracts are live, but Uniswap V3
+> returns no USDC/WCTC pool at any standard fee tier. Mainnet-specific Phase 2–5
+> source assumptions are not accepted for the selected build. See
+> SEPOLIA-ONLY-REASSESSMENT.md. No transaction was sent.
+
+> **WCTC identity checkpoint (2026-09-08):** The Sepolia token's live NTT manager
+> has a bidirectional Creditcoin peer, but that peer controls Creditcoin token
+> `0x069F7fD9C1dc4156416ff3d5748ae94e329d6a67` (live total supply `0`), not the
+> PenguinSwap pool's WCTC `0x56072113e08015e1c40A3F3f656b1C1Fa78E329E`.
+> Therefore the proposed source/destination tokens are not the same NTT-linked
+> asset. The audit now fails this identity check in addition to the missing source
+> pool and destination cardinality. Phase 1 remains blocked; no transaction was sent.
+
+> **Destination-wrapper checkpoint (2026-09-08):** Verified source and live state
+> show PenguinSwap WCTC `0x5607…329E` is a plain native-CTC wrapper (`deposit` /
+> `withdraw`), not an NTT token. Its total supply exactly equals its Creditcoin native
+> balance, and its address has no Sepolia bytecode. No bridge-linked Sepolia
+> representation was found. See decision #29.
+
+> **Takeover/readiness checkpoint (2026-09-08):** Fresh regressions remain green
+> (Foundry 103/103, agent 42/42 + build, frontend lint/build). Direct RPC reads
+> reconfirmed chains 1/102031, both frozen venue tuples and nonzero liquidity, but
+> both pools remain at observation cardinality/current-next 1/1. A fail-closed,
+> read-only audit now records exact preconditions; known tenant wallets hold no WCTC
+> or USD-TCoin and no Ethereum deployer is configured. Phase 4 remains blocked before
+> broadcast; no transaction was sent. See PHASE-4-READINESS.md.
+
+> **Phase 5 checkpoint (2026-09-08):** The new local path now includes a composed,
+> per-tenant `FairWitnessTreasury` and immutable `FairWitnessTreasuryFactory`.
+> Treasury policy independently verifies facts, direction, drift, destination
+> spot/TWAP deviation, worst-case cost-adjusted edge, trade size, slippage, replay,
+> rate limit, authorization, and journal state. Regressions: Foundry 103/103, agent
+> 42/42 plus TypeScript build, frontend lint/build PASS. No new-path contracts are
+> deployed and no blockchain state was changed. Phase 4 live acceptance remains
+> open. See PHASE-5-REPORT.md; older audit narrative below is historical.
+
+> **Current checkpoint (2026-09-08):** Phase 1 freeze V2, Phase 2 real-source
+> implementation, and Phase 3 Attestcoin hardening are complete locally. Phase 4 has
+> a fixed PenguinSwap adapter but remains IN PROGRESS because no real deployment/swap
+> is verified and both selected pools require oracle-cardinality preparation. Current
+> regressions: Foundry 85/85, agent 42/42 + build, frontend build PASS. No blockchain
+> state was changed. PHASE-1-FREEZE-V2.md and PHASE-2/3/4-REPORT.md supersede older
+> checkpoint notices below.
+
+> **Security checkpoint (2026-09-08):** Same-proof/different-index replay reproduced locally; source now binds both indices to verified Merkle positions. See [PROOF-IDENTITY-FIX.md](PROOF-IDENTITY-FIX.md). Deployed instances unchanged; live exploit/execution not tested. Phase 1 market acceptance remains blocked.
+
+> **Continuation checkpoint (2026-09-07):** Phase 1 reassessment is BLOCKED. Read [PHASE-1-REASSESSMENT.md](PHASE-1-REASSESSMENT.md) for fresh RPC evidence, invalid historical pool address, mandatory source correction, asset-comparability blocker and proof-index replay concern. This supersedes prior completion claims; no functional changes or transactions performed.
+
+> **Repair notice (2026-09-07):** Current checkpoint: handoff repair only. HEAD ad1a71a has inherited source ACL/fixture changes and five untracked ACL tests. Fresh baseline: contracts 38/38, agent 41/41, frontend build PASS with chunk warning. Phase 0/1 completion requires reassessment against MASTER_INSTRUCTIONS.md. Reasoning is file-only, not Supabase-backed; live state not re-queried. Read LAST_SESSION.md and REPAIR_AUDIT.md. Remainder is historical.
+
 Scope: full audit of `attested-arbitrage-journal` @ `abc931f3` (master) as the entry
 gate to the master build plan. Method: every contract and TS module read in full; all
 claims re-verified live via RPC (`eth_chainId`, `eth_getCode`, `eth_call`), Blockscout
@@ -205,6 +266,3 @@ None hard-block progress. The material gaps (in priority order):
 - Execution txs + journal decode: DEPLOYMENTS.md §Manifest.
 - Test outputs: TEST_MATRIX.md (fresh 2026-09-07 runs).
 - Git archaeology: `git show 651479b` (stage-1 sources matching deployed bytecode).
-
-
-

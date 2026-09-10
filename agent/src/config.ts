@@ -6,17 +6,25 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function requireFrozenSourceChain(): number {
+  const configured = Number(process.env.SOURCE_CHAIN_KEY ?? "3");
+  if (configured !== 3) {
+    throw new Error(
+      `SOURCE_CHAIN_KEY must be 3 (Ethereum mainnet) for the frozen market path; received ${configured}`
+    );
+  }
+  return configured;
+}
+
 export const config = {
-  sepoliaRpcUrl: requireEnv("SEPOLIA_RPC_URL"),
-  // Optional comma-separated backup endpoints (same public read-only role). Sepolia public
-  // RPCs degrade in waves (reads AND writes) — observed repeatedly on 2026-09-02 — so every
-  // Sepolia read tries these in order and pins the last one that worked. When unset the
-  // watcher simply uses SEPOLIA_RPC_URL alone.
-  sepoliaRpcUrls: (process.env.SEPOLIA_RPC_URLS ?? "")
-    .split(",")
-    .map((u) => u.trim())
-    .filter(Boolean),
-  priceContractAddress: requireEnv("PRICE_CONTRACT_ADDRESS"),
+  ethereumRpcUrl: requireEnv("ETHEREUM_RPC_URL"),
+  // Optional comma-separated Ethereum-mainnet read endpoints. Every source read validates
+  // the immutable observer event rather than accepting a caller-supplied price.
+  ethereumRpcUrls: [
+    requireEnv("ETHEREUM_RPC_URL"),
+    ...(process.env.ETHEREUM_RPC_URLS ?? "").split(","),
+  ].map((u) => u.trim()).filter((u, index, all) => Boolean(u) && all.indexOf(u) === index),
+  marketObserverAddress: requireEnv("MARKET_OBSERVER_ADDRESS"),
 
   creditcoinRpcUrl: requireEnv("CREDITCOIN_RPC_URL"),
   proofBuilderUrl: requireEnv("CREDITCOIN_PROOF_BUILDER_URL"),
@@ -24,10 +32,10 @@ export const config = {
   factoryAddress: process.env.FACTORY_ADDRESS, // Optional: enables multi-tenant factory support
   agentSubmitPrivateKey: requireEnv("AGENT_SUBMIT_PRIVATE_KEY"),
 
-  sourceChainKey: Number(process.env.SOURCE_CHAIN_KEY ?? "1"),
+  sourceChainKey: requireFrozenSourceChain(),
 
   geminiApiKey: requireEnv("GEMINI_API_KEY"),
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite",
 
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? "30000"),
   // Pre-flight-only filter to avoid wasting a proof-generation round trip on an obviously

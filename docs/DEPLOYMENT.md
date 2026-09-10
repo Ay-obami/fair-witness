@@ -1,5 +1,7 @@
 # Deployment Guide
 
+> **HISTORICAL LEGACY GUIDE — DO NOT USE FOR SCHEMA V1.** This guide deploys the older arbitrage-only `ASCTreasuryJournal`/mock path. The current controlled schema-v1 stack is already deployed; use `docs/CONTROLLED_DEMO_RUNBOOK.md` and `contracts/deployments/controlled-demo-schema-v1.json`. Never point the legacy agent or scripts at the schema-v1 treasury.
+
 > **DEPLOYMENT RECORD:** this guide was executed end-to-end on 2026-08-23. Live addresses,
 > transaction hashes, the adversarial-demo result, and every pitfall hit along the way are
 > recorded in `DEVLOG.md` → "Session 7". The demo runs against a seeded constant-product

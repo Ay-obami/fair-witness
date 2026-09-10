@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-08",
+  "classification": "VERIFIED",
+  "sdk": "@gluwa/usc-sdk 0.18.0 installed source",
+  "creditcoinChainId": 102031,
+  "blockProver": "0x0000000000000000000000000000000000000FD2",
+  "chainInfo": "0x0000000000000000000000000000000000000FD3",
+  "selectors": {
+    "calculateTxIndex((bytes32,(bytes32,bool)[]))": "0x44f85f1c",
+    "verifyAndEmit(uint64,uint64,bytes,(bytes32,(bytes32,bool)[]),(bytes32,bytes32[]))": "0x02f4d167",
+    "get_latest_attestation_height_and_hash(uint64)": "0x809112da"
+  },
+  "sdkAbiSha256": {
+    "block_prover.json": "d23b14cf103128844e4c9a614398a71d811e81393d3bb6c9fc419c4cbaf61077",
+    "chain_info.json": "e9f34587b9a24f7b29ac498b4a77c8e04e9bae5f3fc5944e7032d4626eeac2a7"
+  },
+  "readOnlyCalls": {
+    "calculateTxIndexEmptyPath": 0,
+    "ethereumLatestAttestation": {
+      "height": 25931050,
+      "hash": "0x02e9f4f1564e93606e75513d04c4886cd5cc38156b7d73294b05a9e43344d434",
+      "isAttestation": true,
+      "exists": true
+    },
+    "ethereumHead": 25931089,
+    "lagBlocks": 39
+  },
+  "transactionsSent": 0
+}

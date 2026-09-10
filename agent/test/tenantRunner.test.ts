@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AttestcoinClient, AttestedProof } from "../src/attestcoinClient.js";
-import type { SepoliaWatcher, PriceObservation } from "../src/sepoliaWatcher.js";
+import type {
+  EthereumMarketWatcher,
+  MarketObservation,
+} from "../src/ethereumMarketWatcher.js";
 import type { DecisionInput, Decision } from "../src/decisionEngine.js";
 import type { ReasoningPayload } from "../src/reasoningStore.js";
 import { buildCycleProofs, runTenantCycle, type CycleProofs, type TenantRuntime } from "../src/tenantRunner.js";
@@ -21,7 +24,7 @@ const FACT32 = "0x" + "ab".repeat(32);
 
 function makeProof(tx: string, height: number, index: number): AttestedProof {
   return {
-    chainKey: 1,
+    chainKey: 3,
     blockHeight: height,
     transactionIndex: index,
     encodedTransaction: "0x" + tx.slice(2),
@@ -31,18 +34,36 @@ function makeProof(tx: string, height: number, index: number): AttestedProof {
 }
 
 function makeShared(state: {
-  sourceObs?: PriceObservation | null;
-  confirmObs?: PriceObservation | null;
+  sourceObs?: MarketObservation | null;
+  confirmObs?: MarketObservation | null;
   decisions?: Decision[];
   proofFor?: (tx: string) => AttestedProof | undefined;
 } = {}) {
   const sourceObs =
     state.sourceObs === undefined
-      ? ({ blockHeight: 1_000_000, transactionIndex: 0, transactionHash: "0xsource", price: 1_010_000n } as PriceObservation)
+      ? ({
+          blockHeight: 1_000_000,
+          transactionIndex: 0,
+          transactionHash: "0xsource",
+          price: 1_010_000n,
+          arithmeticMeanTick: 0n,
+          spotSqrtPriceX96: 1n << 96n,
+          liquidity: 1n,
+          reporter: AGENT,
+        } as MarketObservation)
       : state.sourceObs;
   const confirmObs =
     state.confirmObs === undefined
-      ? ({ blockHeight: 1_000_003, transactionIndex: 0, transactionHash: "0xconfirm", price: 1_011_000n } as PriceObservation)
+      ? ({
+          blockHeight: 1_000_003,
+          transactionIndex: 0,
+          transactionHash: "0xconfirm",
+          price: 1_011_000n,
+          arithmeticMeanTick: 0n,
+          spotSqrtPriceX96: 1n << 96n,
+          liquidity: 1n,
+          reporter: AGENT,
+        } as MarketObservation)
       : state.confirmObs;
   const proofFor =
     state.proofFor === undefined
@@ -57,7 +78,7 @@ function makeShared(state: {
   const watcher = {
     pollLatest: vi.fn(async () => sourceObs),
     pollAt: vi.fn(async () => confirmObs),
-  } as unknown as SepoliaWatcher;
+  } as unknown as EthereumMarketWatcher;
 
   const attestcoin = {
     waitUntilReady: vi.fn(async () => undefined),
@@ -131,7 +152,7 @@ describe("buildCycleProofs", () => {
 
     expect(result).not.toBeNull();
     // Guardrails of the factory shape: fact = keccak(chainKey, block, txIndex) as on-chain.
-    const expectedFact = factKey(1, 1_000_000, 0);
+    const expectedFact = factKey(3, 1_000_000, 0);
     expect(result.fact).toBe(expectedFact);
     const expectedNonce = deterministicNonce(expectedFact, 1_010_000n, 1_011_000n);
     expect(result.nonce).toBe(expectedNonce);
@@ -159,7 +180,7 @@ describe("buildCycleProofs", () => {
         transactionIndex: 2,
         transactionHash: "0xconfirm",
         price: 1_011_000n,
-      } as PriceObservation,
+      } as MarketObservation,
     });
     const result = (await buildCycleProofs(shared, undefined, () => undefined)) as CycleProofs;
 
@@ -256,7 +277,7 @@ describe("runTenantCycle", () => {
     // submission carries the direction the contract will validate against the prices.
     expect(payload.direction).toBe("BuyBaseForQuote");
     expect(submit).toHaveBeenCalledTimes(1);
-    expect(submit.mock.calls[0][0].chainKey).toBe(1);
+    expect(submit.mock.calls[0][0].chainKey).toBe(3);
     expect(submit.mock.calls[0][2]).toBe(42n);
     expect(submit.mock.calls[0][4]).toBe(TradeDirection.BuyBaseForQuote);
     expect(s.mocks.decisionEngine.decide.mock.calls[0][0].guardrails.owner).toBe(r.guardrails.owner);

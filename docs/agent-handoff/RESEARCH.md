@@ -1,5 +1,44 @@
 # Research Agenda — Phase 1 gate questions (RESOLVED  2026-09-07)
 
+> **Newest NTT enumeration result (2026-09-08):** A chain-wide Sepolia
+> `PeerUpdated(chainId=59)` scan returned six NTT managers. One exact pair links
+> Sepolia token `0x9cE4…4F2d` through manager `0x84bE…aA41` to PenguinSwap WCTC
+> `0x5607…329E` through Creditcoin manager `0x7f31…B1ECc`. Managers are unpaused,
+> threshold 1, and bidirectionally peered; Creditcoin is locking mode 0 and Sepolia
+> is burning mode 1. The Sepolia token is nevertheless zero-supply and its minter is
+> the owner rather than the manager. Verified NTT source calls token `mint()` for
+> inbound burning-mode transfers, so the route is currently incomplete.
+
+> **REOPENED (2026-09-08):** User requires Sepolia-only. Fresh discovery found no
+> Sepolia Uniswap V3 Circle-USDC/WCTC pool at any standard fee tier. Mainnet source
+> conclusions are superseded; see SEPOLIA-ONLY-REASSESSMENT.md.
+
+> **NTT identity result (2026-09-08):** Live peer traversal confirms Sepolia manager
+> `0xe6fE…2e78` (Wormhole ID 10002) and Creditcoin peer `0x0371…17F0` (ID 59)
+> reference each other. The Creditcoin peer token is `0x069F…6a67`, supply zero,
+> not PenguinSwap WCTC `0x5607…329E`. This closes the acquisition lead negatively
+> for the currently selected destination pool.
+> PenguinSwap factory reads returned zero for the linked token/USD-TCoin at all four
+> standard fees; the live testnet indexer returned an empty pool set for the token.
+
+> **Penguin WCTC provenance (2026-09-08):** Blockscout-verified Solidity for
+> `0x5607…329E` is a non-upgradeable WETH9-style native wrapper with only
+> `deposit`/`withdraw`; its live `totalSupply()` and native CTC contract balance both
+> equal `224507489811958139103326995` wei. The address has zero Sepolia code. Of all
+> token addresses in the 130 indexed PenguinSwap pools, only three liquid-token
+> addresses had Sepolia code; all three were unrelated contracts (different runtime
+> hashes and reverting ERC-20 metadata calls), so same-address discovery produced no
+> candidate.
+
+> **Reassessment result (2026-09-08):** The authoritative Phase 1 conclusions are in
+> [PHASE-1-FREEZE-V2.md](PHASE-1-FREEZE-V2.md), backed by raw files under `evidence/`.
+> Earlier Sepolia/ACL and malformed PenguinSwap-pool conclusions below are historical
+> and superseded where they conflict with that freeze.
+
+> **Continuation checkpoint (2026-09-07):** Phase 1 reassessment is BLOCKED. Read [PHASE-1-REASSESSMENT.md](PHASE-1-REASSESSMENT.md) for fresh RPC evidence, invalid historical pool address, mandatory source correction, asset-comparability blocker and proof-index replay concern. This supersedes prior completion claims; no functional changes or transactions performed.
+
+> **Repair notice (2026-09-07):** Historical research, not freshly verified network state. R4 optional real-market migration conflicts with the master. R6 recorded 500,000,000 wei equals 0.5 gwei, not 500 gwei; the fee estimate is off by 1000 using its numbers. No new market research done. See REPAIR_AUDIT.md.
+
 Phase 0 established *what is*. Phase 1 establishes *what is real* and freezes the
 architecture. Every "YES" below was re-derived live this session from primary sources — the
 PenguinSwap app bundle (penguinswap.org,hosted off files.gluwa.com,Gluwa = the

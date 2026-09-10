@@ -21,7 +21,7 @@ const context = {
     source: { chainKey: 3n, blockHeight: 100n, transactionIndex: 1n, transactionHash: h("d"), reporter: address("5"), arithmeticMeanTick: 0n, spotSqrtPriceX96: 1n, liquidity: 1000n, priceE6: 1_000_000n },
     confirmation: { chainKey: 3n, blockHeight: 105n, transactionIndex: 2n, transactionHash: h("e"), reporter: address("5"), arithmeticMeanTick: 0n, spotSqrtPriceX96: 1n, liquidity: 1000n, priceE6: 1_000_000n } },
   destination: { readBlockNumber: 1n, twapPriceE6: 1_100_000n, spotPriceE6: 1_100_000n, arithmeticMeanTick: 0n, liquidity: 1000n, poolFee: 500 },
-  portfolio: { readBlockNumber: 1n, wctcBalance: 100n * 10n ** 18n, stableBalance: 100_000_000n },
+  portfolio: { readBlockNumber: 1n, wctcBalance: 100n * 10n ** 18n, stableBalance: 100_000_000n, dailyRiskReductionUsedE6: 0n },
 } satisfies VerifiedContext;
 
 describe("ArbitrageStrategy", () => {

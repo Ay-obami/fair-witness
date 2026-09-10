@@ -1,5 +1,7 @@
 # Phase 1 Report — Research + Architecture Freeze(2026-09-07)
 
+> **Repair notice (2026-09-07):** Preserved historical report. COMPLETE/RESOLVED claims require reassessment against MASTER_INSTRUCTIONS.md. F2 cannot make real-market migration optional; old STOP taxonomy superseded by master §68. R6 gas-unit error propagates here. Live claims not re-queried. See REPAIR_AUDIT.md and LAST_SESSION.md.
+
 Entry-gate: Phase 0 audit(what is)complete. This phase establishes *what is real* and freezes the
 architecture before any build work(Phase 2+. Every load-bearing fact was re-derived live this session —
 penguinswap.org app bundle + its testnet indexer/router-service,Blockscout API v2,both chains' live

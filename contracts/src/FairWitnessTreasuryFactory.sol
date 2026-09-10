@@ -12,7 +12,6 @@ contract FairWitnessTreasuryFactory {
     address public immutable FACT_VALIDATOR;
     address public immutable DEX_ADAPTER;
 
-    mapping(address => address[]) private ownerTreasuries;
     mapping(address => bool) public isFactoryTreasury;
 
     error InvalidConfiguration();
@@ -22,8 +21,10 @@ contract FairWitnessTreasuryFactory {
     );
 
     constructor(address validator_, address adapter_) {
-        if (validator_ == address(0) || adapter_ == address(0)) revert InvalidConfiguration();
-        if (validator_.code.length == 0 || adapter_.code.length == 0) revert InvalidConfiguration();
+        if (
+            validator_ == address(0) || adapter_ == address(0) || validator_.code.length == 0
+                || adapter_.code.length == 0
+        ) revert InvalidConfiguration();
         FACT_VALIDATOR = validator_;
         DEX_ADAPTER = adapter_;
     }
@@ -40,16 +41,7 @@ contract FairWitnessTreasuryFactory {
     {
         treasury = new FairWitnessTreasury(FACT_VALIDATOR, DEX_ADAPTER, owner, universal, arbitrage, rebalance, risk);
         address treasuryAddress = address(treasury);
-        ownerTreasuries[owner].push(treasuryAddress);
         isFactoryTreasury[treasuryAddress] = true;
-        emit TreasuryCreated(treasuryAddress, owner, msg.sender, keccak256(abi.encode(universal, arbitrage, rebalance, risk)));
-    }
-
-    function treasuryCount(address owner) external view returns (uint256) {
-        return ownerTreasuries[owner].length;
-    }
-
-    function treasuryAt(address owner, uint256 index) external view returns (address) {
-        return ownerTreasuries[owner][index];
+        emit TreasuryCreated(treasuryAddress, owner, msg.sender, treasury.currentPolicyHash());
     }
 }

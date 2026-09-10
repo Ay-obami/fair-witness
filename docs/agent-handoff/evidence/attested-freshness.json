@@ -1,0 +1,54 @@
+{
+  "observedAt": "2026-09-07T23:19:04.625Z",
+  "scope": "read-only attested freshness evidence",
+  "records": [
+    {
+      "url": "https://rpc.cc3-testnet.creditcoin.network",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_blockNumber",
+        "params": []
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0x53249f"
+      }
+    },
+    {
+      "url": "https://ethereum-rpc.publicnode.com",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_blockNumber",
+        "params": []
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "result": "0x18ba40b",
+        "id": 1
+      }
+    },
+    {
+      "url": "https://rpc.cc3-testnet.creditcoin.network",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_call",
+        "params": [
+          {
+            "to": "0x0000000000000000000000000000000000000fd3",
+            "data": "0x809112da0000000000000000000000000000000000000000000000000000000000000003"
+          },
+          "finalized"
+        ]
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": "0x00000000000000000000000000000000000000000000000000000000018ba3e8eb7fbe661063bea925216116b22be22d34f6079cdb57ac5f3a032f43bd8eda9200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"
+      }
+    }
+  ]
+}

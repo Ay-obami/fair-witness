@@ -59,6 +59,10 @@ abstract contract TestBase is Test {
         router = new MockDexRouter(address(usdc), address(quote));
         verifier = new MockNativeQueryVerifier();
         priceSource = new PriceObservation();
+        // D3 — the source contract now has an observer-writer ACL;the fixture(owner,which
+        //        deployed it) registers itself as an allowed observer so the suite keeps
+        //        being able to drive deliberate observationswhen needed.
+        priceSource.setObserver(address(this), true);
 
         treasury = new ASCTreasuryJournal(
             address(verifier),

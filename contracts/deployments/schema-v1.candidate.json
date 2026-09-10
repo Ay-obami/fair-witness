@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "status": "SUPERSEDED_BY_CONTROLLED_DEMO_AMENDMENT",
+  "generatedAt": "2026-09-09T07:42:43.619Z",
+  "source": {
+    "name": "Sepolia",
+    "chainId": "11155111",
+    "attestcoinChainKey": "1",
+    "stable": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "wctc": "0x9cE462d2B56C385d0B15AEFc74413896AEa34F2d",
+    "pool": null,
+    "observer": null
+  },
+  "destination": {
+    "name": "Creditcoin testnet",
+    "chainId": "102031",
+    "blockProver": "0x0000000000000000000000000000000000000FD2",
+    "chainInfo": "0x0000000000000000000000000000000000000FD3",
+    "penguinFactory": "0xEcc68469F9c015A217215E19Fb6a183FE27aD1E9",
+    "penguinRouter": "0x3f65634837F914F18dBc4Db3E9d8Aa8F547f3229",
+    "penguinPool": "0x04a3227587a1D2b79f8AFE6F0e361fAbD6EEB6E9",
+    "wctc": "0x56072113e08015e1c40A3F3f656b1C1Fa78E329E",
+    "stable": "0xa1Cc4d7aa040eA903fd00c13E7b43f8e26cbB7F8",
+    "fee": 500,
+    "validator": null,
+    "adapter": null,
+    "factory": null,
+    "treasury": null
+  },
+  "oracle": {
+    "twapWindowSeconds": 300,
+    "minimumCardinality": 16,
+    "maxProofAgeBlocks": 64,
+    "maxConfirmGapBlocks": 12
+  },
+  "roles": {
+    "deployer": null,
+    "treasuryOwner": null,
+    "agentSubmitter": null,
+    "ownerAgentSeparated": false
+  },
+  "mandate": {
+    "approved": false,
+    "enabledStrategies": ["ARBITRAGE", "REBALANCE", "RISK_REDUCTION"],
+    "automationMode": "PAUSED",
+    "universal": null,
+    "arbitrage": null,
+    "rebalance": null,
+    "riskReduction": null,
+    "expectedPolicyHash": null
+  },
+  "blockers": [
+    "Sepolia WCTC total supply is zero",
+    "Sepolia WCTC NTT manager is not the token minter",
+    "No Sepolia Uniswap V3 USDC/WCTC pool exists at supported fee tiers",
+    "Destination pool observation cardinality is 1, below required 16",
+    "Owner, agent and numeric mandate have not been reviewed"
+  ],
+  "claims": {
+    "environment": "TESTNET_ONLY",
+    "marketMode": "NOT_READY",
+    "naturallyOccurringArbitrage": false,
+    "productionProfitability": false
+  }
+}

@@ -1,5 +1,40 @@
 # Deployments — Verified Manifest (2026-09-07)
 
+> **Newest external NTT discovery (2026-09-08; not a project deployment):** Sepolia
+> token `0x9cE4…4F2d` / manager `0x84bE…aA41` is exactly peered with Creditcoin
+> manager `0x7f31…B1ECc` / PenguinSwap WCTC `0x5607…329E`. Both managers have live
+> proxy bytecode and reciprocal peers. The Sepolia token has zero supply and its
+> minter remains the external owner rather than its NTT manager, so this is not yet
+> an operational deployment dependency. No transaction was sent.
+
+> **Fresh no-deployment checkpoint (2026-09-08):** Direct RPC reads re-verified the
+> legacy bytecode, tenant journal lengths 6/1, immutable mock bindings, recorded
+> deployment receipts, and a sampled execution receipt. No new-path address is
+> present in repository configuration and no transaction was sent. Phase 4 readiness
+> evidence is in PHASE-4-READINESS.md.
+
+> **Read-only NTT discovery (2026-09-08; not a project deployment):** Sepolia token
+> `0xeB32…1E53` uses manager `0xe6fE…2e78` (Wormhole ID 10002), which is
+> bidirectionally peered with Creditcoin-testnet manager `0x0371…17F0` (ID 59).
+> That peer controls zero-supply token `0x069F…6a67`, not PenguinSwap WCTC
+> `0x5607…329E`. These external contracts were not deployed by this session and do
+> not constitute a usable Fair Witness market path. No transaction was sent.
+
+> **External destination token provenance (2026-09-08):** PenguinSwap WCTC
+> `0x5607…329E` was deployed in successful tx `0x7592e008…c153f` on 2024-11-21.
+> Verified source is a native-CTC deposit/withdraw wrapper; live supply equals native
+> backing. The same address has no Sepolia bytecode. This is not a Fair Witness
+> deployment and no transaction was sent during verification.
+
+> **Phase 5 checkpoint (2026-09-08):** `FairWitnessTreasury` and
+> `FairWitnessTreasuryFactory` exist only in local source. They have no address,
+> deployment transaction, block, or live bytecode to record. No blockchain
+> transaction was sent during Phases 2–5. Entries below describe legacy deployments.
+
+> **Continuation checkpoint (2026-09-07):** Phase 1 reassessment is BLOCKED. Read [PHASE-1-REASSESSMENT.md](PHASE-1-REASSESSMENT.md) for fresh RPC evidence, invalid historical pool address, mandatory source correction, asset-comparability blocker and proof-index replay concern. This supersedes prior completion claims; no functional changes or transactions performed.
+
+> **Repair notice (2026-09-07):** Network claims below are historical and UNVERIFIED in this repair. No deployments, transactions or RPC checks performed. Local ACL code does not prove deployment. Re-query critical claims before relying on them. See REPAIR_AUDIT.md.
+
 Every address below was re-verified this session via RPC (`eth_chainId`,
 `eth_getCode`, `eth_call`) and/or the Creditcoin Blockscout API
 (`https://creditcoin-testnet.blockscout.com/api`). Nothing is copied from docs.
@@ -103,5 +138,3 @@ from source; live instances still carry it.)
 | 2026-08-28 21:56 | V1 factory + 2 instances; funding of tenant wallets `0xd1D4…` (A), `0xa3fC…` (B) |
 | 2026-09-01 12:22–12:24 | Live-era run: deploy (`0xa61412e1…` → `0xf63431df…`), factory (`0x9e0637f1…`, block 5411764), Tenant A (block 5411765), Tenant B (block 5411766) |
 | 2026-09-02/03 | 7 real executions (table above); agent key rotated off `0x2404Ed…` on 09-03 |
-
-

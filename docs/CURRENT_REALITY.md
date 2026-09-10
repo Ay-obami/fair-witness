@@ -1,5 +1,7 @@
 # Fair Witness — Current Reality (single source of truth)
 
+> **HISTORICAL — SUPERSEDED 2026-09-09.** This snapshot describes the legacy arbitrage-only generation. Current schema-v1 truth is in `master_instruction.md`, `docs/handoffs/PHASE_12_HANDOFF.md`, and `contracts/deployments/controlled-demo-schema-v1.json`. Do not use the legacy addresses or mock-market statements below as current deployment guidance.
+
 _Last verified: 2026-09-06 (frontend hosting + Phase-1 pages; earlier 2026-09-05 for
 Tasks 3.6, 3.7, 3.11, 3.12 — each link verified against the actual code/env, not
 copied). If anything here disagrees with a doc in this repo, this file is the truth

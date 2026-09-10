@@ -1,5 +1,43 @@
 # Fair Witness — Agent Handoff
 
+## Current checkpoint — 2026-09-08 (read first)
+
+[MASTER_INSTRUCTIONS.md](MASTER_INSTRUCTIONS.md) is the complete persistent
+engineering instruction set. Handoff repair and local Phases 0–3 and 5 are complete;
+Phase 4 has a tested local adapter but remains open at its live acceptance boundary.
+No new-path contract has been deployed and no state-changing network transaction was
+sent. The fresh fail-closed readiness audit and blockers are recorded in
+[PHASE-4-READINESS.md](PHASE-4-READINESS.md). Read [LAST_SESSION.md](LAST_SESSION.md), the Phase 1 V2 freeze, and Phase 2–5
+reports before relying on the qualified historical dossier below.
+
+**Newest override:** the user selected a Sepolia-only source on 2026-09-08. Phase 1
+is reopened because no Sepolia USDC/WCTC Uniswap V3 pool currently exists. Read
+[SEPOLIA-ONLY-REASSESSMENT.md](SEPOLIA-ONLY-REASSESSMENT.md) before the older
+mainnet-source reports; do not deploy chain key 3/mainnet configuration.
+
+Required hierarchy and takeover reading order:
+
+1. [MASTER_INSTRUCTIONS.md](MASTER_INSTRUCTIONS.md) — how the agent must work.
+2. [CURRENT_STATE.md](CURRENT_STATE.md) — where the project currently is.
+3. [LAST_SESSION.md](LAST_SESSION.md) — where the previous agent stopped.
+4. [PHASE-STATUS.md](PHASE-STATUS.md) — phase completion/incompletion.
+5. [DECISIONS.md](DECISIONS.md) — why decisions were made.
+6. [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — broken/unresolved work.
+
+Then read supporting records and inspect Git status/diff and actual source. Use
+master §12 for instruction conflicts, §18 for evidence classifications and §68 for
+the ten STOP conditions. Old VERIFIED labels do not prove current chain state.
+
+At every session end, including interrupted or blocked work, update LAST_SESSION.md
+with agent/date/phase/status, completed/pending work, exact last command/result,
+changed files, test commands/results, deployment changes, transaction evidence,
+failure/cause, discoveries, prohibitions and next exact action. Use UNKNOWN for
+missing history; distinguish inherited changes from this session. Update
+CURRENT_STATE.md and affected supporting records. Do not mark a phase complete
+unless master §61 is satisfied. Keep handoff updates in version control, not only chat.
+
+## Historical dossier (qualified by repair audit)
+
 Operational knowledge base for any agent (or human) continuing work on the Fair Witness
 repo. Written 2026-09-07 as the deliverable of **Phase 0 (repository audit)** of the
 master build plan, from primary evidence: direct contract reads, RPC queries against
@@ -7,7 +45,7 @@ live testnets, Blockscout API, fresh test runs, and git history. Nothing here is
 on faith from READMEs or stale docs; every load-bearing claim carries a verification
 label.
 
-## Reading order
+## Historical supporting-document index
 
 | File | What it covers |
 | --- | --- |

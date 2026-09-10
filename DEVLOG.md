@@ -1,5 +1,7 @@
 # Development Log
 
+> **HISTORICAL RUNNING LOG.** Entries preserve what was true when written and are not current deployment instructions. Current state is summarized in `master_instruction.md` and the latest `docs/handoffs/PHASE_*_HANDOFF.md`.
+
 Running record of design decisions, pitfalls, and status. Updated as the build
 progresses — see `docs/PRD.md` for the spec this build follows and `docs/DESIGN.md`
 for the original architecture write-up.

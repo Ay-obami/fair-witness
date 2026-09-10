@@ -1,5 +1,7 @@
 # Fair Witness — Plain-Language Help
 
+> **HISTORICAL LEGACY HELP.** This file describes the arbitrage-only mock-token sign-up flow. Use the frontend `/demo` and `/mandate` pages plus `docs/CONTROLLED_DEMO_RUNBOOK.md` for the deployed schema-v1 controlled demonstration.
+
 This is the non-technical help section for people who signed up (or are thinking
 about it). It deliberately uses no jargon: you won't find `factKey`, `decisionHash`,
 or `attestation proofs` here — that lives in `ARCHITECTURE_V2.md` for the developers.

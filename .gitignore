@@ -7,12 +7,12 @@ contracts/lib/
 # Node
 node_modules/
 .vite/
-agent/dist/
-frontend/dist/
-frontend/node_modules/
-agent/node_modules/
+**/dist/
 agent/.reasoning-store/
 *.log
+
+# Local hosting/tool state
+.vercel/
 
 # Env
 .env
@@ -24,8 +24,10 @@ agent/.env.tenant-*
 # Stage tenant wallets (worthless testnet keys, still never commit)
 contracts/script/.stage-*
 
-# Phase-1 research scratch (raw RPC dumps, downloaded penguinswap app bundle, probe scripts)
+# Disposable research scratch. Curated migration evidence belongs under docs/.
 .phase1-research/
+.research/
+research-scratch/
 
 # OS
 .DS_Store

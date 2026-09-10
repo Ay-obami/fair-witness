@@ -137,16 +137,15 @@ export default function Architecture() {
               <h3 className="text-lg font-semibold text-ledger-200">Journal (on-chain)</h3>
             </div>
             <p className="text-sm text-ledger-400">
-              Every executed trade is written to the journal as a structured entry with
+              Every schema-v1 attempt is written to the journal as a structured entry with
               a <code className="font-data text-xs text-ledger-200">decisionHash</code>
               that commits to the agent's off-chain reasoning. You can reconstruct the
               entire chain — fact, proof, decision, action — and verify the hash matches
               independently.
             </p>
             <p className="mt-2 text-xs text-ledger-400">
-              Note: rejected attempts are intentionally not journaled — they revert
-              on-chain. Your guardrails did their job; that's the security outcome,
-              not an error to log.
+              Rejected and execution-failed proposals are first-class security records.
+              A rejection records the reason while leaving treasury balances untouched.
             </p>
           </div>
         </section>

@@ -1,14 +1,14 @@
 # Fair Witness Persistent Implementation Instruction
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 Architecture status: **LOCKED**
 
-Current implementation phase: **Phase 4 — Arbitrage Migration — COMPLETE**
+Current implementation phase: **Phase 13 — Live Demo Completion — COMPLETED**
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13**
 
-Next implementation phase: **Phase 5 — Rebalancing**
+Next implementation phase: **NONE — the locked migration and explicitly authorized live-demo follow-up are complete**
 
 This file is persistent project memory for a fresh implementation agent. Read it completely before acting, then read every file in `docs/architecture/`. Code remains the primary truth for implementation state; this file defines the authorized target architecture and handoff protocol.
 
@@ -62,30 +62,30 @@ The working tree contains two generations.
 
 These prove mechanics and historical Attestcoin-mediated execution, not a real-market or three-strategy product. Do not mutate or relabel them as the migrated system.
 
-### New local, undeployed generation
+### Schema-v1 generation
 
 The current working tree also has:
 
 - `EthereumV3MarketObserver`: fixed V3 pool, caller-independent 300-second TWAP event.
 - `VerifiedMarketFactValidator`: BlockProver + ChainInfo, absolute freshness, chain/gap/index binding, successful receipt and exact observer/pool/event semantic decoding.
 - `PenguinV3Adapter`: fixed PenguinSwap router/factory/pool/pair/fee and exact-input swaps.
-- `FairWitnessTreasury`/factory: stronger compositional arbitrage treasury with destination TWAP/spot gate and cost-aware edge.
+- `FairWitnessTreasury`/factory: schema-v1 three-strategy treasury with universal policy, deterministic arbitrage/rebalancing/risk branches, destination TWAP/spot gates, replay protection, atomic execution, and attempt journaling.
 
-These components are locally tested but are not wired into the current agent/frontend, have no repository deployment address, and remain arbitrage-only. Build the migration additively from them; do not confuse local implementation with integration or deployment.
+These components are locally tested and deployed additively for a controlled public-testnet demonstration. The frozen manifest is `contracts/deployments/controlled-demo-schema-v1.json`; deployment evidence is in `docs/deployments/CONTROLLED_SCHEMA_V1_DEPLOYMENT_2026-09-09.md`. Do not confuse controlled liquidity with an independent market or production economics.
 
 ### Agent
 
-The TypeScript agent has a real `@gluwa/usc-sdk` proof-builder/BlockProver/ChainInfo client, observer watcher with RPC failover, Gemini structured decisions, multi-tenant runner, typed legacy submitter, deterministic keys, local JSON reasoning store, and replay CLI. It is still coupled to the legacy `ASCTreasuryJournal` ABI and arbitrage. `probe_e2e.ts` is stale because it imports deleted `sepoliaWatcher.ts` and is not part of `src` build.
+The TypeScript agent has a real `@gluwa/usc-sdk` proof-builder/BlockProver/ChainInfo client, observer watcher with RPC failover, strict AI decision parser, deterministic strategy coordinator and proposal builder, schema-v1 submitter, audit index/replay CLIs, controlled risk rehearsal, and retained legacy runner. `agent/src/index.ts` remains the legacy runtime entrypoint; schema-v1 demonstrations must use the controlled scripts and runbook until a later, separately authorized runtime cutover.
 
 ### Frontend
 
-React/Vite provides signup via Thirdweb embedded wallet, treasury deployment/agent registration, user-instance dashboard, treasury guardrails, journal replay, reasoning hash verification, and explicit live/demo modes. All important product types and screens still assume arbitrage and successful-only legacy journal entries.
+React/Vite retains legacy signup/dashboard surfaces and adds a presentation-only schema-v1 mandate planner, all-three-strategy status, security-boundary statement, typed policy reasons, six-stage audit timeline, and controlled `/demo` route. It does not authorize execution. Legacy surfaces remain labeled; schema-v1 controlled addresses and disclosures are pinned in `frontend/src/lib/controlledDemo.ts`.
 
 ### Supabase
 
-Supabase must be kept. Current implementation has only `user_instances` and permissive PoC browser policies. Reasoning currently uses `.reasoning-store`, not Supabase. There is no backend indexer or audit schema yet.
+Supabase is retained as a non-authoritative audit projection. Phase 7 adds normalized observation/evidence/decision/proposal/attempt/execution/portfolio/mandate/preference tables, removes anonymous identity writes, and permits browser reads but no audit-truth writes. The server-only REST adapter reads `SUPABASE_SERVICE_ROLE_KEY`; the frontend contains only publishable-key configuration. Reasoning remains locally compatible while the schema-v1 audit repository is available to new orchestration.
 
-### Current implementation state after Phase 4
+### Current implementation state through Phase 12
 
 Phase 1 added a side-by-side domain layer under `agent/src/domain/` and strategy layer under `agent/src/strategies/`. The live legacy arbitrage runner does not import them yet, by design.
 
@@ -124,6 +124,34 @@ The TypeScript side now has a deterministic `ArbitrageStrategy`, canonical close
 
 No contracts were deployed and no chain state changed.
 
+Phase 5 activates deterministic two-asset rebalancing. The treasury values WCTC from the confirmed verified E6 price, treats stable raw units as E6 value, floors portfolio allocation and target calculations, treats both tolerance boundaries as inside the band, derives direction toward target, caps required adjustment by rebalance and universal limits, converts sell value to WCTC with floor rounding, requires exact proposal input, and journals allocation/target/permitted value. The TypeScript `RebalancingStrategy` mirrors this arithmetic and verified-market eligibility.
+
+Verified-market checks shared by arbitrage and rebalancing were factored into one internal routine without changing policy. Rebalancing and arbitrage execute through the same rollback-safe boundary; risk reduction remains fail closed.
+
+Size after Phase 5: treasury runtime `20,073` bytes (4,503 margin); factory runtime `23,973` bytes (603 margin). Phase 6 must not begin adding bytecode blindly. Measure an implementation spike immediately; if the factory exceeds EIP-170, stop for explicit architecture authorization or a scope-neutral deployment-bytecode solution.
+
+Phase 6 activates the locked exposure-only risk branch, fixed-day successful-use accounting, rollback-safe charging, journal metrics, and matching TypeScript candidate math. Risk reduction triggers only above the immutable WCTC exposure threshold, permits only WCTC-to-stable sales, and caps the exact deterministic value by excess exposure, per-action risk limit, remaining daily allowance, universal limit, and balance. Rejections and caught execution failures do not consume daily allowance.
+
+The initial Phase 6 factory artifact exceeded EIP-170. The resolution preserved the same treasury/factory/custody architecture: shared portfolio valuation removed duplicate code; compiler optimizer runs are `1` with metadata hash omitted; factory creation emits the treasury's canonical policy hash; redundant owner-array enumeration was removed in favor of the already-locked `TreasuryCreated` event/indexer/Supabase discovery path. `isFactoryTreasury` remains authoritative provenance. Final runtime sizes are treasury `20,954` bytes (3,622 margin) and factory `24,521` bytes (55 margin). This margin is valid but extremely narrow: all later contract changes require an immediate size gate.
+
+Phase 7 adds the off-chain audit projection without changing contracts. `0002_audit_journal.sql` defines the normalized schema, integrity constraints, chain/log idempotency, canonical/orphan reconciliation states, evidence verification guard, owner-scoped UI preferences, public read policies, and no browser write policies for audit truth. The agent adds a server-only Supabase REST repository, complete typed attempt normalization from `getAttempt`, event indexing, block-hash reconciliation, deterministic canonical decision hashing, WAIT/missing/mismatch replay states, and schema-v1 index/replay CLIs. Legacy replay remains separate. Live database migration and RPC/Supabase indexing were not run because credentials/services were not supplied; static migration tests and in-memory reconciliation tests cover the local contract.
+
+Phase 8 adds `/mandate`, a presentation-only schema-v1 mandate planner covering capital instructions, strategy enablement, target/tolerance, WCTC risk cap, exact assets/venue, universal size/slippage, and automation. It validates protocol-facing UI bounds, explains constructor immutability/redeployment, shows all three strategy states, and presents the observation-to-outcome audit sequence. Shared reason/strategy mappings match Solidity enum ordinals and have frontend unit tests. Home, architecture, help, footer, and signup copy now distinguish schema-v1 rejected-attempt journaling from the legacy success-only deployment. No chain deployment, Supabase mutation, or security-authoritative browser behavior was added.
+
+Phase 9 closes mandatory adversarial assertion gaps without changing production contracts. Schema-v1 tests now prove unauthorized assets, expired proposals, invalid/stale evidence, and changed-nonce evidence replay do not reach capital; rebalance tolerance/wrong-direction and risk oversizing assert balances, allowances, counters and usage. A 256-run risk oversize fuzz test establishes the principal malicious-AI scenario. Agent integration proves model-supplied amount/venue fields are rejected and valid proposal execution terms come only from the deterministic candidate/mandate. `docs/ADVERSARIAL_TEST_MATRIX.md` maps every mandatory case to concrete local evidence and clearly records live-stack limitations.
+
+Phase 10 preparation ran a read-only live audit on 2026-09-09 and deliberately did not broadcast. Creditcoin chain ID/pool provenance/liquidity, Attestcoin latest Sepolia attestation behavior, BlockProver behavior, WCTC NTT peer identity and artifacts were observable. Deployment is blocked because Sepolia WCTC supply is zero, its NTT manager is not the minter, no supported-fee Sepolia USDC/WCTC pool exists, and destination observation cardinality is 1 versus the locked minimum 16. Owner/agent identities and numeric mandate are also unreviewed. The candidate manifest is structurally valid but contains 14 unresolved fields and is explicitly `BLOCKED_NOT_APPROVED_FOR_BROADCAST`. Do not proceed to Phase 11 or introduce a broadcast path until the same audit reports ready and the manifest gate reports broadcast-ready.
+
+The owner then explicitly authorized a controlled-demo amendment: deploy distinct demo-token pairs and new controlled V3 pools on public Sepolia and Creditcoin testnets while retaining genuine Attestcoin verification of the Sepolia observer transactions. The paired tokens have declared demo equivalence only—no bridge, redemption, economic peg, natural-arbitrage or profitability claim. Prices must move through pool swaps, not caller-supplied observations. This supersedes the external NTT token-activation requirement for the controlled demo only; it does not authorize weakening evidence, policy, custody, fixed-route, cardinality/history or labeling requirements. See `docs/architecture/CONTROLLED_DEMO_AMENDMENT.md`.
+
+Phase 10 completed the authorized additive controlled deployment. Fixed-supply `fwUSD`/`fwWCTC` tokens and 0.3% full-range V3 pools now exist independently on Sepolia and Creditcoin testnet with required opposite token ordering, cardinality 16, aged 300-second history, and no mint/bridge/redemption claim. Schema-v1 addresses are frozen in `contracts/deployments/controlled-demo-schema-v1.json`: Sepolia observer `0x9bAF94da27d5C71c42b40D25b43070083DE7296E`; Creditcoin adapter `0x9bAF94da27d5C71c42b40D25b43070083DE7296E`, validator `0x13Dd030815550080Ef80Ff3499fAE8d971A119f5`, factory `0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd`, treasury `0x7fF88afF5D8AEA666582730AD81F49b3C303A3d3`. Treasury owner is `0xF40003d36567478489BcCF1a1fEd094f87EeC9a5`; registered agent/deployer is `0xB1D19F71d68c4e7065749e8593D338E9A30D654f`; automation is paused. A paused rejection preserved balances, and a genuine two-proof Attestcoin risk-reduction smoke executed the exact deterministic amount before the owner returned the treasury to paused. Exact receipts and limitations are in `docs/deployments/CONTROLLED_SCHEMA_V1_DEPLOYMENT_2026-09-09.md` and `docs/handoffs/PHASE_10_HANDOFF.md`.
+
+Phase 11 adds no contracts and does not redeploy the security boundary. `control-demo-market.js` uses the two already-deployed factory-bound routers to move either controlled pool toward a bounded 0.50–2.00 target through real swaps, defaults to preview, clears approval, and records broadcasts. `controlledDemoValidSmoke.ts` now has fresh-nonce valid/oversized risk modes, explicit progress, genuine proofs and fail-safe re-pausing. `/demo` pins real Phase 10 evidence and distinguishes it from rehearsal-ready scenarios; `/mandate` displays deployed immutable defaults and the mandatory controlled-market label. `docs/CONTROLLED_DEMO_RUNBOOK.md` defines reset, all three scenarios, WAIT/network failure and replay procedures. A live oversized-risk rehearsal on 2026-09-09 funded controlled exposure but stopped while paused after the Attestcoin SDK exceeded readiness retries; it is not claimed as an on-chain rejection. Local contract/fuzz tests remain the deterministic fallback.
+
+Phase 12 reconciles release-facing documentation and CI without changing contracts or deployment state. `README.md`, Help, historical document banners, `docs/ADVERSARIAL_TEST_MATRIX.md`, and `docs/RELEASE_AUDIT.md` now distinguish verified local behavior, captured public-testnet evidence, rehearsal-ready scenarios, legacy surfaces, and remaining operational limitations. CI now runs contract size reporting, agent build, frontend tests/lint/build, checks the Phase 1–12 handoff chain, and rejects tracked private environment files. Release classification is **controlled-demo ready with disclosed limitations**, not production-ready.
+
+Phase 13 is an explicitly authorized post-migration live-demo completion, not an architectural extension. It fixed the Sepolia SwapRouter02 tuple and added RPC failover plus a closed Gemini-gated Arbitrage/Rebalancing runner. The verified runtime model is `gemini-3.1-flash-lite`; the sample and code defaults match it. Genuine Attestcoin evidence backs public receipts for controlled Arbitrage, Rebalancing, valid Risk Reduction, and oversized Risk Reduction rejection. Post-phase submission hardening deployed the canonical Vercel site, added a public non-authoritative demo-request queue with a service-role operator CLI, removed legacy flows from judge-facing navigation, and verified the observer, adapter, validator, factory, and treasury source on Blockscout. Public request `0302054a-aa7e-466d-bc59-77733440a75d` completed as Arbitrage attempt 6; treasury final state is paused with 6 attempts and 4 executions, and the source market was reset to 1.00. Gemini used profitability language for valueless controlled tokens in attempt 6; this is untrusted rationale, not an economic claim, and did not influence deterministic authorization.
+
 Phase 1 files added:
 
 - `agent/src/domain/types.ts`
@@ -152,16 +180,19 @@ Phase 2 also exports the proposal package from `agent/src/domain/index.ts`.
 
 ### Current test state
 
-- `forge test`: 105 passed, 0 failed.
-- agent focused Phase 2 proposal tests: 8 passed, 0 failed.
-- agent full Vitest: 78 passed, 0 failed.
+- `forge test`: 121 passed, 0 failed across 14 suites.
+- agent proposal-schema tests: 8 passed, 0 failed.
+- agent full Vitest: 113 passed, 0 failed across 17 files.
 - agent TypeScript build: passed.
+- frontend Vitest: 9 passed, 0 failed across 3 files.
 - frontend lint: passed.
 - frontend production build: passed with the pre-existing large-chunk warning.
 
 Preserve these regressions. They cover important custody, replay, proof identity, verifier semantics, market/route bounds, tenant isolation, reasoning-hash invariants, domain closure, AI-output confinement, strategy priority and snapshot invalidation.
 
-The worktree was already heavily dirty before Phase 0. Preserve existing changes. Phase 0 added this file and `docs/architecture/*`; Phase 1 added only the domain/strategy/test/handoff files listed above and updated this persistent state.
+The latest supervised rehearsal re-confirmed the destination owner, registered agent, paused mode, attempt count 6, and execution count 4. The current policy hash has advanced from the creation-time manifest hash because supervised mode changes increment the immutable policy epoch by design.
+
+The migration was completed in a heavily dirty worktree across multiple phase sessions. Preserve the full uncommitted phase set unless the user explicitly directs a reviewed commit operation.
 
 ## 4. Current market and Attestcoin reality
 
@@ -172,7 +203,7 @@ The worktree was already heavily dirty before Phase 0. Preserve existing changes
 - There is no dependable independent Sepolia WCTC market supporting a claim of naturally occurring profitable cross-chain arbitrage.
 - Controlled demonstration liquidity may demonstrate mechanics only and must be labeled controlled.
 - Testnet tokens do not prove production economic profitability.
-- The local newer watcher/config currently includes Ethereum-mainnet assumptions that conflict with the desired Sepolia-only final demo; do not silently deploy that as the final path.
+- The retained legacy runner/config must not be presented as the schema-v1 controlled-demo runtime; use the controlled runbook and scripts.
 
 Attestcoin proves a source transaction and continuity/inclusion. The semantic decoder binds that proof to a market observation. It does not prove token equivalence across chains, bridge viability, profitability, future price, or production safety.
 

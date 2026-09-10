@@ -1,0 +1,16 @@
+[
+  {
+    "type": "event",
+    "name": "MarketPriceObserved",
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "pool", "type": "address" },
+      { "indexed": true, "name": "reporter", "type": "address" },
+      { "indexed": false, "name": "twapWindow", "type": "uint32" },
+      { "indexed": false, "name": "arithmeticMeanTick", "type": "int24" },
+      { "indexed": false, "name": "spotSqrtPriceX96", "type": "uint160" },
+      { "indexed": false, "name": "liquidity", "type": "uint128" },
+      { "indexed": false, "name": "priceE6", "type": "uint256" }
+    ]
+  }
+]

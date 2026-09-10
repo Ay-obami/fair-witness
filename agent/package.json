@@ -1,7 +1,7 @@
 {
   "name": "attested-arbitrage-agent",
   "version": "1.0.0",
-  "description": "Custody-free arbitrage agent runner: watches Sepolia, gets an LLM act/don't-act decision, generates Attestcoin proofs, submits to ASCTreasuryJournal. Holds no funds.",
+  "description": "Custody-free arbitrage agent runner: watches an Ethereum market observer, gets an advisory LLM decision, generates Attestcoin proofs, and submits to a constrained treasury.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,12 +9,19 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "replay": "tsx src/replay.ts",
+    "replay:audit": "tsx src/auditReplay.ts",
+    "index:audit": "tsx src/auditIndexer.ts",
+    "demo:risk:valid": "CONTROLLED_DEMO_RISK_MODE=valid tsx src/controlledDemoValidSmoke.ts",
+    "demo:risk:oversized": "CONTROLLED_DEMO_RISK_MODE=oversized tsx src/controlledDemoValidSmoke.ts",
+    "demo:arbitrage": "CONTROLLED_DEMO_STRATEGY=arbitrage tsx src/controlledDemoStrategySmoke.ts",
+    "demo:rebalance": "CONTROLLED_DEMO_STRATEGY=rebalance tsx src/controlledDemoStrategySmoke.ts",
+    "demo:requests": "tsx src/demoRequestOperator.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@google/genai": "^2.18.0",
     "@gluwa/usc-sdk": "^0.18.0",
+    "@google/genai": "^2.18.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.0"
   },

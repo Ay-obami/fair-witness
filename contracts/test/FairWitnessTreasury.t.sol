@@ -12,35 +12,56 @@ import {FairWitnessHashing} from "../src/libraries/FairWitnessHashing.sol";
 contract Phase3ValidatorStub {
     address public constant MARKET_OBSERVER = address(0x1111);
     address public constant SOURCE_POOL = address(0x2222);
+
     function verifyPair(
         VerifiedMarketFactValidator.ProofData calldata sourceProof,
         VerifiedMarketFactValidator.ProofData calldata confirmProof
-    ) external pure returns (
-        VerifiedMarketFactValidator.VerifiedObservation memory source,
-        VerifiedMarketFactValidator.VerifiedObservation memory confirmation
-    ) {
-        source = VerifiedMarketFactValidator.VerifiedObservation(sourceProof.blockHeight, sourceProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6);
-        confirmation = VerifiedMarketFactValidator.VerifiedObservation(confirmProof.blockHeight, confirmProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6);
+    )
+        external
+        pure
+        returns (
+            VerifiedMarketFactValidator.VerifiedObservation memory source,
+            VerifiedMarketFactValidator.VerifiedObservation memory confirmation
+        )
+    {
+        source = VerifiedMarketFactValidator.VerifiedObservation(
+            sourceProof.blockHeight, sourceProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6
+        );
+        confirmation = VerifiedMarketFactValidator.VerifiedObservation(
+            confirmProof.blockHeight, confirmProof.transactionIndex, address(1), 0, uint160(1 << 96), 10, 1e6
+        );
     }
 }
+
 contract Phase3AdapterStub {
     address public immutable WCTC;
     address public immutable STABLE;
-    constructor(address wctc, address stable) { WCTC = wctc; STABLE = stable; }
+
+    constructor(address wctc, address stable) {
+        WCTC = wctc;
+        STABLE = stable;
+    }
 }
 
 contract Phase3ApprovedHarness is FairWitnessTreasury {
     constructor(address validator, address adapter, address owner, T.UniversalPolicy memory universal)
         FairWitnessTreasury(
-            validator, adapter, owner, universal, T.ArbitragePolicy(80, 2_000e6),
-            T.RebalancePolicy(4_000, 500, 1_000e6), T.RiskPolicy(6_000, 1_000e6, 2_500e6)
-        ) {}
+            validator,
+            adapter,
+            owner,
+            universal,
+            T.ArbitragePolicy(80, 2_000e6),
+            T.RebalancePolicy(4_000, 500, 1_000e6),
+            T.RiskPolicy(6_000, 1_000e6, 2_500e6)
+        )
+    {}
+
     function _evaluateStrategy(
         T.Proposal calldata,
         VerifiedMarketFactValidator.VerifiedObservation memory,
         VerifiedMarketFactValidator.VerifiedObservation memory
     ) internal pure override returns (StrategyEvaluation memory result) {
-        result = StrategyEvaluation(true, T.ReasonCode.None, 1, 1, 1, bytes32(uint256(1)));
+        result = StrategyEvaluation(true, T.ReasonCode.None, 1, 1, 0, 1, bytes32(uint256(1)));
     }
 }
 
@@ -57,12 +78,16 @@ contract FairWitnessTreasuryTest is Test {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
         treasury = new FairWitnessTreasury(
-            address(validator), address(adapter), owner, _universal(),
+            address(validator),
+            address(adapter),
+            owner,
+            _universal(),
             T.ArbitragePolicy(80, 2_000e6),
             T.RebalancePolicy(4_000, 500, 1_000e6),
             T.RiskPolicy(6_000, 1_000e6, 2_500e6)
         );
-        vm.prank(owner); treasury.registerAgent(agent);
+        vm.prank(owner);
+        treasury.registerAgent(agent);
     }
 
     function test_PausedProposalIsDurablyRejectedWithoutMovement() public {
@@ -77,60 +102,79 @@ contract FairWitnessTreasuryTest is Test {
     }
 
     function test_UniversalChecksAndReplayAreJournaled() public {
-        vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
+        vm.prank(owner);
+        treasury.setAutomationMode(T.AutomationMode.Autonomous);
         T.Proposal memory p = _proposal(7);
         p.policyHash = treasury.currentPolicyHash();
-        vm.prank(agent); (, T.ReasonCode first) = treasury.submitProposal(p, _proof(), _proof());
+        vm.prank(agent);
+        (, T.ReasonCode first) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(first), uint8(T.ReasonCode.DestinationMarketInvalid));
         assertTrue(treasury.usedNonces(agent, 7));
-        vm.prank(agent); (, T.ReasonCode replay) = treasury.submitProposal(p, _proof(), _proof());
+        vm.prank(agent);
+        (, T.ReasonCode replay) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(replay), uint8(T.ReasonCode.ReplayProposal));
         assertEq(treasury.executionCount(), 0);
     }
 
     function test_WrongVenueAndOverslippageCannotMoveFunds() public {
-        vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
-        T.Proposal memory p = _proposal(2); p.policyHash = treasury.currentPolicyHash(); p.venue = address(0xBEEF);
-        vm.prank(agent); (, T.ReasonCode venueReason) = treasury.submitProposal(p, _proof(), _proof());
+        vm.prank(owner);
+        treasury.setAutomationMode(T.AutomationMode.Autonomous);
+        T.Proposal memory p = _proposal(2);
+        p.policyHash = treasury.currentPolicyHash();
+        p.venue = address(0xBEEF);
+        vm.prank(agent);
+        (, T.ReasonCode venueReason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(venueReason), uint8(T.ReasonCode.VenueNotAllowed));
-        p = _proposal(3); p.policyHash = treasury.currentPolicyHash(); p.maxSlippageBps = 101;
-        vm.prank(agent); (, T.ReasonCode slipReason) = treasury.submitProposal(p, _proof(), _proof());
+        p = _proposal(3);
+        p.policyHash = treasury.currentPolicyHash();
+        p.maxSlippageBps = 101;
+        vm.prank(agent);
+        (, T.ReasonCode slipReason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(slipReason), uint8(T.ReasonCode.SlippageExceedsPolicy));
     }
 
     function test_UnauthorizedCallerAndAttemptCapRevert() public {
         T.Proposal memory unauthorized = _proposal(1);
-        vm.expectRevert(FairWitnessTreasury.NotRegisteredAgent.selector); treasury.submitProposal(unauthorized, _proof(), _proof());
+        vm.expectRevert(FairWitnessTreasury.NotRegisteredAgent.selector);
+        treasury.submitProposal(unauthorized, _proof(), _proof());
         for (uint64 i = 0; i < 6; i++) {
             T.Proposal memory bounded = _proposal(i);
-            vm.prank(agent); treasury.submitProposal(bounded, _proof(), _proof());
+            vm.prank(agent);
+            treasury.submitProposal(bounded, _proof(), _proof());
         }
         T.Proposal memory overflowAttempt = _proposal(9);
-        vm.prank(agent); vm.expectRevert(FairWitnessTreasury.AttemptRateLimitExceeded.selector);
+        vm.prank(agent);
+        vm.expectRevert(FairWitnessTreasury.AttemptRateLimitExceeded.selector);
         treasury.submitProposal(overflowAttempt, _proof(), _proof());
     }
 
     function test_ModeChangeInvalidatesOldPolicyHash() public {
         T.Proposal memory p = _proposal(1);
         bytes32 pausedHash = treasury.currentPolicyHash();
-        vm.prank(owner); treasury.setAutomationMode(T.AutomationMode.Autonomous);
+        vm.prank(owner);
+        treasury.setAutomationMode(T.AutomationMode.Autonomous);
         assertNotEq(pausedHash, treasury.currentPolicyHash());
         p.policyHash = pausedHash;
-        vm.prank(agent); (, T.ReasonCode reason) = treasury.submitProposal(p, _proof(), _proof());
+        vm.prank(agent);
+        (, T.ReasonCode reason) = treasury.submitProposal(p, _proof(), _proof());
         assertEq(uint8(reason), uint8(T.ReasonCode.PolicyHashMismatch));
     }
 
     function test_OwnerExitIsPairOnlyAndOnlyToOwner() public {
         wctc.mint(address(treasury), 10e18);
-        vm.prank(owner); treasury.ownerExit(address(wctc), 3e18);
+        vm.prank(owner);
+        treasury.ownerExit(address(wctc), 3e18);
         assertEq(wctc.balanceOf(owner), 3e18);
         MockERC20 other = new MockERC20("Other", "O", 18);
-        vm.prank(owner); vm.expectRevert(FairWitnessTreasury.AssetNotAllowed.selector); treasury.ownerExit(address(other), 1);
+        vm.prank(owner);
+        vm.expectRevert(FairWitnessTreasury.AssetNotAllowed.selector);
+        treasury.ownerExit(address(other), 1);
     }
 
     function test_ExecutionHelperRejectsDirectCall() public {
         T.Proposal memory p = _proposal(1);
-        vm.expectRevert(FairWitnessTreasury.OnlySelf.selector); treasury.executeApproved(p, 1);
+        vm.expectRevert(FairWitnessTreasury.OnlySelf.selector);
+        treasury.executeApproved(p, 1, 1);
     }
 
     function test_FactoryCreatesIndependentMandateTreasury() public {
@@ -138,25 +182,33 @@ contract FairWitnessTreasuryTest is Test {
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
         FairWitnessTreasuryFactory factory = new FairWitnessTreasuryFactory(address(validator), address(adapter));
         FairWitnessTreasury created = factory.createTreasury(
-            owner, _universal(), T.ArbitragePolicy(80, 2_000e6),
-            T.RebalancePolicy(4_000, 500, 1_000e6), T.RiskPolicy(6_000, 1_000e6, 2_500e6)
+            owner,
+            _universal(),
+            T.ArbitragePolicy(80, 2_000e6),
+            T.RebalancePolicy(4_000, 500, 1_000e6),
+            T.RiskPolicy(6_000, 1_000e6, 2_500e6)
         );
         assertEq(created.owner(), owner);
         assertTrue(factory.isFactoryTreasury(address(created)));
-        assertEq(factory.treasuryAt(owner, 0), address(created));
     }
 
     function test_FailedExecutionRollsBackReplayAndExecutionCountButJournalsFailure() public {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
-        Phase3ApprovedHarness harness = new Phase3ApprovedHarness(address(validator), address(adapter), owner, _universal());
-        vm.startPrank(owner); harness.registerAgent(agent); harness.setAutomationMode(T.AutomationMode.Autonomous); vm.stopPrank();
+        Phase3ApprovedHarness harness =
+            new Phase3ApprovedHarness(address(validator), address(adapter), owner, _universal());
+        vm.startPrank(owner);
+        harness.registerAgent(agent);
+        harness.setAutomationMode(T.AutomationMode.Autonomous);
+        vm.stopPrank();
         wctc.mint(address(harness), 2e18);
         T.Proposal memory p = _proposal(44);
-        p.venue = address(adapter); p.policyHash = harness.currentPolicyHash();
+        p.venue = address(adapter);
+        p.policyHash = harness.currentPolicyHash();
         bytes32 key = keccak256(abi.encode(address(harness), p.strategy, p.action, p.evidenceHash));
         uint256 balanceBefore = wctc.balanceOf(address(harness));
-        vm.prank(agent); (uint64 id, T.ReasonCode reason) = harness.submitProposal(p, _proof(), _proof());
+        vm.prank(agent);
+        (uint64 id, T.ReasonCode reason) = harness.submitProposal(p, _proof(), _proof());
         assertEq(uint8(reason), uint8(T.ReasonCode.ExecutionReverted));
         assertEq(uint8(harness.getAttempt(id).result), uint8(T.AttemptResult.ExecutionFailed));
         assertFalse(harness.executedEvidence(key));
@@ -166,9 +218,22 @@ contract FairWitnessTreasuryTest is Test {
     }
 
     function _proposal(uint64 nonce) internal view returns (T.Proposal memory) {
-        return T.Proposal(1, T.StrategyType.Arbitrage, T.ActionType.SwapExactIn, address(wctc), address(stable),
-            address(treasury.DEX_ADAPTER()), 1e18, 50, uint64(block.timestamp + 60), nonce,
-            _evidenceHash(), keccak256("observation"), keccak256("decision"), keccak256("policy"));
+        return T.Proposal(
+            1,
+            T.StrategyType.Arbitrage,
+            T.ActionType.SwapExactIn,
+            address(wctc),
+            address(stable),
+            address(treasury.DEX_ADAPTER()),
+            1e18,
+            50,
+            uint64(block.timestamp + 60),
+            nonce,
+            _evidenceHash(),
+            keccak256("observation"),
+            keccak256("decision"),
+            keccak256("policy")
+        );
     }
 
     function _universal() internal pure returns (T.UniversalPolicy memory) {
@@ -181,12 +246,22 @@ contract FairWitnessTreasuryTest is Test {
     }
 
     function _evidenceHash() internal pure returns (bytes32) {
-        return FairWitnessHashing.evidenceHash(T.EvidenceHashInput({
-            sourceChainKey: 1, sourceBlockHeight: 1, sourceTxIndex: 0,
-            confirmBlockHeight: 1, confirmTxIndex: 0,
-            immutableObserver: address(0x1111), immutableSourcePool: address(0x2222),
-            sourcePriceE6: 1e6, confirmPriceE6: 1e6, sourceMeanTick: 0, confirmMeanTick: 0,
-            sourceLiquidity: 10, confirmLiquidity: 10
-        }));
+        return FairWitnessHashing.evidenceHash(
+            T.EvidenceHashInput({
+                sourceChainKey: 1,
+                sourceBlockHeight: 1,
+                sourceTxIndex: 0,
+                confirmBlockHeight: 1,
+                confirmTxIndex: 0,
+                immutableObserver: address(0x1111),
+                immutableSourcePool: address(0x2222),
+                sourcePriceE6: 1e6,
+                confirmPriceE6: 1e6,
+                sourceMeanTick: 0,
+                confirmMeanTick: 0,
+                sourceLiquidity: 10,
+                confirmLiquidity: 10
+            })
+        );
     }
 }

@@ -32,6 +32,15 @@ contract MockNativeQueryVerifier is INativeQueryVerifier {
         emit VerificationRegistered(key, verified);
     }
 
+    /// @dev Mirrors the read-only precompile path convention: a left sibling sets
+    ///      the bit at its leaf-to-root depth. This does not validate proof hashes.
+    function calculateTxIndex(MerkleProof calldata merkleProof) external pure returns (uint64 index) {
+        require(merkleProof.siblings.length <= 64, "index path too deep");
+        for (uint256 i = 0; i < merkleProof.siblings.length; ++i) {
+            if (merkleProof.siblings[i].isLeft) index |= uint64(1) << uint64(i);
+        }
+    }
+
     function verify(
         uint64 chainKey,
         uint64 blockHeight,

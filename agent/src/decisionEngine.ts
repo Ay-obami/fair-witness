@@ -85,7 +85,7 @@ export class DecisionEngine {
     const cached = this.cache.get(key);
     if (cached) return cached;
 
-    const prompt = `Source price (attested, Sepolia): ${input.srcPrice}
+    const prompt = `Source price (Attestcoin-verified Ethereum market observer): ${input.srcPrice}
 Confirmation price (attested, later block): ${input.confPrice}
 Current destination DEX price (Creditcoin, PenguinSwap): ${input.destPrice}
 Observed gap vs destination: ${input.gapBps} bps

@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "status": "DEPLOYED_PAUSED_VERIFIED",
+  "label": "Controlled demonstration markets and liquidity. Token equivalence and price conditions are configured for demonstration and do not represent a production bridge, natural arbitrage, or economic profitability.",
+  "source": {
+    "chainId": "11155111",
+    "attestcoinChainKey": "1",
+    "factory": "0x0227628f3F023bb0B980b67D528571c95c6DaC1c",
+    "stable": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+    "wctc": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c",
+    "pool": "0xB88deB0436eAD37A6Dd625e9140AE45D5024424f",
+    "fee": 3000,
+    "observer": "0x9bAF94da27d5C71c42b40D25b43070083DE7296E",
+    "observerReadback": {
+      "cardinality": "16",
+      "liquidity": "10000000000000000",
+      "unlocked": true,
+      "twapPriceE6": "1000002"
+    },
+    "schemaTransactions": [
+      {
+        "action": "deploy-EthereumV3MarketObserver",
+        "transactionHash": "0xcbf834e66c6ac979368122052c95fcc21195fc8589cea16a604fcf27d6674bc9",
+        "blockNumber": 11666818
+      }
+    ]
+  },
+  "destination": {
+    "chainId": "102031",
+    "blockProver": "0x0000000000000000000000000000000000000FD2",
+    "chainInfo": "0x0000000000000000000000000000000000000FD3",
+    "penguinFactory": "0xEcc68469F9c015A217215E19Fb6a183FE27aD1E9",
+    "penguinRouter": "0x3f65634837F914F18dBc4Db3E9d8Aa8F547f3229",
+    "penguinPool": "0xC696be12663762324fDb0438c4fd85678bd79e78",
+    "wctc": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+    "stable": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c",
+    "pool": "0xC696be12663762324fDb0438c4fd85678bd79e78",
+    "fee": 3000,
+    "adapter": "0x9bAF94da27d5C71c42b40D25b43070083DE7296E",
+    "validator": "0x13Dd030815550080Ef80Ff3499fAE8d971A119f5",
+    "factory": "0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd",
+    "treasury": "0x7fF88afF5D8AEA666582730AD81F49b3C303A3d3",
+    "readback": {
+      "owner": "0xF40003d36567478489BcCF1a1fEd094f87EeC9a5",
+      "automationMode": 0,
+      "policyHash": "0x29df37e9a998d0656ffcb3535c378a9d70e54e52d6da9e54d54204a3e69a321c",
+      "deployerRegisteredAsAgent": true,
+      "destinationTwapPriceE6": "999902",
+      "destinationSpotPriceE6": "999999",
+      "destinationLiquidity": "10000000000000000"
+    },
+    "schemaTransactions": [
+      {
+        "action": "deploy-PenguinV3Adapter",
+        "transactionHash": "0x5822d931b3a4c02f999f1964042256e4c28955f3846f51f3b2e2470c7820e4e6",
+        "blockNumber": 5456819
+      },
+      {
+        "action": "deploy-VerifiedMarketFactValidator",
+        "transactionHash": "0xb15190e80623ae1ce6d2beb21f3ace4b213f2bd1e544bb98d3e0d3e43995939b",
+        "blockNumber": 5456820
+      },
+      {
+        "action": "deploy-FairWitnessTreasuryFactory",
+        "transactionHash": "0x6a730bcaf42ae92eb59b3a07fc7eaf767db6ee638959282cef93110f698034a8",
+        "blockNumber": 5456821
+      },
+      {
+        "action": "create-treasury",
+        "transactionHash": "0x063295b36e6e1bb87d57e9a997c9e0994dd3cdaca5bf119b13a02e0a414d7fc7",
+        "blockNumber": 5456822
+      },
+      {
+        "action": "fund-treasury-stable",
+        "transactionHash": "0x0588697500b894a75872f44605442f3184176c67c15e2f18245af27bb0289b7c",
+        "blockNumber": 5456823
+      },
+      {
+        "action": "fund-treasury-wctc",
+        "transactionHash": "0x6b140ec9583a8d35f0169568bc5c23003e5b612e7eca1efa3827ef4c85fd7c17",
+        "blockNumber": 5456824
+      }
+    ]
+  },
+  "oracle": {
+    "twapWindowSeconds": 300,
+    "minimumCardinality": 16,
+    "maxProofAgeBlocks": 64,
+    "maxConfirmGapBlocks": 12
+  },
+  "roles": {
+    "deployer": "0xB1D19F71d68c4e7065749e8593D338E9A30D654f",
+    "treasuryOwner": "0xF40003d36567478489BcCF1a1fEd094f87EeC9a5",
+    "agentSubmitter": "0xB1D19F71d68c4e7065749e8593D338E9A30D654f",
+    "ownerAgentSeparated": true
+  },
+  "mandate": {
+    "approved": true,
+    "enabledStrategies": [
+      "ARBITRAGE",
+      "REBALANCE",
+      "RISK_REDUCTION"
+    ],
+    "automationMode": "PAUSED",
+    "universal": [
+      7,
+      "100000000",
+      300,
+      500,
+      500,
+      "1000000000000000",
+      "1000000000000000",
+      10,
+      3600,
+      50
+    ],
+    "arbitrage": [
+      100,
+      "100000000"
+    ],
+    "rebalance": [
+      4000,
+      500,
+      "100000000"
+    ],
+    "riskReduction": [
+      6000,
+      "50000000",
+      "200000000"
+    ],
+    "expectedPolicyHash": "0x29df37e9a998d0656ffcb3535c378a9d70e54e52d6da9e54d54204a3e69a321c"
+  },
+  "blockers": [],
+  "controlledMarketTransactions": {
+    "sepolia": [
+      {
+        "action": "deploy-stable",
+        "transactionHash": "0xd4c8ee5fb29a7fff60d23ac79682a46f31f15653fa980b0cc849807aeef38d6b",
+        "blockNumber": 11666784
+      },
+      {
+        "action": "deploy-wctc",
+        "transactionHash": "0xe32f44e132a8b8439e3614e390b60d6ea4d480488a72489478889936e5f9f9d4",
+        "blockNumber": 11666785
+      },
+      {
+        "action": "create-pool",
+        "transactionHash": "0x9c46c9c5d8c5c81490d447b45c3dcbe04de7ee0f169711dde3fa9fd7c2531047",
+        "blockNumber": 11666787
+      },
+      {
+        "action": "initialize-pool",
+        "transactionHash": "0xf2deaf61a09afd9d915bf185795ed1ab97b233d24f07622012f4c7044ecc622d",
+        "blockNumber": 11666788
+      },
+      {
+        "action": "increase-cardinality",
+        "transactionHash": "0x0fbe70365669d3cf0401cae5dc31947707764f86a2a924b164d9a38ca1cebfc8",
+        "blockNumber": 11666789
+      },
+      {
+        "action": "deploy-liquidity-provider",
+        "transactionHash": "0x0185a85edee21d5595d4649b87b437072958c37bd834073fb3ce7d55762dd64c",
+        "blockNumber": 11666791
+      },
+      {
+        "action": "approve-stable",
+        "transactionHash": "0x01c4bb3a90f59c9c2c145ba00d61104bd873e0f49307a2729d8936c223a3dfad",
+        "blockNumber": 11666792
+      },
+      {
+        "action": "approve-wctc",
+        "transactionHash": "0xe04339ef4c068aebdb3f94b40925590fdaedc010feb00e89d8ba5a8db2f155c3",
+        "blockNumber": 11666793
+      },
+      {
+        "action": "seed-liquidity",
+        "transactionHash": "0x207c432c5c6c535b1b37c0ebb9f4bba2e7f3b7953cd4662bdf74c53e8364a1aa",
+        "blockNumber": 11666794
+      }
+    ],
+    "creditcoin": [
+      {
+        "action": "deploy-wctc",
+        "transactionHash": "0x2a1c81dd2b4e731ef87edcef2737bf91ce94c8414defdadf81b602d3c87254ce",
+        "blockNumber": 5456800
+      },
+      {
+        "action": "deploy-stable",
+        "transactionHash": "0x73c2d511499616811679dd3ba97c9da37067039c79274122e6b3a579c8029d4f",
+        "blockNumber": 5456801
+      },
+      {
+        "action": "create-pool",
+        "transactionHash": "0xf8f97d42959204fbc05b182b98b71bc3389e17fb419ae7baa83ae604af742e9e",
+        "blockNumber": 5456802
+      },
+      {
+        "action": "initialize-pool",
+        "transactionHash": "0x214539878fa3305e6f4a749dec4a0c5d2ccc825a92c82a90f3230eefbff23d8a",
+        "blockNumber": 5456803
+      },
+      {
+        "action": "increase-cardinality",
+        "transactionHash": "0xaeefbd1312feb6916c8faefa21467606b36bba24c7af2dbb4c57426599d6c27b",
+        "blockNumber": 5456804
+      },
+      {
+        "action": "deploy-liquidity-provider",
+        "transactionHash": "0xf7db7ca3b9c15e951ab5da4c14abcc405b8220e828b4b0293900cfc923461b79",
+        "blockNumber": 5456805
+      },
+      {
+        "action": "approve-stable",
+        "transactionHash": "0xfcc440ef06c9a24b7a09d84d1a1aee05cda4f44b83cbcd4685c5f82ed5e4119c",
+        "blockNumber": 5456806
+      },
+      {
+        "action": "approve-wctc",
+        "transactionHash": "0xa961d701166ff9594bbbc8463e1037f4250011025ead845bfc7edbc97c2d8940",
+        "blockNumber": 5456807
+      },
+      {
+        "action": "seed-liquidity",
+        "transactionHash": "0x06f8ae11ca860e1e16c5757ce1b4c76aee77c2e81d521ddff2eb0a97dd3f58ac",
+        "blockNumber": 5456808
+      }
+    ]
+  },
+  "claims": {
+    "environment": "PUBLIC_TESTNET_CONTROLLED_DEMO",
+    "naturallyOccurringArbitrage": false,
+    "productionProfitability": false,
+    "bridgedOrRedeemableTokens": false
+  },
+  "operationalTransactions": {
+    "registerAgent": "0x3c4e348b86088493654d8b3dcd61dd40d319eec80067d7d7b6f95189b37c7038",
+    "riskExposureFunding": "0x03bbfb8120b5aa83671c78e3b320b9d0ccaacf647e39bbecfef1e1e54281bbbc",
+    "discardedSmokeEnable": "0xf193e12cf7024b5c7d086eb201fd9a2a6069274992bf81e44ba70d8752e14236",
+    "discardedSmokePause": "0x4507fd5f3e75d131ab3c53d3b3efb48d94ecc3b2b14c70047bb5706afb587a1b",
+    "validSmokeEnable": "0x483660dbf150a8bf71c99058e2bdf8f411d87530681afe37e8b4b78a99b8a7e2",
+    "finalPause": "0x0c8ee214f7e5690bd8b0e379edb5820c8bff02d849c8f1ce2ad736b9fbf522af",
+    "phase11OversizedRehearsalExposureFunding": "0xc921ef379cc881ed7ff6ee018be8159f65675c7a12350a2cfc6589afdbe2c16f",
+    "controlledSourceMoveTo115": "0x78283169e6b408bf547e4e7f26fc8bb916d389a61ea8fb5eed3641c5ef1febcc",
+    "arbitragePortfolioSetup": "0xc2025d051fa4222f4198892781f360c53d1bb9db06084cd447705ed85c7b561f",
+    "rebalancePortfolioSetup": "0x1058df61c12bb6b50f9cbc4a028bd59e902ba40ef03563dddc68972a152aeeea",
+    "controlledSourceResetTo100": "0x63856acac8456d15fe4469fc9638d8638c0c70fa777d7d8fdb28ddd670077609",
+    "publicRequestArbitrageMoveTo115": "0x0c91b65a6c606f3bc298149a76eed90a1c77cd7a9a43f8d008b1b46f7d372e82",
+    "publicRequestArbitrageEnable": "0x840ba6057982c8e2579e77200a33756c3fa8a9cdea6143aafd765f2a01305ff4",
+    "publicRequestArbitragePause": "0xb04757e216e8a249d3f204de3b2c308d46f03afe81449c49eaf712eb58368fc7",
+    "publicRequestArbitrageResetTo100": "0x421c286efb1a576bc98c39420089c9792e4eb1f41d638a79ca5b433156e476ff"
+  },
+  "finalReadback": {
+    "automationMode": "PAUSED",
+    "agentRegistered": true,
+    "attemptCount": 6,
+    "executionCount": 4,
+    "stableBalance": "4307256914",
+    "wctcBalance": "2655884055563498552591"
+  },
+  "smokeTests": [
+    {
+      "name": "PAUSED_POLICY_REJECTION",
+      "transactionHash": "0x6f75c57e0fa3618d25d0562eeab8c3fdf753467421c0303e0bed111f90751eb1",
+      "blockNumber": 5456985,
+      "attemptId": "1",
+      "reason": "PolicyPaused",
+      "treasuryBalancesUnchanged": true,
+      "executionCountUnchanged": true
+    },
+    {
+      "name": "VALID_ATTESTCOIN_RISK_REDUCTION",
+      "sourceObservation": "0x1c0e67ad9621ec5d23f061d330e1b7b41d69c66646a97358e1be09dfe42e408f",
+      "confirmationObservation": "0xf87e562164ca1f23dea01df67b0f907cd36f9e2b25d49f99133a74f43a906cbb",
+      "sourceBlock": "11667084",
+      "confirmationBlock": "11667085",
+      "fundingTransaction": "already-funded",
+      "enableTransaction": "0x483660dbf150a8bf71c99058e2bdf8f411d87530681afe37e8b4b78a99b8a7e2",
+      "executionTransaction": "0x05b04421472d9318e297b255ad233d974839518e88d6f7ee981d64d4ec3e58a4",
+      "attemptId": "2",
+      "amountIn": "40000719998560002879",
+      "amountOut": "39722302",
+      "genuineAttestcoinProofsLocallyVerified": true
+    },
+    {
+      "name": "OVERSIZED_ATTESTCOIN_RISK_REJECTION",
+      "sourceObservation": "0x00b4a05dedf5384d2012aa5666e828a42c7d30ec7aec2ed1fe691c734efa39a5",
+      "confirmationObservation": "0xae7c79bf9bd99e01f750894c7fb9ef0116e0323cc08a5b96e8dca2fab1675e43",
+      "sourceBlock": "11668226",
+      "confirmationBlock": "11668227",
+      "fundingTransaction": "already-funded",
+      "enableTransaction": "0x6c680cc9b69f4533009fcc02f98c21e7cdfa2b47f048de44f4cc05c83a51797c",
+      "submissionTransaction": "0x2fe2274948f467da43fe0ec5f13bc2e80ba01c02fd64d47f03ff2fb296358bdc",
+      "attemptId": "3",
+      "proposedAmountIn": "7000000000000000000000",
+      "permittedAmountIn": "49999900000199999600",
+      "amountOut": "0",
+      "reason": 28,
+      "protectedStateUnchanged": true,
+      "genuineAttestcoinProofsLocallyVerified": true
+    },
+    {
+      "name": "CONTROLLED_ATTESTCOIN_ARBITRAGE",
+      "sourceObservation": "0x382cc3afc4c2b2bf06216eceb7853046d5c95a7139ceaf1e2902a4f692aa7ed1",
+      "confirmationObservation": "0x01bf0f9cbf41494ab87beadb3344d4a3fccde0eb012744e608d47ee6302121bf",
+      "sourceBlock": "11668603",
+      "confirmationBlock": "11668605",
+      "fundingTransaction": "0xc2025d051fa4222f4198892781f360c53d1bb9db06084cd447705ed85c7b561f",
+      "enableTransaction": "0x8ec24687fb5b9c51cf3fdf6b2ad0a35bffea53d5f57329a2e347d1da3560754a",
+      "submissionTransaction": "0xf023d109ca5e021f933a47aceffafcdcde41797c93fe3186c6c2c6fb4bb62a39",
+      "pauseTransaction": "0x46d2e89b51e70ce7aea984a658348ce8bfc9c4da43ff68adb111de5182580e60",
+      "attemptId": "4",
+      "amountIn": "100000000",
+      "amountOut": "99500827701813270733",
+      "netEdgeBps": 1234,
+      "decisionHash": "0x5c8e23fc8b287138e2b37c1deccc65a2ea153c2e471bdb0064a68d30104b34f9",
+      "aiDecision": "EXECUTE",
+      "aiModel": "gemini-3.1-flash-lite",
+      "genuineAttestcoinProofsLocallyVerified": true
+    },
+    {
+      "name": "CONTROLLED_ATTESTCOIN_REBALANCE",
+      "sourceObservation": "0x720cd355a9af65e59afecbc54693b95e6dea175924fb318cc0046511a1adf4c5",
+      "confirmationObservation": "0xc00761f989abc4256dbfddd30a273d390cfa18dbef273565e23f524d4532d011",
+      "sourceBlock": "11669357",
+      "confirmationBlock": "11669358",
+      "fundingTransaction": "0x1058df61c12bb6b50f9cbc4a028bd59e902ba40ef03563dddc68972a152aeeea",
+      "enableTransaction": "0x2afe6fe507f1f82d897bafebf6c18b3dbb7d1d86d01a41c7131404107afb1b39",
+      "submissionTransaction": "0x776b2e1e2f43625352b8ad2e8f76d67871d082f3b18c1d57cf92be06c6d3dd3f",
+      "pauseTransaction": "0x9ef9a3d97b97887245eb2cc1b90f7f3d90f15822a9acd1eeb6289be574e8b3da",
+      "attemptId": "5",
+      "amountIn": "87014480949919685634",
+      "amountOut": "87037602",
+      "currentWctcBps": 5499,
+      "targetWctcBps": 4000,
+      "decisionHash": "0x2e38423b9294561099b79a8a819f28d3aec0e4681c0454374ab0fe750d8e6da8",
+      "aiDecision": "EXECUTE",
+      "aiModel": "gemini-3.1-flash-lite",
+      "aiRationaleLimitation": "The model selected REBALANCE/EXECUTE but its free-text rationale incorrectly described arbitrage. Deterministic policy ignored the prose and independently authorized only the valid rebalance terms.",
+      "genuineAttestcoinProofsLocallyVerified": true
+    },
+    {
+      "name": "PUBLIC_REQUEST_ATTESTCOIN_ARBITRAGE",
+      "requestId": "0302054a-aa7e-466d-bc59-77733440a75d",
+      "sourceObservation": "0xd5680a9b2c494475db5aba166ff633db119872d3bc3c8b46dd5144739bb5277f",
+      "confirmationObservation": "0x0c7014cfd31562709f025710aea3ab7cda8d3796d351732b6764de222f955946",
+      "sourceBlock": "11671158",
+      "confirmationBlock": "11671159",
+      "fundingTransaction": "not-required",
+      "enableTransaction": "0x840ba6057982c8e2579e77200a33756c3fa8a9cdea6143aafd765f2a01305ff4",
+      "submissionTransaction": "0xe9ea7fa5b420bbc310c6d1b1f7eed24e9a0df025cfda3ced47447b582ab7752a",
+      "pauseTransaction": "0xb04757e216e8a249d3f204de3b2c308d46f03afe81449c49eaf712eb58368fc7",
+      "attemptId": "6",
+      "amountIn": "100000000",
+      "amountOut": "99249569462321594722",
+      "netEdgeBps": 1205,
+      "decisionHash": "0xca44d0f1084530a61aff0aa6ac52dd5b9a21adad2f373f32f4cb2baac6e997f5",
+      "aiDecision": "EXECUTE",
+      "aiModel": "gemini-3.1-flash-lite",
+      "aiRationaleLimitation": "The model used profitability language for a controlled valueless-token testnet edge. This wording is not an economic claim and had no authority over deterministic policy.",
+      "genuineAttestcoinProofsLocallyVerified": true
+    }
+  ]
+}

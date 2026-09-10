@@ -191,6 +191,7 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
 
     error NotRegisteredAgent();
     error ActionAlreadyExecuted();
+    error TransactionIndexMismatch();
     error ConfirmProofNotNewer();
     error ConfirmProofTooOld();
     error ChainMismatch();
@@ -378,6 +379,15 @@ contract ASCTreasuryJournal is Ownable, ReentrancyGuard {
             confirmProof.continuityProof
         );
         if (!v2) revert ConfirmVerificationFailed();
+
+        // The caller's index determines factKey/actionKey and the journal metadata,
+        // but is not an argument to verifyAndEmit. Bind it to the SAME verified
+        // Merkle path so changing metadata cannot mint a second action identity.
+        // Compare at uint64 width: never truncate a proof index to uint32.
+        if (
+            VERIFIER.calculateTxIndex(sourceProof.merkleProof) != uint64(sourceProof.transactionIndex)
+                || VERIFIER.calculateTxIndex(confirmProof.merkleProof) != uint64(confirmProof.transactionIndex)
+        ) revert TransactionIndexMismatch();
 
         (uint256 srcPrice, bool srcSuccess) = _decodePriceObservation(sourceProof.encodedTransaction);
         (uint256 confPrice, bool confSuccess) = _decodePriceObservation(confirmProof.encodedTransaction);

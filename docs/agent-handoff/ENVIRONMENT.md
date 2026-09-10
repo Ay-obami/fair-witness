@@ -1,5 +1,27 @@
 # Environment Reference (2026-09-07)
 
+> **Sepolia-only target change (2026-09-08):** The selected future runtime must use
+> `SEPOLIA_RPC_URL`, optional `SEPOLIA_RPC_URLS`, and `SOURCE_CHAIN_KEY=1`, and must
+> verify actual chain ID 11155111. The `ETHEREUM_*`, key 3, and chain ID 1 Phase 2
+> settings are historical and must not be deployed. Exact source pool/observer values
+> remain unset until Phase 1 is re-frozen.
+
+> **Phase 4 readiness variables (2026-09-08):** The read-only audit accepts
+> `ETHEREUM_RPC_URL`, optional `ETHEREUM_RPC_URLS`, `CC_RPC`, optional `CC_RPC_URLS`,
+> and address-only `ETHEREUM_DEPLOYER_ADDRESS`, `CC_DEPLOYER_ADDRESS`,
+> `TENANT_OWNER_ADDRESS`, `AGENT_ADDRESS`. It never accepts keys, signs, or broadcasts.
+> No Ethereum deployer is currently configured; the existing `agent/.env` still uses
+> legacy Sepolia names and is not ready for the new path.
+
+> **Phase 2 environment change (2026-09-08):** The selected new source runtime uses
+> `ETHEREUM_RPC_URL`, optional `ETHEREUM_RPC_URLS`,
+> `MARKET_OBSERVER_ADDRESS`, and `SOURCE_CHAIN_KEY=3`. The watcher verifies the
+> RPC's actual chain ID is 1; config rejects any other source chain key. Historical
+> `SEPOLIA_*` and `PRICE_CONTRACT_ADDRESS` values below apply only to the legacy
+> deployment and must not be used for the new path.
+
+> **Repair notice (2026-09-07):** Node v22.23.2, npm 10.9.8 and forge 1.5.1-stable checked locally. Service connectivity and secrets not verified. Supabase reasoning claim conflicts with file-only source. Remaining environment claims are historical. See REPAIR_AUDIT.md.
+
 ## Toolchain (VERIFIED this session)
 
 | Tool | Version |

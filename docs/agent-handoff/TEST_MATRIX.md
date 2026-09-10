@@ -1,5 +1,40 @@
 # Test Matrix — Baseline & Coverage Gaps (2026-09-07)
 
+> **Architecture-change qualification (2026-09-08):** The 103/42/build baseline
+> remains green, but mainnet-specific watcher/config tests do not prove the newly
+> selected Sepolia path. Sepolia chain-key/wrong-chain/source-pool cases require
+> updates only after Phase 1 selects an exact source market.
+
+> **Takeover regression (2026-09-08):** Fresh results: Foundry 103/103 PASS; agent
+> 42/42 PASS plus TypeScript build; frontend oxlint and production build PASS with
+> the existing chunk warning. `node --check script/audit-live-path.js` passes. The
+> readiness command exits 2 by design while live preconditions are blocked; this is
+> not a test failure. No live proof or swap was executed.
+
+> **Phase 5 checkpoint (2026-09-08):** Foundry **103/103 PASS**, including 18
+> composed treasury/factory tests and 257 fuzz runs over the trade-size bound. Agent
+> Vitest **42/42 PASS** plus TypeScript build. Frontend oxlint and production build
+> PASS; the existing large-chunk warning remains. New coverage includes deterministic
+> direction, cost-adjusted width, drift, destination spot/TWAP deviation, replay,
+> authorization, epoch limit, failed-swap rollback, no-withdraw/no-renounce,
+> immutable safety ceilings, and tenant isolation. Live precompile/prover/DEX
+> execution remains outside automated coverage.
+
+> **Phase 3 checkpoint (2026-09-08):** Fresh full results: Foundry **76/76 PASS**,
+> agent Vitest **42/42 PASS**, agent TypeScript build PASS, frontend production
+> build PASS with the existing large-chunk warning. New coverage: immutable
+> Uniswap V3 observer (8), strict receipt decoder (12), proof/freshness validator
+> (13), and Ethereum watcher wrong-chain/failover behavior (6 total watcher tests).
+> Real precompile/prover and live observer receipts remain NOT VERIFIED.
+
+> **Phase 4 local checkpoint (2026-09-08):** Foundry **85/85 PASS** after adding
+> 9 fixed PenguinSwap adapter tests. A real adapter deployment/swap remains NOT
+> VERIFIED and is not represented by the mock-router test fixture.
+
+> **Security checkpoint (2026-09-08):** Same-proof/different-index replay reproduced locally; source now binds both indices to verified Merkle positions. See [PROOF-IDENTITY-FIX.md](PROOF-IDENTITY-FIX.md). Deployed instances unchanged; live exploit/execution not tested. Phase 1 market acceptance remains blocked.
+
+> **Repair notice (2026-09-07):** Fresh repair baseline: contracts/ forge test: 38 passed, 0 failed; agent/ npm test: 41 passed, 0 failed across six files; frontend/ npm run build: PASS with chunk warning. All exit 0. Lint and separate agent build not rerun; live integration NOT VERIFIED. Old 33-test counts/coverage assertions below are historical. See REPAIR_AUDIT.md.
+
 ## Fresh baseline runs (this session)
 
 | Suite | Command | Result | Notes |

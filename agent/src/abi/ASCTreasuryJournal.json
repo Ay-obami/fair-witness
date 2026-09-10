@@ -963,6 +963,11 @@
   },
   {
     "type": "error",
+    "name": "TransactionIndexMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "UnderlyingTxNotSuccessful",
     "inputs": []
   },

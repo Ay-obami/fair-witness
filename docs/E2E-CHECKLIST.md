@@ -1,5 +1,7 @@
 # Fair Witness — Browser E2E Walkthrough (MVP acceptance test)
 
+> **HISTORICAL LEGACY CHECKLIST — DO NOT RUN AGAINST SCHEMA V1.** It references the old public-mint token, factory and hosted flow. Current controlled rehearsal instructions are in `docs/CONTROLLED_DEMO_RUNBOOK.md`.
+
 Target: a stranger can go landing page → own funded instance → agent watching → verify an
 action — with no manual step from the platform. Run against the **live** site:
 `https://ay-obami.github.io/fair-witness/`

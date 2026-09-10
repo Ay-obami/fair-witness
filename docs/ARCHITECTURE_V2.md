@@ -1,5 +1,7 @@
 # Architecture V2 — the multi-tenant pivot (Fair Witness)
 
+> **HISTORICAL LEGACY ARCHITECTURE.** This is the arbitrage-only factory generation, not the locked schema-v1 three-strategy architecture. Use `docs/architecture/ARCHITECTURE_LOCK.md` as the current source of truth.
+
 > **Provenance / honesty note.** This document describes the V2 architecture as
 > specified in the multi-tenant pivot brief. The brief's instruction was to base the doc
 > on a full architecture writeup and "don't invent one"; no separate writeup beyond the

@@ -12,6 +12,8 @@ import SignUpDone from './routes/SignUpDone'
 import Help from './routes/Help'
 import Dashboard from './routes/Dashboard'
 import NotFound from './routes/notFound'
+import Mandate from './routes/Mandate'
+import Demo from './routes/Demo'
 import { ErrorBoundary } from './components/errorBoundary'
 
 // GitHub Pages SPA fallback: `public/404.html` stashes the real path+query in
@@ -42,6 +44,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/action/:actionKey" element={<ActionDetail />} />
           <Route path="/action/:actionKey/:instance" element={<ActionDetail />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/mandate" element={<Mandate />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/signup/done" element={<SignUpDone />} />
           <Route path="/docs" element={<Help />} />
           <Route path="*" element={<NotFound />} />

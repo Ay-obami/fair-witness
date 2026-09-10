@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { config } from "./config.js";
-import type { SepoliaWatcher } from "./sepoliaWatcher.js";
+import type { EthereumMarketWatcher } from "./ethereumMarketWatcher.js";
 import type { AttestcoinClient, AttestedProof } from "./attestcoinClient.js";
 import type { DecisionEngine } from "./decisionEngine.js";
 import type { ReasoningStore } from "./reasoningStore.js";
@@ -14,7 +14,7 @@ export type Logger = (msg: string) => void;
 
 /** Everything shared across tenants in one agent process (fact-scoped, not tenant-scoped). */
 export interface SharedDeps {
-  watcher: SepoliaWatcher;
+  watcher: EthereumMarketWatcher;
   attestcoin: AttestcoinClient;
   decisionEngine: DecisionEngine;
   reasoningStore: ReasoningStore;
