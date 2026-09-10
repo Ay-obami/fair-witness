@@ -13,7 +13,6 @@ import { useAuthSession } from "../lib/authSession";
 import { useOwnerTreasuries, type TreasuryView } from "../lib/useOwnerTreasuries";
 import { humanError } from "../lib/humanError";
 
-const pct = (bps: unknown) => `${Number(bps) / 100}%`;
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 
 export default function Dashboard() {
