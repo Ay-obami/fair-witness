@@ -12,7 +12,6 @@ import {VerifiedMarketFactValidator} from "./VerifiedMarketFactValidator.sol";
 import {PenguinV3Adapter} from "./PenguinV3Adapter.sol";
 
 /// @notice Generic schema-v1 custody and universal-policy boundary.
-/// @dev Strategy branches deliberately fail closed until Phases 4-6.
 contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -28,6 +27,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     address public immutable WCTC;
     address public immutable STABLE;
     address public immutable VENUE;
+    address public immutable LIFECYCLE_CONFIGURATOR;
 
     T.UniversalPolicy private _universal;
     T.ArbitragePolicy private _arbitrage;
@@ -35,6 +35,11 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     T.RiskPolicy private _risk;
     T.AutomationMode public automationMode;
     uint64 public policyEpoch;
+
+    address public demoReserve;
+    bool public lifecycleConfigured;
+    bool public demoMode;
+    bool public closed;
 
     mapping(address => bool) public registeredAgents;
     mapping(address => mapping(uint64 => bool)) public usedNonces;
@@ -79,6 +84,10 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     error OnlySelf();
     error AssetNotAllowed();
     error AmountOutOverflow();
+    error NotLifecycleConfigurator();
+    error LifecycleAlreadyConfigured();
+    error TreasuryClosed();
+    error DemoTokenWithdrawalDisabled();
 
     event AgentRegistered(address indexed agent);
     event AgentDeregistered(address indexed agent);
@@ -93,6 +102,8 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         T.ReasonCode reason
     );
     event OwnerExit(address indexed asset, uint256 amount, address indexed recipient);
+    event LifecycleConfigured(bool demoMode, address indexed demoReserve);
+    event TreasuryClosed(address indexed recipient, uint256 wctcAmount, uint256 stableAmount, bool demoMode);
 
     constructor(
         address validator_,
@@ -114,11 +125,24 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         WCTC = adapter.WCTC();
         STABLE = adapter.STABLE();
         VENUE = adapter_;
+        LIFECYCLE_CONFIGURATOR = msg.sender;
         _universal = universal_;
         _arbitrage = arbitrage_;
         _rebalance = rebalance_;
         _risk = risk_;
         automationMode = T.AutomationMode.Paused;
+    }
+
+    /// @notice One-shot factory configuration. A zero reserve means normal/production mode;
+    ///         a non-zero reserve means controlled-demo mode.
+    function configureLifecycle(address demoReserve_) external {
+        if (msg.sender != LIFECYCLE_CONFIGURATOR) revert NotLifecycleConfigurator();
+        if (lifecycleConfigured) revert LifecycleAlreadyConfigured();
+        if (demoReserve_ == address(this)) revert InvalidConfiguration();
+        lifecycleConfigured = true;
+        demoReserve = demoReserve_;
+        demoMode = demoReserve_ != address(0);
+        emit LifecycleConfigured(demoMode, demoReserve_);
     }
 
     function universalPolicy() external view returns (T.UniversalPolicy memory) {
@@ -153,6 +177,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     }
 
     function registerAgent(address agent) external onlyOwner {
+        if (closed) revert TreasuryClosed();
         if (agent == address(0)) revert InvalidConfiguration();
         registeredAgents[agent] = true;
         emit AgentRegistered(agent);
@@ -164,6 +189,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     }
 
     function setAutomationMode(T.AutomationMode mode) external onlyOwner {
+        if (closed) revert TreasuryClosed();
         if (mode == automationMode) return;
         T.AutomationMode oldMode = automationMode;
         automationMode = mode;
@@ -180,6 +206,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.ProofData calldata sourceProof,
         VerifiedMarketFactValidator.ProofData calldata confirmProof
     ) external nonReentrant returns (uint64 attemptId, T.ReasonCode reason) {
+        if (closed) revert TreasuryClosed();
         if (!registeredAgents[msg.sender]) revert NotRegisteredAgent();
         uint256 epoch = block.timestamp / _universal.epochLength;
         if (attemptsInEpoch[epoch] >= _universal.maxAttemptsPerEpoch) revert AttemptRateLimitExceeded();
@@ -659,10 +686,36 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         a.policyHash = p.policyHash;
     }
 
+    /// @notice Withdraw a supported treasury asset to the owner. Controlled-demo
+    ///         assets deliberately cannot leave the treasury through this path.
     function ownerExit(address asset, uint256 amount) external onlyOwner nonReentrant {
+        if (demoMode) revert DemoTokenWithdrawalDisabled();
         if (asset != WCTC && asset != STABLE) revert AssetNotAllowed();
         IERC20(asset).safeTransfer(owner(), amount);
         emit OwnerExit(asset, amount, owner());
+    }
+
+    /// @notice Permanently closes the treasury. Production assets are returned to
+    ///         the owner; controlled-demo assets are recycled to the configured reserve.
+    /// @dev Closing cannot be undone. Historical attempt records remain readable forever.
+    function closeTreasury() external onlyOwner nonReentrant {
+        if (closed) revert TreasuryClosed();
+        closed = true;
+
+        if (automationMode != T.AutomationMode.Paused) {
+            T.AutomationMode oldMode = automationMode;
+            automationMode = T.AutomationMode.Paused;
+            policyEpoch++;
+            emit AutomationModeChanged(oldMode, automationMode, policyEpoch, currentPolicyHash());
+        }
+
+        address recipient = demoMode ? demoReserve : owner();
+        if (recipient == address(0)) revert InvalidConfiguration();
+        uint256 wctcAmount = IERC20(WCTC).balanceOf(address(this));
+        uint256 stableAmount = IERC20(STABLE).balanceOf(address(this));
+        if (wctcAmount != 0) IERC20(WCTC).safeTransfer(recipient, wctcAmount);
+        if (stableAmount != 0) IERC20(STABLE).safeTransfer(recipient, stableAmount);
+        emit TreasuryClosed(recipient, wctcAmount, stableAmount, demoMode);
     }
 
     function getAttempt(uint64 id) external view returns (T.AttemptRecord memory) {
