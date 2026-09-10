@@ -20,5 +20,21 @@ export const thirdwebClient = createThirdwebClient({
   clientId: configuredClientId || "fair-witness-unconfigured-client",
 });
 
-export const wallet = inAppWallet({ executionMode: { mode: "EOA" } });
+// The authenticated account is a Thirdweb smart account owned by the user's in-app
+// wallet. Thirdweb's paymaster sponsors its transactions, so a new user does not
+// need CC3 CTC merely to deploy/activate a Fair Witness treasury.
+export const wallet = inAppWallet({
+  auth: {
+    mode: "popup",
+    options: ["google", "apple", "email"],
+  },
+  smartAccount: {
+    chain: creditcoinTestnet,
+    sponsorGas: true,
+  },
+  metadata: {
+    name: "Fair Witness",
+  },
+});
+
 export { thirdwebClient as client };
