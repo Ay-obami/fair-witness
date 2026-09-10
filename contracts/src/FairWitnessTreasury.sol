@@ -103,7 +103,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     );
     event OwnerExit(address indexed asset, uint256 amount, address indexed recipient);
     event LifecycleConfigured(bool demoMode, address indexed demoReserve);
-    event TreasuryClosed(address indexed recipient, uint256 wctcAmount, uint256 stableAmount, bool demoMode);
+    event TreasuryClosure(address indexed recipient, uint256 wctcAmount, uint256 stableAmount, bool demoMode);
 
     constructor(
         address validator_,
@@ -133,8 +133,6 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         automationMode = T.AutomationMode.Paused;
     }
 
-    /// @notice One-shot factory configuration. A zero reserve means normal/production mode;
-    ///         a non-zero reserve means controlled-demo mode.
     function configureLifecycle(address demoReserve_) external {
         if (msg.sender != LIFECYCLE_CONFIGURATOR) revert NotLifecycleConfigurator();
         if (lifecycleConfigured) revert LifecycleAlreadyConfigured();
@@ -145,21 +143,10 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         emit LifecycleConfigured(demoMode, demoReserve_);
     }
 
-    function universalPolicy() external view returns (T.UniversalPolicy memory) {
-        return _universal;
-    }
-
-    function arbitragePolicy() external view returns (T.ArbitragePolicy memory) {
-        return _arbitrage;
-    }
-
-    function rebalancePolicy() external view returns (T.RebalancePolicy memory) {
-        return _rebalance;
-    }
-
-    function riskPolicy() external view returns (T.RiskPolicy memory) {
-        return _risk;
-    }
+    function universalPolicy() external view returns (T.UniversalPolicy memory) { return _universal; }
+    function arbitragePolicy() external view returns (T.ArbitragePolicy memory) { return _arbitrage; }
+    function rebalancePolicy() external view returns (T.RebalancePolicy memory) { return _rebalance; }
+    function riskPolicy() external view returns (T.RiskPolicy memory) { return _risk; }
 
     function currentPolicyHash() public view returns (bytes32) {
         T.PolicyHashInput memory input = T.PolicyHashInput({
@@ -197,9 +184,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         emit AutomationModeChanged(oldMode, mode, policyEpoch, currentPolicyHash());
     }
 
-    function renounceOwnership() public pure override {
-        revert CannotRenounceOwnership();
-    }
+    function renounceOwnership() public pure override { revert CannotRenounceOwnership(); }
 
     function submitProposal(
         T.Proposal calldata proposal,
@@ -250,16 +235,13 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
                 else evaluation = _evaluateStrategy(proposal, source, confirmation);
             } catch (bytes memory verifierError) {
                 evidenceStatus = T.EvidenceStatus.Invalid;
-                evaluation.reason =
-                    _isStaleError(verifierError) ? T.ReasonCode.EvidenceStale : T.ReasonCode.InvalidEvidence;
+                evaluation.reason = _isStaleError(verifierError) ? T.ReasonCode.EvidenceStale : T.ReasonCode.InvalidEvidence;
             }
             reason = evaluation.reason;
             if (evaluation.approved) {
                 _record(attemptId, proposal, proposalId, executionKey, T.ReasonCode.None);
                 _populateEvidence(attemptId, sourceProof, confirmProof, evidenceStatus, evaluation);
-                try this.executeApproved(proposal, evaluation.minimumOut, evaluation.permittedValueE6) returns (
-                    uint256 amountOut
-                ) {
+                try this.executeApproved(proposal, evaluation.minimumOut, evaluation.permittedValueE6) returns (uint256 amountOut) {
                     T.AttemptRecord storage executed = _attempts[attemptId];
                     executed.result = T.AttemptResult.Executed;
                     executed.amountInActual = proposal.amountIn;
@@ -287,13 +269,10 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
     function verifyEvidence(
         VerifiedMarketFactValidator.ProofData calldata sourceProof,
         VerifiedMarketFactValidator.ProofData calldata confirmProof
-    )
-        external
-        returns (
-            VerifiedMarketFactValidator.VerifiedObservation memory,
-            VerifiedMarketFactValidator.VerifiedObservation memory
-        )
-    {
+    ) external returns (
+        VerifiedMarketFactValidator.VerifiedObservation memory,
+        VerifiedMarketFactValidator.VerifiedObservation memory
+    ) {
         if (msg.sender != address(this)) revert OnlySelf();
         return FACT_VALIDATOR.verifyPair(sourceProof, confirmProof);
     }
@@ -304,9 +283,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.VerifiedObservation memory confirmation
     ) internal view virtual returns (StrategyEvaluation memory evaluation) {
         if (proposal.strategy != T.StrategyType.Arbitrage) {
-            if (proposal.strategy == T.StrategyType.Rebalance) {
-                return _evaluateRebalance(proposal, source, confirmation);
-            }
+            if (proposal.strategy == T.StrategyType.Rebalance) return _evaluateRebalance(proposal, source, confirmation);
             return _evaluateRisk(proposal, source, confirmation);
         }
         return _evaluateArbitrage(proposal, source, confirmation);
@@ -318,15 +295,9 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.VerifiedObservation memory confirmation
     ) private view returns (StrategyEvaluation memory e) {
         MarketEvaluation memory market = _validatedMarket(source, confirmation);
-        if (market.reason != T.ReasonCode.None) {
-            e.reason = market.reason;
-            return e;
-        }
+        if (market.reason != T.ReasonCode.None) { e.reason = market.reason; return e; }
         PortfolioEvaluation memory portfolio = _portfolio(confirmation.priceE6);
-        if (portfolio.totalValueE6 == 0) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
+        if (portfolio.totalValueE6 == 0) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
         uint256 currentWctcBps = portfolio.wctcBps;
         e.currentWctcBps = uint16(currentWctcBps);
         e.referenceBps = _risk.maxWctcExposureBps;
@@ -335,12 +306,8 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
             e.evaluatedStateHash = keccak256(abi.encode(portfolio));
             return e;
         }
-        if (p.assetIn != WCTC || p.assetOut != STABLE) {
-            e.reason = T.ReasonCode.WrongDirection;
-            return e;
-        }
-        uint256 excessValueE6 = portfolio.wctcValueE6
-            - Math.mulDiv(portfolio.totalValueE6, _risk.maxWctcExposureBps, BPS);
+        if (p.assetIn != WCTC || p.assetOut != STABLE) { e.reason = T.ReasonCode.WrongDirection; return e; }
+        uint256 excessValueE6 = portfolio.wctcValueE6 - Math.mulDiv(portfolio.totalValueE6, _risk.maxWctcExposureBps, BPS);
         uint256 usedToday = riskReductionUsedByDay[block.timestamp / 1 days];
         if (usedToday >= _risk.dailyRiskReductionValueE6) {
             e.reason = T.ReasonCode.DailyRiskLimit;
@@ -353,32 +320,17 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         if (permittedValueE6 > remainingDaily) permittedValueE6 = remainingDaily;
         if (permittedValueE6 > _universal.maxActionValueE6) permittedValueE6 = _universal.maxActionValueE6;
         e.permittedValueE6 = uint128(permittedValueE6);
-        e.evaluatedStateHash = keccak256(
-            abi.encode(market, portfolio, excessValueE6, usedToday, remainingDaily, permittedValueE6)
-        );
+        e.evaluatedStateHash = keccak256(abi.encode(market, portfolio, excessValueE6, usedToday, remainingDaily, permittedValueE6));
         uint256 maximumInput = Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6);
-        if (maximumInput == 0) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
-        if (p.amountIn > maximumInput) {
-            e.reason = T.ReasonCode.AmountExceedsPolicy;
-            return e;
-        }
-        if (IERC20(WCTC).balanceOf(address(this)) < p.amountIn) {
-            e.reason = T.ReasonCode.InsufficientBalance;
-            return e;
-        }
+        if (maximumInput == 0) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
+        if (p.amountIn > maximumInput) { e.reason = T.ReasonCode.AmountExceedsPolicy; return e; }
+        if (IERC20(WCTC).balanceOf(address(this)) < p.amountIn) { e.reason = T.ReasonCode.InsufficientBalance; return e; }
         if (executionsInEpoch[block.timestamp / _universal.epochLength] >= _universal.maxExecutionsPerEpoch) {
-            e.reason = T.ReasonCode.ExecutionRateLimit;
-            return e;
+            e.reason = T.ReasonCode.ExecutionRateLimit; return e;
         }
         uint256 expectedOut = Math.mulDiv(p.amountIn, market.twap, 1e18);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
-        if (minimumOut == 0 || minimumOut > type(uint128).max) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
+        if (minimumOut == 0 || minimumOut > type(uint128).max) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
         e.approved = true;
         e.reason = T.ReasonCode.None;
         e.minimumOut = uint128(minimumOut);
@@ -390,100 +342,59 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.VerifiedObservation memory confirmation
     ) private view returns (StrategyEvaluation memory e) {
         MarketEvaluation memory market = _validatedMarket(source, confirmation);
-        if (market.reason != T.ReasonCode.None) {
-            e.reason = market.reason;
-            return e;
-        }
+        if (market.reason != T.ReasonCode.None) { e.reason = market.reason; return e; }
         uint256 twap = market.twap;
         uint256 spot = market.spot;
         uint128 liquidity = market.liquidity;
-
         PortfolioEvaluation memory portfolio = _portfolio(confirmation.priceE6);
         uint256 wctcValueE6 = portfolio.wctcValueE6;
         uint256 stableValueE6 = portfolio.stableValueE6;
         uint256 portfolioValueE6 = portfolio.totalValueE6;
-        if (portfolioValueE6 == 0) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
+        if (portfolioValueE6 == 0) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
         uint256 currentWctcBps = portfolio.wctcBps;
         uint256 target = _rebalance.targetWctcBps;
         uint256 deviation = currentWctcBps > target ? currentWctcBps - target : target - currentWctcBps;
         e.currentWctcBps = uint16(currentWctcBps);
         e.referenceBps = _rebalance.targetWctcBps;
         uint256[9] memory basicState;
-        basicState[0] = twap;
-        basicState[1] = spot;
-        basicState[2] = liquidity;
-        basicState[3] = wctcValueE6;
-        basicState[4] = stableValueE6;
-        basicState[5] = portfolioValueE6;
-        basicState[6] = currentWctcBps;
-        basicState[7] = target;
-        basicState[8] = deviation;
+        basicState[0] = twap; basicState[1] = spot; basicState[2] = liquidity;
+        basicState[3] = wctcValueE6; basicState[4] = stableValueE6; basicState[5] = portfolioValueE6;
+        basicState[6] = currentWctcBps; basicState[7] = target; basicState[8] = deviation;
         e.evaluatedStateHash = keccak256(abi.encode(basicState));
-        if (deviation <= _rebalance.toleranceBps) {
-            e.reason = T.ReasonCode.RebalanceWithinTolerance;
-            return e;
-        }
+        if (deviation <= _rebalance.toleranceBps) { e.reason = T.ReasonCode.RebalanceWithinTolerance; return e; }
         bool sell = currentWctcBps > target;
-        if (
-            (sell && (p.assetIn != WCTC || p.assetOut != STABLE))
-                || (!sell && (p.assetIn != STABLE || p.assetOut != WCTC))
-        ) {
-            e.reason = T.ReasonCode.WrongDirection;
-            return e;
+        if ((sell && (p.assetIn != WCTC || p.assetOut != STABLE)) || (!sell && (p.assetIn != STABLE || p.assetOut != WCTC))) {
+            e.reason = T.ReasonCode.WrongDirection; return e;
         }
         uint256 targetValueE6 = Math.mulDiv(portfolioValueE6, target, BPS);
-        uint256 requiredValueE6 =
-            wctcValueE6 > targetValueE6 ? wctcValueE6 - targetValueE6 : targetValueE6 - wctcValueE6;
+        uint256 requiredValueE6 = wctcValueE6 > targetValueE6 ? wctcValueE6 - targetValueE6 : targetValueE6 - wctcValueE6;
         uint256 permittedValueE6 = requiredValueE6;
         if (permittedValueE6 > _rebalance.maxRebalanceValueE6) permittedValueE6 = _rebalance.maxRebalanceValueE6;
         if (permittedValueE6 > _universal.maxActionValueE6) permittedValueE6 = _universal.maxActionValueE6;
         e.permittedValueE6 = uint128(permittedValueE6);
-        e.evaluatedStateHash =
-            keccak256(abi.encode(e.evaluatedStateHash, targetValueE6, requiredValueE6, permittedValueE6));
+        e.evaluatedStateHash = keccak256(abi.encode(e.evaluatedStateHash, targetValueE6, requiredValueE6, permittedValueE6));
         uint256 maximumInput = sell ? Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6) : permittedValueE6;
-        if (maximumInput == 0) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
-        if (p.amountIn > maximumInput) {
-            e.reason = T.ReasonCode.AmountExceedsPolicy;
-            return e;
-        }
-        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) {
-            e.reason = T.ReasonCode.InsufficientBalance;
-            return e;
-        }
+        if (maximumInput == 0) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
+        if (p.amountIn > maximumInput) { e.reason = T.ReasonCode.AmountExceedsPolicy; return e; }
+        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) { e.reason = T.ReasonCode.InsufficientBalance; return e; }
         if (executionsInEpoch[block.timestamp / _universal.epochLength] >= _universal.maxExecutionsPerEpoch) {
-            e.reason = T.ReasonCode.ExecutionRateLimit;
-            return e;
+            e.reason = T.ReasonCode.ExecutionRateLimit; return e;
         }
         uint256 expectedOut = sell ? Math.mulDiv(p.amountIn, twap, 1e18) : Math.mulDiv(p.amountIn, 1e18, twap);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
         if (minimumOut == 0 || minimumOut > type(uint128).max || permittedValueE6 > type(uint128).max) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
+            e.reason = T.ReasonCode.ZeroExecutableAmount; return e;
         }
         e.approved = true;
         e.reason = T.ReasonCode.None;
         e.minimumOut = uint128(minimumOut);
     }
 
-    function _universalReason(T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey)
-        private
-        view
-        returns (T.ReasonCode)
-    {
+    function _universalReason(T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey) private view returns (T.ReasonCode) {
         if (p.schemaVersion != 1) return T.ReasonCode.UnsupportedSchema;
-        if (p.evidenceHash == 0 || p.observationHash == 0 || p.decisionHash == 0 || p.policyHash == 0) {
-            return T.ReasonCode.InvalidCommitment;
-        }
+        if (p.evidenceHash == 0 || p.observationHash == 0 || p.decisionHash == 0 || p.policyHash == 0) return T.ReasonCode.InvalidCommitment;
         if (automationMode != T.AutomationMode.Autonomous) return T.ReasonCode.PolicyPaused;
-        if ((_universal.enabledStrategies & (uint8(1) << uint8(p.strategy))) == 0) {
-            return T.ReasonCode.StrategyDisabled;
-        }
+        if ((_universal.enabledStrategies & (uint8(1) << uint8(p.strategy))) == 0) return T.ReasonCode.StrategyDisabled;
         if (p.action != T.ActionType.SwapExactIn) return T.ReasonCode.ActionNotAllowed;
         bool pair = (p.assetIn == WCTC && p.assetOut == STABLE) || (p.assetIn == STABLE && p.assetOut == WCTC);
         if (!pair) return T.ReasonCode.AssetNotAllowed;
@@ -505,73 +416,39 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.VerifiedObservation memory confirmation
     ) private view returns (StrategyEvaluation memory e) {
         MarketEvaluation memory market = _validatedMarket(source, confirmation);
-        if (market.reason != T.ReasonCode.None) {
-            e.reason = market.reason;
-            return e;
-        }
+        if (market.reason != T.ReasonCode.None) { e.reason = market.reason; return e; }
         uint256 twap = market.twap;
         uint256 spot = market.spot;
         uint128 liquidity = market.liquidity;
         bool sell = twap > confirmation.priceE6;
-        if (twap == confirmation.priceE6) {
-            e.reason = T.ReasonCode.ArbitrageEdgeTooLow;
-            return e;
-        }
-        if (
-            (sell && (p.assetIn != WCTC || p.assetOut != STABLE))
-                || (!sell && (p.assetIn != STABLE || p.assetOut != WCTC))
-        ) {
-            e.reason = T.ReasonCode.WrongDirection;
-            return e;
+        if (twap == confirmation.priceE6) { e.reason = T.ReasonCode.ArbitrageEdgeTooLow; return e; }
+        if ((sell && (p.assetIn != WCTC || p.assetOut != STABLE)) || (!sell && (p.assetIn != STABLE || p.assetOut != WCTC))) {
+            e.reason = T.ReasonCode.WrongDirection; return e;
         }
         uint256 gross = sell
             ? Math.mulDiv(twap - confirmation.priceE6, BPS, confirmation.priceE6)
             : Math.mulDiv(confirmation.priceE6 - twap, BPS, twap);
         uint256 poolFeeBps = Math.ceilDiv(DEX_ADAPTER.POOL_FEE(), 100);
         uint256 costs = poolFeeBps + p.maxSlippageBps + EXECUTION_RESERVE_BPS;
-        if (gross < costs + _arbitrage.minNetEdgeBps) {
-            e.reason = T.ReasonCode.ArbitrageEdgeTooLow;
-            return e;
-        }
+        if (gross < costs + _arbitrage.minNetEdgeBps) { e.reason = T.ReasonCode.ArbitrageEdgeTooLow; return e; }
         uint256 net = gross - costs;
-        uint256 valueCap = _arbitrage.maxArbitrageValueE6 < _universal.maxActionValueE6
-            ? _arbitrage.maxArbitrageValueE6
-            : _universal.maxActionValueE6;
-        uint256 balanceValue = sell
-            ? Math.mulDiv(IERC20(WCTC).balanceOf(address(this)), twap, 1e18)
-            : IERC20(STABLE).balanceOf(address(this));
-        if (balanceValue == 0) {
-            e.reason = T.ReasonCode.InsufficientBalance;
-            return e;
-        }
+        uint256 valueCap = _arbitrage.maxArbitrageValueE6 < _universal.maxActionValueE6 ? _arbitrage.maxArbitrageValueE6 : _universal.maxActionValueE6;
+        uint256 balanceValue = sell ? Math.mulDiv(IERC20(WCTC).balanceOf(address(this)), twap, 1e18) : IERC20(STABLE).balanceOf(address(this));
+        if (balanceValue == 0) { e.reason = T.ReasonCode.InsufficientBalance; return e; }
         if (balanceValue < valueCap) valueCap = balanceValue;
         uint256 scaledValue = Math.mulDiv(valueCap, net, uint256(_arbitrage.minNetEdgeBps) * 4);
         if (scaledValue > valueCap) scaledValue = valueCap;
         uint256 maximumInput = sell ? Math.mulDiv(scaledValue, 1e18, twap) : scaledValue;
-        if (maximumInput == 0) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
-        }
-        if (p.amountIn > maximumInput) {
-            e.reason = T.ReasonCode.AmountExceedsPolicy;
-            return e;
-        }
-        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) {
-            e.reason = T.ReasonCode.InsufficientBalance;
-            return e;
-        }
+        if (maximumInput == 0) { e.reason = T.ReasonCode.ZeroExecutableAmount; return e; }
+        if (p.amountIn > maximumInput) { e.reason = T.ReasonCode.AmountExceedsPolicy; return e; }
+        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) { e.reason = T.ReasonCode.InsufficientBalance; return e; }
         if (executionsInEpoch[block.timestamp / _universal.epochLength] >= _universal.maxExecutionsPerEpoch) {
-            e.reason = T.ReasonCode.ExecutionRateLimit;
-            return e;
+            e.reason = T.ReasonCode.ExecutionRateLimit; return e;
         }
         uint256 expectedOut = sell ? Math.mulDiv(p.amountIn, twap, 1e18) : Math.mulDiv(p.amountIn, 1e18, twap);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
-        if (
-            minimumOut == 0 || minimumOut > type(uint128).max || scaledValue > type(uint128).max
-                || net > type(uint16).max
-        ) {
-            e.reason = T.ReasonCode.ZeroExecutableAmount;
-            return e;
+        if (minimumOut == 0 || minimumOut > type(uint128).max || scaledValue > type(uint128).max || net > type(uint16).max) {
+            e.reason = T.ReasonCode.ZeroExecutableAmount; return e;
         }
         e = StrategyEvaluation({
             approved: true,
@@ -580,9 +457,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
             permittedValueE6: uint128(scaledValue),
             currentWctcBps: 0,
             referenceBps: uint16(net),
-            evaluatedStateHash: keccak256(
-                abi.encode(source, confirmation, twap, spot, liquidity, gross, costs, scaledValue)
-            )
+            evaluatedStateHash: keccak256(abi.encode(source, confirmation, twap, spot, liquidity, gross, costs, scaledValue))
         });
     }
 
@@ -623,34 +498,17 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         VerifiedMarketFactValidator.VerifiedObservation memory source,
         VerifiedMarketFactValidator.VerifiedObservation memory confirmation
     ) private view returns (MarketEvaluation memory market) {
-        if (source.priceE6 == 0 || confirmation.priceE6 == 0) {
-            market.reason = T.ReasonCode.InvalidEvidence;
-            return market;
-        }
-        if (_bpsGap(source.priceE6, confirmation.priceE6) > _universal.maxSourceDriftBps) {
-            market.reason = T.ReasonCode.SourceDriftTooHigh;
-            return market;
-        }
-        if (source.liquidity < _universal.minSourceLiquidity || confirmation.liquidity < _universal.minSourceLiquidity)
-        {
-            market.reason = T.ReasonCode.SourceLiquidityTooLow;
-            return market;
+        if (source.priceE6 == 0 || confirmation.priceE6 == 0) { market.reason = T.ReasonCode.InvalidEvidence; return market; }
+        if (_bpsGap(source.priceE6, confirmation.priceE6) > _universal.maxSourceDriftBps) { market.reason = T.ReasonCode.SourceDriftTooHigh; return market; }
+        if (source.liquidity < _universal.minSourceLiquidity || confirmation.liquidity < _universal.minSourceLiquidity) {
+            market.reason = T.ReasonCode.SourceLiquidityTooLow; return market;
         }
         try DEX_ADAPTER.marketState() returns (uint256 twap, int24, uint256 spot, uint128 liquidity) {
-            market.twap = twap;
-            market.spot = spot;
-            market.liquidity = liquidity;
-        } catch {
-            market.reason = T.ReasonCode.DestinationMarketInvalid;
-            return market;
-        }
-        if (market.twap == 0 || market.spot == 0) {
-            market.reason = T.ReasonCode.DestinationMarketInvalid;
-        } else if (market.liquidity < _universal.minDestinationLiquidity) {
-            market.reason = T.ReasonCode.DestinationLiquidityTooLow;
-        } else if (_bpsGap(market.twap, market.spot) > _universal.maxSpotTwapDeviationBps) {
-            market.reason = T.ReasonCode.DestinationDeviationTooHigh;
-        }
+            market.twap = twap; market.spot = spot; market.liquidity = liquidity;
+        } catch { market.reason = T.ReasonCode.DestinationMarketInvalid; return market; }
+        if (market.twap == 0 || market.spot == 0) market.reason = T.ReasonCode.DestinationMarketInvalid;
+        else if (market.liquidity < _universal.minDestinationLiquidity) market.reason = T.ReasonCode.DestinationLiquidityTooLow;
+        else if (_bpsGap(market.twap, market.spot) > _universal.maxSpotTwapDeviationBps) market.reason = T.ReasonCode.DestinationDeviationTooHigh;
     }
 
     function _isStaleError(bytes memory data) private pure returns (bool) {
@@ -660,9 +518,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         return selector == VerifiedMarketFactValidator.ProofTooOld.selector;
     }
 
-    function _record(uint64 id, T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey, T.ReasonCode reason)
-        private
-    {
+    function _record(uint64 id, T.Proposal calldata p, bytes32 proposalId, bytes32 executionKey, T.ReasonCode reason) private {
         T.AttemptRecord storage a = _attempts[id];
         a.attemptId = id;
         a.nonce = p.nonce;
@@ -686,8 +542,6 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         a.policyHash = p.policyHash;
     }
 
-    /// @notice Withdraw a supported treasury asset to the owner. Controlled-demo
-    ///         assets deliberately cannot leave the treasury through this path.
     function ownerExit(address asset, uint256 amount) external onlyOwner nonReentrant {
         if (demoMode) revert DemoTokenWithdrawalDisabled();
         if (asset != WCTC && asset != STABLE) revert AssetNotAllowed();
@@ -695,48 +549,35 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         emit OwnerExit(asset, amount, owner());
     }
 
-    /// @notice Permanently closes the treasury. Production assets are returned to
-    ///         the owner; controlled-demo assets are recycled to the configured reserve.
-    /// @dev Closing cannot be undone. Historical attempt records remain readable forever.
     function closeTreasury() external onlyOwner nonReentrant {
         if (closed) revert TreasuryClosed();
         closed = true;
-
         if (automationMode != T.AutomationMode.Paused) {
             T.AutomationMode oldMode = automationMode;
             automationMode = T.AutomationMode.Paused;
             policyEpoch++;
             emit AutomationModeChanged(oldMode, automationMode, policyEpoch, currentPolicyHash());
         }
-
         address recipient = demoMode ? demoReserve : owner();
         if (recipient == address(0)) revert InvalidConfiguration();
         uint256 wctcAmount = IERC20(WCTC).balanceOf(address(this));
         uint256 stableAmount = IERC20(STABLE).balanceOf(address(this));
         if (wctcAmount != 0) IERC20(WCTC).safeTransfer(recipient, wctcAmount);
         if (stableAmount != 0) IERC20(STABLE).safeTransfer(recipient, stableAmount);
-        emit TreasuryClosed(recipient, wctcAmount, stableAmount, demoMode);
+        emit TreasuryClosure(recipient, wctcAmount, stableAmount, demoMode);
     }
 
-    function getAttempt(uint64 id) external view returns (T.AttemptRecord memory) {
-        return _attempts[id];
-    }
+    function getAttempt(uint64 id) external view returns (T.AttemptRecord memory) { return _attempts[id]; }
 
-    /// @dev Installed for the locked atomic pattern; unreachable from proposals until a strategy approves.
     function executeApproved(T.Proposal calldata p, uint128 amountOutMinimum, uint128 permittedValueE6)
-        external
-        returns (uint256 amountOut)
+        external returns (uint256 amountOut)
     {
         if (msg.sender != address(this)) revert OnlySelf();
         bytes32 key = FairWitnessHashing.executionKey(address(this), p);
         executedEvidence[key] = true;
         executionCount++;
         executionsInEpoch[block.timestamp / _universal.epochLength]++;
-        if (p.strategy == T.StrategyType.RiskReduction) {
-            // Deliberately charge the full deterministic allowance rather than the smaller submitted amount.
-            // This keeps daily risk accounting conservative when an agent submits below the current ceiling.
-            riskReductionUsedByDay[block.timestamp / 1 days] += permittedValueE6;
-        }
+        if (p.strategy == T.StrategyType.RiskReduction) riskReductionUsedByDay[block.timestamp / 1 days] += permittedValueE6;
         IERC20 input = IERC20(p.assetIn);
         input.forceApprove(VENUE, p.amountIn);
         PenguinV3Adapter.TradeDirection direction = p.assetIn == WCTC
@@ -759,19 +600,9 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
                 || u.maxAttemptsPerEpoch < u.maxExecutionsPerEpoch || u.epochLength < MIN_EPOCH_LENGTH
                 || u.epochLength > MAX_EPOCH_LENGTH
         ) revert InvalidPolicy();
-        if ((u.enabledStrategies & 1) != 0 && (a.minNetEdgeBps == 0 || a.maxArbitrageValueE6 == 0)) {
-            revert InvalidPolicy();
-        }
-        if (
-            (u.enabledStrategies & 2) != 0
-                && (r.targetWctcBps > BPS || r.toleranceBps == 0 || r.maxRebalanceValueE6 == 0)
-        ) revert InvalidPolicy();
-        if (
-            (u.enabledStrategies & 4) != 0
-                && (k.maxWctcExposureBps > BPS || k.maxRiskReductionValueE6 == 0 || k.dailyRiskReductionValueE6 == 0)
-        ) revert InvalidPolicy();
-        if (
-            (u.enabledStrategies & 6) == 6 && uint256(k.maxWctcExposureBps) <= uint256(r.targetWctcBps) + r.toleranceBps
-        ) revert InvalidPolicy();
+        if ((u.enabledStrategies & 1) != 0 && (a.minNetEdgeBps == 0 || a.maxArbitrageValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 2) != 0 && (r.targetWctcBps > BPS || r.toleranceBps == 0 || r.maxRebalanceValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 4) != 0 && (k.maxWctcExposureBps > BPS || k.maxRiskReductionValueE6 == 0 || k.dailyRiskReductionValueE6 == 0)) revert InvalidPolicy();
+        if ((u.enabledStrategies & 6) == 6 && uint256(k.maxWctcExposureBps) <= uint256(r.targetWctcBps) + r.toleranceBps) revert InvalidPolicy();
     }
 }
