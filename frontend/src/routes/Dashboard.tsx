@@ -61,6 +61,7 @@ function OverviewCard({ view, index, busy, onMode }: { view: TreasuryView; index
   const usd = Number(ethers.formatUnits(view.stableBalance, 6));
   const total = wctc + usd;
   const allocation = total ? Math.round((wctc / total) * 100) : 0;
+  const stableAllocation = total ? Math.max(0, 100 - allocation) : 0;
   const target = Number(view.rebalance.targetWctcBps) / 100;
   const tolerance = Number(view.rebalance.toleranceBps) / 100;
   const latest = view.activities[0];
@@ -73,9 +74,23 @@ function OverviewCard({ view, index, busy, onMode }: { view: TreasuryView; index
         <span className={`rounded-full border px-3 py-1 text-xs ${active ? "border-verified-500/40 bg-verified-500/5 text-verified-400" : "border-alert-500/40 bg-alert-500/5 text-alert-400"}`}>● {active ? "ACTIVE" : "PAUSED"}</span>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Metric title="Portfolio" value={`${total.toFixed(2)} demo units`} detail={`${wctc.toFixed(2)} fwWCTC · ${usd.toFixed(2)} fwUSD`} />
-        <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-4"><p className="text-xs text-ledger-500">WCTC allocation</p><p className="mt-1 text-2xl font-semibold text-ledger-100">{allocation}%</p><div className="mt-3 h-2 overflow-hidden rounded bg-ledger-800"><div className="h-full bg-verified-500 transition-all duration-500" style={{ width: `${Math.min(100, allocation)}%` }} /></div><p className="mt-2 text-xs text-ledger-400">Target {target}% · band {target - tolerance}%–{target + tolerance}%</p></div>
+      <section className="mt-7">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-xs uppercase tracking-widest text-ledger-500">Treasury assets</p><h3 className="mt-1 text-lg font-semibold text-ledger-100">Current token balances</h3></div>
+          <p className="text-xs text-ledger-500">Balances are read directly from the treasury on Creditcoin.</p>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <AssetCard symbol="fwWCTC" balance={wctc} allocation={allocation} address={view.wctc} />
+          <AssetCard symbol="fwUSD" balance={usd} allocation={stableAllocation} address={view.stable} />
+        </div>
+      </section>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-5">
+          <div className="flex items-end justify-between gap-4"><div><p className="text-xs text-ledger-500">WCTC allocation</p><p className="mt-1 text-3xl font-semibold text-ledger-100">{allocation}%</p></div><p className="text-right text-xs text-ledger-400">Target {target}%<br/>Allowed band {target - tolerance}%–{target + tolerance}%</p></div>
+          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-ledger-800"><div className="h-full bg-verified-500 transition-all duration-500" style={{ width: `${Math.min(100, allocation)}%` }} /></div>
+          <p className="mt-3 text-xs leading-relaxed text-ledger-500">Allocation is shown separately from token balances so the actual asset amounts remain the primary financial information.</p>
+        </div>
         <Metric title="Latest on-chain decision" value={lastText} detail={latest ? reasonLabel(latest.reason) : "Agent is ready for a policy-bounded candidate."} />
       </div>
 
@@ -89,8 +104,15 @@ function OverviewCard({ view, index, busy, onMode }: { view: TreasuryView; index
   </article>;
 }
 
+function AssetCard({ symbol, balance, allocation, address }: { symbol: string; balance: number; allocation: number; address: string }) {
+  return <div className="rounded-2xl border border-ledger-700 bg-ledger-950 p-5 md:p-6">
+    <div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-widest text-ledger-500">{symbol}</p><p className="mt-2 text-4xl font-semibold tracking-tight text-ledger-100 md:text-5xl">{balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p><p className="mt-2 text-sm text-ledger-400">{symbol} held by this treasury</p></div><span className="rounded-full border border-verified-500/30 bg-verified-500/5 px-3 py-1 text-xs font-medium text-verified-400">{allocation}%</span></div>
+    <div className="mt-5 flex items-center justify-between gap-3 border-t border-ledger-800 pt-4"><span className="text-xs text-ledger-500">Token contract</span><a href={`${config.explorerBaseUrl}/address/${address}`} target="_blank" rel="noreferrer" className="font-data text-xs text-ledger-400 hover:text-verified-400">{short(address)} ↗</a></div>
+  </div>;
+}
+
 function Metric({ title, value, detail }: { title: string; value: string; detail: string }) {
-  return <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-4"><p className="text-xs text-ledger-500">{title}</p><p className="mt-1 text-xl font-semibold text-ledger-100">{value}</p><p className="mt-2 text-xs leading-relaxed text-ledger-400">{detail}</p></div>;
+  return <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-5"><p className="text-xs text-ledger-500">{title}</p><p className="mt-1 text-2xl font-semibold text-ledger-100">{value}</p><p className="mt-3 text-xs leading-relaxed text-ledger-400">{detail}</p></div>;
 }
 function SignedOut() { return <section className="mt-8 rounded-xl border border-ledger-700 bg-ledger-900 p-6"><h2 className="text-lg font-semibold text-ledger-100">Sign in to your Fair Witness account</h2><p className="mt-2 text-sm text-ledger-400">Use the same Google, Apple, or email identity that owns your treasury.</p><Link to="/signup" className="mt-4 inline-block rounded bg-copper-500 px-4 py-2 text-sm font-semibold text-ledger-950">Sign in</Link></section>; }
 function Empty() { return <section className="mt-8 rounded-xl border border-ledger-700 bg-ledger-900 p-6"><p className="text-ledger-300">No treasury found for this wallet.</p><Link to="/signup" className="mt-4 inline-block text-copper-400">Create your first treasury →</Link></section>; }
