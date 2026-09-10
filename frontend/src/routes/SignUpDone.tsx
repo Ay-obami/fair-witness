@@ -7,6 +7,8 @@ import { creditcoinTestnet, wallet, thirdwebClient } from "../lib/thirdweb";
 import { config } from "../lib/config";
 import { FAIR_WITNESS_TREASURY_ABI } from "../lib/abi";
 import { CONTROLLED_DEMO } from "../lib/controlledDemo";
+import { humanError } from "../lib/humanError";
+import { ensureSponsoredGas } from "../lib/sponsor";
 
 function useQuery() { return new URLSearchParams(useLocation().search); }
 const FAUCET_ABI = ["function claimed(address) view returns(bool)","function claim(address treasury)"];
@@ -36,11 +38,12 @@ export default function SignUpDone() {
       try { setFunded(Boolean(await new ethers.Contract(config.faucetAddress,FAUCET_ABI,provider).claimed(address))); } catch { setFunded(false); }
     }
   }
-  useEffect(()=>{ void refresh().catch(e=>setError(e instanceof Error?e.message:String(e))); },[address]);
+  useEffect(()=>{ void refresh().catch(e=>setError(humanError(e,"Could not load treasury status."))); },[address]);
 
   async function signer() {
     if (!account) throw new Error("Reconnect through Launch Fair Witness to perform owner actions.");
     if (owner && account.address.toLowerCase() !== owner.toLowerCase()) throw new Error("Connected wallet is not this treasury's owner.");
+    await ensureSponsoredGas(account.address);
     return ethers6Adapter.signer.toEthers({client:thirdwebClient,chain:creditcoinTestnet,account});
   }
 
@@ -57,7 +60,7 @@ export default function SignUpDone() {
         await (await (action === "register" ? treasury.registerAgent(config.agentSubmitAddress) : treasury.setAutomationMode(1))).wait();
       }
       await refresh();
-    } catch (e) { setError(e instanceof Error?e.message:String(e)); }
+    } catch (e) { setError(humanError(e,"The onboarding transaction could not be completed.")); }
     finally { setBusy(null); }
   }
 
@@ -66,7 +69,7 @@ export default function SignUpDone() {
   return <Layout><main className="mx-auto max-w-3xl px-6 py-14">
     <p className="text-xs uppercase tracking-widest text-verified-400">Treasury deployed</p>
     <h1 className="mt-2 text-3xl font-semibold text-ledger-100">Activate your Fair Witness</h1>
-    <p className="mt-3 text-sm text-ledger-400">The treasury starts paused. Complete the owner-controlled steps below before autonomous proposals can execute.</p>
+    <p className="mt-3 text-sm text-ledger-400">The treasury starts paused. Complete the owner-controlled steps below before autonomous proposals can execute. Fair Witness tops up CC3 gas; your authenticated wallet still signs every owner action.</p>
     <section className="mt-7 rounded-lg border border-ledger-700 bg-ledger-900 p-5">
       <p className="text-xs uppercase text-ledger-500">Treasury</p><code className="mt-2 block break-all text-sm text-verified-400">{treasuryAddress}</code>
       <p className="mt-3 text-xs text-ledger-400">Owner <span className="font-data break-all text-ledger-200">{owner || "Loading…"}</span></p>
