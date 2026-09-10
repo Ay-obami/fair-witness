@@ -329,20 +329,16 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         e.evaluatedStateHash = keccak256(
             abi.encode(market, portfolio, excessValueE6, usedToday, remainingDaily, permittedValueE6)
         );
-        uint256 expectedInput = Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6);
-        if (expectedInput == 0) {
+        uint256 maximumInput = Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6);
+        if (maximumInput == 0) {
             e.reason = T.ReasonCode.ZeroExecutableAmount;
             return e;
         }
-        if (p.amountIn > expectedInput) {
+        if (p.amountIn > maximumInput) {
             e.reason = T.ReasonCode.AmountExceedsPolicy;
             return e;
         }
-        if (p.amountIn != expectedInput) {
-            e.reason = T.ReasonCode.AmountMismatch;
-            return e;
-        }
-        if (IERC20(WCTC).balanceOf(address(this)) < expectedInput) {
+        if (IERC20(WCTC).balanceOf(address(this)) < p.amountIn) {
             e.reason = T.ReasonCode.InsufficientBalance;
             return e;
         }
@@ -350,7 +346,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
             e.reason = T.ReasonCode.ExecutionRateLimit;
             return e;
         }
-        uint256 expectedOut = Math.mulDiv(expectedInput, market.twap, 1e18);
+        uint256 expectedOut = Math.mulDiv(p.amountIn, market.twap, 1e18);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
         if (minimumOut == 0 || minimumOut > type(uint128).max) {
             e.reason = T.ReasonCode.ZeroExecutableAmount;
@@ -420,20 +416,16 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         e.permittedValueE6 = uint128(permittedValueE6);
         e.evaluatedStateHash =
             keccak256(abi.encode(e.evaluatedStateHash, targetValueE6, requiredValueE6, permittedValueE6));
-        uint256 expectedInput = sell ? Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6) : permittedValueE6;
-        if (expectedInput == 0) {
+        uint256 maximumInput = sell ? Math.mulDiv(permittedValueE6, 1e18, confirmation.priceE6) : permittedValueE6;
+        if (maximumInput == 0) {
             e.reason = T.ReasonCode.ZeroExecutableAmount;
             return e;
         }
-        if (p.amountIn > expectedInput) {
+        if (p.amountIn > maximumInput) {
             e.reason = T.ReasonCode.AmountExceedsPolicy;
             return e;
         }
-        if (p.amountIn != expectedInput) {
-            e.reason = T.ReasonCode.AmountMismatch;
-            return e;
-        }
-        if (IERC20(p.assetIn).balanceOf(address(this)) < expectedInput) {
+        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) {
             e.reason = T.ReasonCode.InsufficientBalance;
             return e;
         }
@@ -441,7 +433,7 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
             e.reason = T.ReasonCode.ExecutionRateLimit;
             return e;
         }
-        uint256 expectedOut = sell ? Math.mulDiv(expectedInput, twap, 1e18) : Math.mulDiv(expectedInput, 1e18, twap);
+        uint256 expectedOut = sell ? Math.mulDiv(p.amountIn, twap, 1e18) : Math.mulDiv(p.amountIn, 1e18, twap);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
         if (minimumOut == 0 || minimumOut > type(uint128).max || permittedValueE6 > type(uint128).max) {
             e.reason = T.ReasonCode.ZeroExecutableAmount;
@@ -528,24 +520,24 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         if (balanceValue < valueCap) valueCap = balanceValue;
         uint256 scaledValue = Math.mulDiv(valueCap, net, uint256(_arbitrage.minNetEdgeBps) * 4);
         if (scaledValue > valueCap) scaledValue = valueCap;
-        uint256 expectedInput = sell ? Math.mulDiv(scaledValue, 1e18, twap) : scaledValue;
-        if (expectedInput == 0) {
+        uint256 maximumInput = sell ? Math.mulDiv(scaledValue, 1e18, twap) : scaledValue;
+        if (maximumInput == 0) {
             e.reason = T.ReasonCode.ZeroExecutableAmount;
             return e;
         }
-        if (p.amountIn > expectedInput) {
+        if (p.amountIn > maximumInput) {
             e.reason = T.ReasonCode.AmountExceedsPolicy;
             return e;
         }
-        if (p.amountIn != expectedInput) {
-            e.reason = T.ReasonCode.AmountMismatch;
+        if (IERC20(p.assetIn).balanceOf(address(this)) < p.amountIn) {
+            e.reason = T.ReasonCode.InsufficientBalance;
             return e;
         }
         if (executionsInEpoch[block.timestamp / _universal.epochLength] >= _universal.maxExecutionsPerEpoch) {
             e.reason = T.ReasonCode.ExecutionRateLimit;
             return e;
         }
-        uint256 expectedOut = sell ? Math.mulDiv(expectedInput, twap, 1e18) : Math.mulDiv(expectedInput, 1e18, twap);
+        uint256 expectedOut = sell ? Math.mulDiv(p.amountIn, twap, 1e18) : Math.mulDiv(p.amountIn, 1e18, twap);
         uint256 minimumOut = Math.mulDiv(expectedOut, BPS - p.maxSlippageBps, BPS);
         if (
             minimumOut == 0 || minimumOut > type(uint128).max || scaledValue > type(uint128).max
@@ -688,6 +680,8 @@ contract FairWitnessTreasury is Ownable, ReentrancyGuard {
         executionCount++;
         executionsInEpoch[block.timestamp / _universal.epochLength]++;
         if (p.strategy == T.StrategyType.RiskReduction) {
+            // Deliberately charge the full deterministic allowance rather than the smaller submitted amount.
+            // This keeps daily risk accounting conservative when an agent submits below the current ceiling.
             riskReductionUsedByDay[block.timestamp / 1 days] += permittedValueE6;
         }
         IERC20 input = IERC20(p.assetIn);
