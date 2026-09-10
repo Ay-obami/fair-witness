@@ -4,10 +4,8 @@
  *
  * Run after ANY change to contracts/src (i.e. after `forge build`). The committed
  * copies in agent/src/abi and frontend/src/abi are what the agent and frontend
- * actually import — letting them drift silently is how the post-3.6 JournalEntry
- * change nearly shipped stale to clients. This script is deliberately boring and
- * loud: it FAILS on any structural surprise instead of writing a plausible-looking
- * file. Both packages standardized on bare ABI arrays (not artifact objects).
+ * actually import. This script fails on structural surprises instead of silently
+ * writing a plausible-looking stale ABI.
  *
  * Usage: cd contracts && forge build && node script/update-abis.js
  */
@@ -22,20 +20,22 @@ const factoryAbi = readArtifact("contracts/out/ASCTreasuryFactory.sol/ASCTreasur
 const policyTreasuryAbi = readArtifact("contracts/out/FairWitnessTreasury.sol/FairWitnessTreasury.json");
 const policyFactoryAbi = readArtifact("contracts/out/FairWitnessTreasuryFactory.sol/FairWitnessTreasuryFactory.json");
 
-// --- Sanity gates: fail loudly if the ABI no longer matches what clients rely on. ---
-
 const journalFn = (name) => journalAbi.find((e) => e.type === "function" && e.name === name);
+const policyFn = (name) => policyTreasuryAbi.find((e) => e.type === "function" && e.name === name);
+const policyFactoryFn = (name) => policyFactoryAbi.find((e) => e.type === "function" && e.name === name);
+
 if (!journalFn("executeArbitrage")) throw new Error("journal ABI has no executeArbitrage");
 if (!journalFn("getJournalEntry")) throw new Error("journal ABI has no getJournalEntry");
-if (!policyTreasuryAbi.some((e) => e.type === "function" && e.name === "submitProposal")) {
-  throw new Error("policy treasury ABI has no submitProposal");
+for (const name of ["submitProposal", "getAttempt", "ownerExit", "closeTreasury", "closed", "demoMode", "demoReserve"]) {
+  if (!policyFn(name)) throw new Error(`policy treasury ABI has no ${name}`);
 }
-if (!policyTreasuryAbi.some((e) => e.type === "function" && e.name === "getAttempt")) {
-  throw new Error("policy treasury ABI has no getAttempt");
+if (!policyTreasuryAbi.some((e) => e.type === "error" && e.name === "DemoTokenWithdrawalDisabled")) {
+  throw new Error("policy treasury ABI has no DemoTokenWithdrawalDisabled error");
+}
+if (!policyFactoryFn("createTreasury") || !policyFactoryFn("DEMO_RESERVE")) {
+  throw new Error("policy factory ABI is missing createTreasury or DEMO_RESERVE");
 }
 
-// JournalEntry field list — update THIS LIST (and the client decoders) together when
-// the struct legitimately changes; the point is that drift must be a loud failure.
 const expectedJournalEntryFields = [
   "factKey",
   "actionKey",
@@ -66,8 +66,6 @@ if (!factoryAbi.some((e) => e.type === "event" && e.name === "TreasuryDeployed")
   throw new Error("factory ABI has no TreasuryDeployed event");
 }
 
-// --- Write: bare ABI arrays, matching how every client imports them. ---
-
 const targets = [
   ["agent/src/abi/ASCTreasuryJournal.json", journalAbi],
   ["frontend/src/abi/ASCTreasuryJournal.json", journalAbi],
@@ -84,4 +82,4 @@ for (const [rel, abi] of targets) {
   fs.writeFileSync(abs, JSON.stringify(abi, null, 2) + "\n");
   console.log("wrote", rel, "(" + abi.length + " ABI entries)");
 }
-console.log("update-abis: OK — JournalEntry has " + gotFields.length + " fields, all gates passed");
+console.log("update-abis: OK — lifecycle surface and JournalEntry gates passed");
