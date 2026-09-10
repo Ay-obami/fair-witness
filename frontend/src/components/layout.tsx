@@ -8,10 +8,23 @@ const NAV_ITEMS = [
   { to: "/evidence", label: "Evidence" },
 ];
 
+const PRODUCT_LINKS = [
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/activity", label: "Agent activity" },
+  { to: "/safeguards", label: "Safeguards" },
+  { to: "/evidence", label: "Verified evidence" },
+];
+
+const TECH_LINKS = [
+  { to: "/architecture", label: "Architecture" },
+  { to: "/docs", label: "Technical docs" },
+];
+
 export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
-  return <div className="min-h-screen bg-background">
-    <nav className="border-b border-hairline">
+
+  return <div className="flex min-h-screen flex-col bg-background">
+    <nav className="shrink-0 border-b border-hairline">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
         <Link to="/" className="text-sm font-semibold tracking-widest text-verified-400 uppercase">Fair Witness</Link>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-sm sm:gap-x-4">
@@ -26,7 +39,43 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </nav>
-    {children}
-    <footer className="mt-16 border-t border-hairline py-6"><div className="mx-auto flex max-w-6xl flex-col items-center justify-between px-6 text-xs text-text-secondary sm:flex-row"><p className="mb-2 sm:mb-0">Fair Witness — AI proposes. Deterministic policy authorizes. Treasury executes.</p><div className="flex flex-wrap items-center justify-center gap-5"><Link to="/evidence" className="hover:text-text-primary">Protocol evidence</Link><Link to="/architecture" className="hover:text-text-primary">Architecture</Link><Link to="/docs" className="hover:text-text-primary">Technical docs</Link><a href="https://creditcoin-testnet.blockscout.com/address/0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd" target="_blank" rel="noreferrer" className="hover:text-text-primary">Factory contract</a></div></div></footer>
+
+    <div className="flex-1">{children}</div>
+
+    <footer className="shrink-0 border-t border-ledger-800 bg-ledger-950/80">
+      <div className="mx-auto max-w-6xl px-6 py-10 md:py-12">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_.8fr_.8fr]">
+          <section>
+            <Link to="/" className="text-sm font-semibold uppercase tracking-[0.2em] text-verified-400">Fair Witness</Link>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-ledger-400">Trust-minimized execution for autonomous financial agents on Creditcoin. AI proposes. Deterministic policy authorizes. Treasury executes.</p>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs text-ledger-500">
+              <span className="rounded-full border border-ledger-800 px-3 py-1">Non-custodial</span>
+              <span className="rounded-full border border-ledger-800 px-3 py-1">Attestcoin verified</span>
+              <span className="rounded-full border border-ledger-800 px-3 py-1">On-chain policy</span>
+            </div>
+          </section>
+
+          <section>
+            <p className="text-xs font-semibold uppercase tracking-widest text-ledger-300">Product</p>
+            <div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">
+              {PRODUCT_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:text-ledger-200">{item.label}</Link>)}
+            </div>
+          </section>
+
+          <section>
+            <p className="text-xs font-semibold uppercase tracking-widest text-ledger-300">Protocol</p>
+            <div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">
+              {TECH_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:text-ledger-200">{item.label}</Link>)}
+              <a href="https://creditcoin-testnet.blockscout.com/address/0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd" target="_blank" rel="noreferrer" className="transition hover:text-ledger-200">Factory contract ↗</a>
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-3 border-t border-ledger-800 pt-6 text-xs text-ledger-600 sm:flex-row sm:items-center sm:justify-between">
+          <p>Fair Witness · Creditcoin CC3 public testnet</p>
+          <p>Controlled demo markets. Verification and policy execution are real on-chain.</p>
+        </div>
+      </div>
+    </footer>
   </div>;
 }
