@@ -31,6 +31,9 @@ export interface TreasuryView {
   policyHash: string;
   policyEpoch: bigint;
   registered: boolean;
+  closed: boolean;
+  demoMode: boolean;
+  demoReserve: string;
   wctc: string;
   stable: string;
   wctcBalance: bigint;
@@ -47,6 +50,11 @@ export interface TreasuryView {
 const DEFAULT_FACTORY_DEPLOYMENT_BLOCK = 5_456_821;
 const LOG_CHUNK_SIZE = 25_000;
 const ACTIVITY_BATCH_SIZE = 20;
+const LIFECYCLE_READ_ABI = [
+  "function closed() view returns(bool)",
+  "function demoMode() view returns(bool)",
+  "function demoReserve() view returns(address)",
+];
 const cache = new Map<string, TreasuryView[]>();
 
 export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | null) {
@@ -104,6 +112,22 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       c.owner(), c.automationMode(), c.currentPolicyHash(), c.policyEpoch(), c.registeredAgents(config.agentSubmitAddress),
       c.WCTC(), c.STABLE(), c.universalPolicy(), c.arbitragePolicy(), c.riskPolicy(), c.rebalancePolicy(), readActivities(c),
     ]);
+
+    // Lifecycle methods only exist on the new generation. Older deployed treasuries
+    // remain readable and default to open/production-like UI semantics.
+    let closed = false;
+    let demoMode = false;
+    let demoReserve = ethers.ZeroAddress;
+    try {
+      const lifecycle = new ethers.Contract(normalized, LIFECYCLE_READ_ABI, provider);
+      const [closedValue, demoValue, reserveValue] = await Promise.all([
+        lifecycle.closed(), lifecycle.demoMode(), lifecycle.demoReserve(),
+      ]);
+      closed = Boolean(closedValue);
+      demoMode = Boolean(demoValue);
+      demoReserve = String(reserveValue);
+    } catch { /* pre-lifecycle treasury */ }
+
     const tokenAbi = ["function balanceOf(address) view returns(uint256)"];
     const [wctcBalance, stableBalance] = await Promise.all([
       new ethers.Contract(wctc, tokenAbi, provider).balanceOf(normalized),
@@ -115,7 +139,8 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
     }
     return {
       address: normalized, owner: ownerAddress, automationMode: Number(mode), policyHash: hash, policyEpoch: BigInt(epoch),
-      registered: Boolean(registered), wctc, stable, wctcBalance: BigInt(wctcBalance), stableBalance: BigInt(stableBalance),
+      registered: Boolean(registered), closed, demoMode, demoReserve,
+      wctc, stable, wctcBalance: BigInt(wctcBalance), stableBalance: BigInt(stableBalance),
       universal, arbitrage, risk, rebalance, activities, createdBlock, createdAt,
     };
   }, [provider, readActivities]);
