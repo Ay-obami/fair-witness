@@ -1,283 +1,117 @@
-// Stage 4b/4c — "Your instances" dashboard.
-// Login-gated: requires a Thirdweb embedded-wallet session (same email OTP flow as
-// /signup). Shows the instances mapped to the signed-in wallet via Supabase, and lets
-// the user add an instance they own (owner is verified on-chain before the mapping is
-// saved, so you can't claim someone else's contract). When Supabase is unconfigured the
-// page degrades gracefully to a wallet-level read (empty list + a clear note).
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/layout";
+import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import { getUserEmail, preAuthenticate } from "thirdweb/wallets/in-app";
-import { creditcoinTestnet, wallet, client } from "../lib/thirdweb";
+import { ethers6Adapter } from "thirdweb/adapters/ethers6";
+import { creditcoinTestnet, wallet, client, thirdwebConfigured } from "../lib/thirdweb";
 import { config } from "../lib/config";
-import { fetchTreasuryInfo } from "../lib/contractReader";
-import { fetchInstancesForWallet, saveInstanceMapping, type SupabaseMapping } from "../lib/instanceStore";
+import { FAIR_WITNESS_FACTORY_ABI, FAIR_WITNESS_TREASURY_ABI } from "../lib/abi";
+import { fetchInstancesForWallet } from "../lib/instanceStore";
+
+interface TreasuryView {
+  address: string;
+  owner: string;
+  automationMode: number;
+  policyHash: string;
+  policyEpoch: bigint;
+  registered: boolean;
+  wctc: string;
+  stable: string;
+  wctcBalance: bigint;
+  stableBalance: bigint;
+  universal: any;
+  rebalance: any;
+  risk: any;
+}
 
 export default function Dashboard() {
-  // Wallet session is owned locally: thirdweb v5.121's ThirdwebProvider takes no
-  // client and programmatic wallet.connect() doesn't populate a React account
-  // context — wallet.getAccount()/autoConnect() cover the session + its restore.
-  const [account, setAccount] = useState(() => wallet.getAccount());
-  useEffect(() => {
-    let cancelled = false;
-    wallet.autoConnect({ client })
-      .then((a) => {
-        if (!cancelled && a) setAccount(a);
-      })
-      .catch(() => { /* no stored session — fine */ });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [awaitingOtp, setAwaitingOtp] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [signingIn, setSigningIn] = useState(false);
+  const provider = useMemo(()=>new ethers.JsonRpcProvider(config.creditcoinRpcUrl),[]);
+  const factory = useMemo(()=>new ethers.Contract(config.factoryAddress, FAIR_WITNESS_FACTORY_ABI, provider),[provider]);
+  const [account,setAccount] = useState(()=>wallet.getAccount());
+  const [email,setEmail] = useState("");
+  const [otp,setOtp] = useState("");
+  const [awaitingOtp,setAwaitingOtp] = useState(false);
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState<string|null>(null);
+  const [treasuries,setTreasuries] = useState<TreasuryView[]>([]);
+  const [loading,setLoading] = useState(false);
+  const [signedEmail,setSignedEmail] = useState<string|undefined>();
 
-  const [loggedEmail, setLoggedEmail] = useState<string | undefined>();
-  const [instances, setInstances] = useState<SupabaseMapping[]>([]);
-  const [listError, setListError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  useEffect(()=>{ if (!thirdwebConfigured) return; wallet.autoConnect({client}).then(a=>{if(a)setAccount(a)}).catch(()=>{}); },[]);
 
-  const [newAddr, setNewAddr] = useState("");
-  const [addState, setAddState] = useState<{ kind: "idle" | "checking" | "ok" | "err"; msg?: string }>({ kind: "idle" });
-
-  // When a wallet is active, resolve the signed-in identity + pull its mappings.
-  useEffect(() => {
-    if (!account) return;
-    let cancelled = false;
-    void (async () => {
-      // Enter an async continuation before touching state (React Compiler
-      // set-state-in-effect lint) — same pattern as Verify.tsx.
-      await Promise.resolve();
-      if (cancelled) return;
-      setLoading(true);
-      setListError(null);
-      try {
-        const userEmail = await getUserEmail({ client });
-        if (cancelled) return;
-        setLoggedEmail(userEmail);
-      } catch {
-        /* email is optional identity — non-fatal */
-      }
-      const rows = await fetchInstancesForWallet(account.address);
-      if (cancelled) return;
-      if (rows === null) {
-        setListError("Supabase not configured — add VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY to frontend/.env (see docs/DEPLOYMENT.md Stage 4c).");
-        setInstances([]);
-      } else {
-        setInstances(rows);
-      }
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [account]);
-
-  async function handleSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.includes("@")) {
-      setAuthError("Enter a valid email to sign in.");
-      return;
-    }
-    setAuthError(null);
-    setSigningIn(true);
-    try {
-      // Same non-custodial email OTP flow as /signup: email a code first, then
-      // verify it below — an existing account logs back in to the same embedded
-      // wallet (the wallet is the instance owner key).
-      await preAuthenticate({ client, strategy: "email", email });
-      setAwaitingOtp(true);
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSigningIn(false);
-    }
+  async function readTreasury(address:string):Promise<TreasuryView> {
+    const c = new ethers.Contract(address, FAIR_WITNESS_TREASURY_ABI, provider);
+    const [owner,mode,hash,epoch,registered,wctc,stable,u,risk,rebalance] = await Promise.all([
+      c.owner(),c.automationMode(),c.currentPolicyHash(),c.policyEpoch(),c.registeredAgents(config.agentSubmitAddress),c.WCTC(),c.STABLE(),c.universalPolicy(),c.riskPolicy(),c.rebalancePolicy(),
+    ]);
+    const tokenAbi=["function balanceOf(address) view returns(uint256)"];
+    const [wctcBalance,stableBalance]=await Promise.all([
+      new ethers.Contract(wctc,tokenAbi,provider).balanceOf(address),new ethers.Contract(stable,tokenAbi,provider).balanceOf(address),
+    ]);
+    return {address:ethers.getAddress(address),owner,automationMode:Number(mode),policyHash:hash,policyEpoch:BigInt(epoch),registered:Boolean(registered),wctc,stable,wctcBalance:BigInt(wctcBalance),stableBalance:BigInt(stableBalance),universal:u,risk,rebalance};
   }
 
-  async function handleOtpSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthError(null);
-    setSigningIn(true);
+  async function discover(owner:string) {
+    setLoading(true); setError(null);
     try {
-      await wallet.connect({
-        client,
-        chain: creditcoinTestnet,
-        strategy: "email",
-        email,
-        verificationCode: otp,
-      });
-      setAccount(wallet.getAccount());
-      setAwaitingOtp(false);
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSigningIn(false);
-    }
+      const latest = await provider.getBlockNumber();
+      const fromBlock = Number(import.meta.env.VITE_FACTORY_DEPLOYMENT_BLOCK ?? Math.max(0,latest-500_000));
+      const filter = factory.filters.TreasuryCreated(null,owner,null);
+      let events: ethers.Log[] = [];
+      try { events = await factory.queryFilter(filter,fromBlock,latest); } catch { events = []; }
+      const addresses = new Set<string>();
+      for (const e of events) if (e instanceof ethers.EventLog) addresses.add(ethers.getAddress(e.args.treasury));
+      const cached = await fetchInstancesForWallet(owner);
+      for (const row of cached ?? []) addresses.add(ethers.getAddress(row.instanceAddress));
+      const views = (await Promise.all([...addresses].map(async a=>{try{return await readTreasury(a)}catch{return null}}))).filter((v):v is TreasuryView=>v!==null && v.owner.toLowerCase()===owner.toLowerCase());
+      setTreasuries(views);
+      try { setSignedEmail(await getUserEmail({client})); } catch { /* optional */ }
+    } catch(e){ setError(e instanceof Error?e.message:String(e)); }
+    finally{setLoading(false)}
+  }
+  useEffect(()=>{ if(account) void discover(account.address); },[account]);
+
+  async function sendCode(e:React.FormEvent){e.preventDefault();if(!thirdwebConfigured)return setError("VITE_THIRDWEB_CLIENT_ID is not configured.");setBusy(true);setError(null);try{await preAuthenticate({client,strategy:"email",email});setAwaitingOtp(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+  async function verify(e:React.FormEvent){e.preventDefault();setBusy(true);setError(null);try{const a=await wallet.connect({client,chain:creditcoinTestnet,strategy:"email",email,verificationCode:otp});setAccount(a);setAwaitingOtp(false)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+
+  async function setAutomation(view:TreasuryView,next:number){
+    if(!account)return;
+    setBusy(true);setError(null);
+    try{
+      const signer=await ethers6Adapter.signer.toEthers({client,chain:creditcoinTestnet,account});
+      const c=new ethers.Contract(view.address,FAIR_WITNESS_TREASURY_ABI,signer);
+      await (await c.setAutomationMode(next)).wait();
+      await discover(account.address);
+    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}
   }
 
-  async function handleAddInstance(e: React.FormEvent) {
-    e.preventDefault();
-    if (!account) return;
-    let addr: string;
-    try {
-      addr = ethers.getAddress(newAddr.trim());
-    } catch {
-      setAddState({ kind: "err", msg: "That doesn't look like a valid address." });
-      return;
-    }
-    setAddState({ kind: "checking" });
-    try {
-      const info = await fetchTreasuryInfo(addr);
-      if (info.owner.toLowerCase() !== account.address.toLowerCase()) {
-        setAddState({ kind: "err", msg: `Owned by ${info.owner}, not your wallet — you can only add your own.` });
-        return;
-      }
-      const res = await saveInstanceMapping({
-        email: loggedEmail ?? "unknown@embedded-wallet",
-        walletAddress: account.address,
-        instanceAddress: addr,
-      });
-      if (!res.ok) {
-        setAddState({ kind: "err", msg: res.error ?? "Could not save mapping." });
-        return;
-      }
-      setAddState({ kind: "ok", msg: "Added — list refreshed below." });
-      const rows = await fetchInstancesForWallet(account.address);
-      setInstances(rows ?? []);
-      setNewAddr("");
-    } catch (err) {
-      setAddState({ kind: "err", msg: err instanceof Error ? err.message : String(err) });
-    }
-  }
-
-  const explorerBase = config.explorerBaseUrl;
-
-  return (
-    <Layout>
-      <div className="mx-auto max-w-3xl px-6 py-14">
-        <h1 className="text-2xl font-bold text-ledger-100">Your instances</h1>
-        <p className="mt-2 text-sm leading-relaxed text-ledger-400">
-          The contracts you own, mapped to your signed-in identity. Everything here is
-          public on-chain anyway — this page is just a convenient "mine" view.
-        </p>
-
-        {!account && (
-          <div className="mt-8 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-            <p className="text-sm font-semibold text-ledger-200">Sign in with your email</p>
-            <p className="mt-1 text-xs text-ledger-400">
-              Non-custodial embedded wallet — the same login you used at sign-up. No seed phrase.
-            </p>
-            {!awaitingOtp ? (
-              <form onSubmit={handleSignIn} className="mt-4 flex gap-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={signingIn}
-                  className="rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
-                >
-                  {signingIn ? "Sending code…" : "Send code"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleOtpSubmit} className="mt-4">
-                <p className="text-xs text-ledger-400">
-                  A one-time code was emailed to <span className="text-ledger-200">{email}</span>. Enter it to sign in.
-                </p>
-                <div className="mt-3 flex gap-3">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="6-digit code"
-                    className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={signingIn}
-                    className="rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
-                  >
-                    {signingIn ? "Verifying…" : "Verify & sign in"}
-                  </button>
-                </div>
-              </form>
-            )}
-            {authError && <p className="mt-3 text-sm text-alert-400">{authError}</p>}
-          </div>
-        )}
-
-        {account && (
-          <div className="mt-8 space-y-8">
-            <div className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-              <p className="text-xs uppercase tracking-wider text-ledger-400">Signed in as</p>
-              <p className="mt-1 text-sm font-semibold text-verified-400">{loggedEmail ?? "embedded wallet"}</p>
-              <code className="mt-1 block font-data text-xs text-ledger-400 break-all">{account.address}</code>
-            </div>
-
-            {loading && <p className="text-sm text-ledger-400">Loading your instances…</p>}
-            {listError && <p className="rounded-md border border-alert-500/30 bg-alert-500/10 px-4 py-3 text-sm text-alert-400">{listError}</p>}
-
-            {!listError && instances.length === 0 && (
-              <div className="rounded-lg border border-ledger-800 bg-ledger-950 p-6 text-sm text-ledger-400">
-                No instances mapped to this wallet yet. Sign up (or add an instance you
-                own below) to create your first one.
-              </div>
-            )}
-
-            {instances.map((m) => (
-              <div key={m.instanceAddress} className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-wider text-ledger-400">Treasury</p>
-                  <a
-                    href={`${explorerBase}/address/${m.instanceAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-verified-400 hover:underline"
-                  >
-                    View on explorer
-                  </a>
-                </div>
-                <code className="mt-2 block font-data text-sm text-verified-400 break-all">{m.instanceAddress}</code>
-                <p className="mt-2 text-xs text-ledger-500">Mapped to {m.email}</p>
-              </div>
-            ))}
-
-            <form onSubmit={handleAddInstance} className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-              <p className="text-sm font-semibold text-ledger-200">Add an instance you own</p>
-              <p className="mt-1 text-xs text-ledger-400">
-                Owner is checked on-chain before saving — you can't claim someone else's contract.
-              </p>
-              <div className="mt-4 flex gap-3">
-                <input
-                  type="text"
-                  value={newAddr}
-                  onChange={(e) => setNewAddr(e.target.value)}
-                  placeholder="0x…"
-                  className="flex-1 rounded-md border border-ledger-700 bg-ledger-950 px-3 py-2 font-data text-sm text-ledger-100 focus:border-verified-500/50 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={addState.kind === "checking"}
-                  className="rounded-md border border-ledger-600 px-5 py-2 text-sm font-semibold text-ledger-200 hover:border-verified-500/50 hover:text-verified-400 transition disabled:opacity-50"
-                >
-                  {addState.kind === "checking" ? "Checking…" : "Add"}
-                </button>
-              </div>
-              {addState.kind === "ok" && <p className="mt-3 text-sm text-verified-400">{addState.msg}</p>}
-              {addState.kind === "err" && <p className="mt-3 text-sm text-alert-400">{addState.msg}</p>}
-            </form>
-          </div>
-        )}
-      </div>
-    </Layout>
-  );
+  return <Layout><main className="mx-auto max-w-5xl px-6 py-12">
+    <p className="text-xs uppercase tracking-widest text-copper-400">Owner console</p><h1 className="mt-2 text-3xl font-semibold text-ledger-100">Your Fair Witness treasuries</h1>
+    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ledger-400">Factory events and on-chain ownership are authoritative. Supabase is used only as an optional discovery cache.</p>
+    {!account && <section className="mt-8 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
+      <h2 className="text-lg text-ledger-100">Sign in to your embedded wallet</h2>
+      {!thirdwebConfigured && <p className="mt-3 text-sm text-alert-400">This deployment is missing VITE_THIRDWEB_CLIENT_ID.</p>}
+      {!awaitingOtp?<form onSubmit={sendCode} className="mt-4 flex gap-3"><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" className="flex-1 rounded border border-ledger-700 bg-ledger-950 px-3 py-2 text-ledger-100"/><button disabled={busy||!thirdwebConfigured} className="rounded bg-copper-500 px-4 py-2 text-sm font-semibold text-ledger-950 disabled:opacity-50">{busy?"Sending…":"Send code"}</button></form>:<form onSubmit={verify} className="mt-4 flex gap-3"><input value={otp} onChange={e=>setOtp(e.target.value)} placeholder="Verification code" className="flex-1 rounded border border-ledger-700 bg-ledger-950 px-3 py-2 text-ledger-100"/><button disabled={busy} className="rounded bg-copper-500 px-4 py-2 text-sm font-semibold text-ledger-950">Verify</button></form>}
+    </section>}
+    {account && <>
+      <section className="mt-7 rounded-lg border border-ledger-700 bg-ledger-900 p-5"><p className="text-xs uppercase text-ledger-500">Signed in</p><p className="mt-1 text-sm text-verified-400">{signedEmail??"embedded wallet"}</p><code className="mt-1 block break-all text-xs text-ledger-400">{account.address}</code></section>
+      {loading && <p className="mt-6 text-sm text-ledger-400">Discovering factory treasuries…</p>}
+      {!loading && treasuries.length===0 && <section className="mt-6 rounded-lg border border-ledger-700 bg-ledger-900 p-6"><p className="text-sm text-ledger-300">No schema-v1 treasury found for this wallet in the indexed factory range.</p><Link to="/mandate" className="mt-4 inline-block text-sm text-copper-400">Create your first treasury →</Link></section>}
+      <div className="mt-7 space-y-5">{treasuries.map(view=><TreasuryCard key={view.address} view={view} busy={busy} onMode={setAutomation}/>)}</div>
+    </>}
+    {error&&<p className="mt-5 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
+  </main></Layout>;
 }
+
+function TreasuryCard({view,busy,onMode}:{view:TreasuryView;busy:boolean;onMode:(view:TreasuryView,next:number)=>Promise<void>}){
+  const enabled=Number(view.universal.enabledStrategies);
+  return <article className="rounded-lg border border-ledger-700 bg-ledger-900 p-6">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs uppercase text-ledger-500">Treasury</p><code className="mt-1 block break-all text-sm text-verified-400">{view.address}</code></div><span className={view.automationMode===1?"text-xs text-verified-400":"text-xs text-alert-400"}>{view.automationMode===1?"AUTONOMOUS ●":"PAUSED"}</span></div>
+    <div className="mt-5 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4"><Metric k="Agent" v={view.registered?"AUTHORIZED":"NOT AUTHORIZED"}/><Metric k="Policy epoch" v={view.policyEpoch.toString()}/><Metric k="fwWCTC" v={ethers.formatUnits(view.wctcBalance,18)}/><Metric k="fwUSD" v={ethers.formatUnits(view.stableBalance,6)}/></div>
+    <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><Metric k="Strategies" v={`${enabled&4?"Risk ":""}${enabled&2?"Rebalance ":""}${enabled&1?"Arbitrage":""}`.trim()||"None"}/><Metric k="Target WCTC" v={`${Number(view.rebalance.targetWctcBps)/100}%`}/><Metric k="Risk ceiling" v={`${Number(view.risk.maxWctcExposureBps)/100}%`}/></div>
+    <p className="font-data mt-4 break-all text-[11px] text-ledger-500">Policy {view.policyHash}</p>
+    <div className="mt-5 flex flex-wrap gap-3"><button disabled={busy} onClick={()=>void onMode(view,view.automationMode===1?0:1)} className="rounded border border-copper-500 px-4 py-2 text-sm text-copper-300 disabled:opacity-50">{view.automationMode===1?"Pause agent":"Enable autonomy"}</button><Link to={`/signup/done?address=${view.address}`} className="rounded border border-ledger-600 px-4 py-2 text-sm text-ledger-300">Activation & agent</Link><a href={`${config.explorerBaseUrl}/address/${view.address}`} target="_blank" rel="noreferrer" className="px-4 py-2 text-sm text-ledger-400">Explorer ↗</a></div>
+  </article>
+}
+function Metric({k,v}:{k:string;v:string}){return <div className="rounded border border-ledger-800 bg-ledger-950 p-3"><p className="text-ledger-500">{k}</p><p className="mt-1 break-all text-ledger-200">{v}</p></div>}
