@@ -71,6 +71,7 @@ contract FairWitnessTreasuryTest is Test {
     FairWitnessTreasury treasury;
     address owner = makeAddr("owner");
     address agent = makeAddr("agent");
+    address demoReserve = makeAddr("demoReserve");
 
     function setUp() public {
         wctc = new MockERC20("WCTC", "WCTC", 18);
@@ -171,6 +172,63 @@ contract FairWitnessTreasuryTest is Test {
         treasury.ownerExit(address(other), 1);
     }
 
+    function test_ProductionCloseReturnsAllAssetsAndCannotReactivate() public {
+        wctc.mint(address(treasury), 8e18);
+        stable.mint(address(treasury), 25e6);
+        vm.prank(owner);
+        treasury.setAutomationMode(T.AutomationMode.Autonomous);
+        vm.prank(owner);
+        treasury.closeTreasury();
+
+        assertTrue(treasury.closed());
+        assertEq(uint8(treasury.automationMode()), uint8(T.AutomationMode.Paused));
+        assertEq(wctc.balanceOf(owner), 8e18);
+        assertEq(stable.balanceOf(owner), 25e6);
+        assertEq(wctc.balanceOf(address(treasury)), 0);
+        assertEq(stable.balanceOf(address(treasury)), 0);
+
+        vm.prank(owner);
+        vm.expectRevert(FairWitnessTreasury.TreasuryClosed.selector);
+        treasury.setAutomationMode(T.AutomationMode.Autonomous);
+        vm.prank(owner);
+        vm.expectRevert(FairWitnessTreasury.TreasuryClosed.selector);
+        treasury.registerAgent(makeAddr("laterAgent"));
+        vm.prank(owner);
+        vm.expectRevert(FairWitnessTreasury.TreasuryClosed.selector);
+        treasury.closeTreasury();
+    }
+
+    function test_DemoFactoryBlocksWithdrawalAndCloseRecyclesAssets() public {
+        Phase3ValidatorStub validator = new Phase3ValidatorStub();
+        Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
+        FairWitnessTreasuryFactory factory =
+            new FairWitnessTreasuryFactory(address(validator), address(adapter), demoReserve);
+        FairWitnessTreasury demoTreasury = factory.createTreasury(
+            owner,
+            _universal(),
+            T.ArbitragePolicy(80, 2_000e6),
+            T.RebalancePolicy(4_000, 500, 1_000e6),
+            T.RiskPolicy(6_000, 1_000e6, 2_500e6)
+        );
+        assertTrue(demoTreasury.lifecycleConfigured());
+        assertTrue(demoTreasury.demoMode());
+        assertEq(demoTreasury.demoReserve(), demoReserve);
+
+        wctc.mint(address(demoTreasury), 12e18);
+        stable.mint(address(demoTreasury), 40e6);
+        vm.prank(owner);
+        vm.expectRevert(FairWitnessTreasury.DemoTokenWithdrawalDisabled.selector);
+        demoTreasury.ownerExit(address(wctc), 1e18);
+
+        vm.prank(owner);
+        demoTreasury.closeTreasury();
+        assertTrue(demoTreasury.closed());
+        assertEq(wctc.balanceOf(demoReserve), 12e18);
+        assertEq(stable.balanceOf(demoReserve), 40e6);
+        assertEq(wctc.balanceOf(owner), 0);
+        assertEq(stable.balanceOf(owner), 0);
+    }
+
     function test_ExecutionHelperRejectsDirectCall() public {
         T.Proposal memory p = _proposal(1);
         vm.expectRevert(FairWitnessTreasury.OnlySelf.selector);
@@ -180,7 +238,7 @@ contract FairWitnessTreasuryTest is Test {
     function test_FactoryCreatesIndependentMandateTreasury() public {
         Phase3ValidatorStub validator = new Phase3ValidatorStub();
         Phase3AdapterStub adapter = new Phase3AdapterStub(address(wctc), address(stable));
-        FairWitnessTreasuryFactory factory = new FairWitnessTreasuryFactory(address(validator), address(adapter));
+        FairWitnessTreasuryFactory factory = new FairWitnessTreasuryFactory(address(validator), address(adapter), address(0));
         FairWitnessTreasury created = factory.createTreasury(
             owner,
             _universal(),
@@ -190,6 +248,9 @@ contract FairWitnessTreasuryTest is Test {
         );
         assertEq(created.owner(), owner);
         assertTrue(factory.isFactoryTreasury(address(created)));
+        assertTrue(created.lifecycleConfigured());
+        assertFalse(created.demoMode());
+        assertEq(created.demoReserve(), address(0));
     }
 
     function test_FailedExecutionRollsBackReplayAndExecutionCountButJournalsFailure() public {
