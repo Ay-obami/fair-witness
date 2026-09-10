@@ -59,7 +59,7 @@ function formatAmount(amount: bigint, asset: string, treasury: TreasuryView) {
   return formatted.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function humanExplanation(item: ActivityItem, treasury: TreasuryView) {
+function humanExplanation(item: ActivityItem) {
   if (item.result === 1) {
     if (item.strategy === 1) {
       const allocation = item.currentWctcBps ? percent(item.currentWctcBps) : null;
@@ -113,7 +113,7 @@ export default function Activity() {
               <div className="flex flex-wrap items-center gap-2"><span className={`text-sm font-semibold ${tone}`}>{status}</span><span className="rounded-full border border-ledger-700 px-2 py-0.5 text-[11px] text-ledger-400">{strategyLabel(item.strategy)}</span>{item.evidenceStatus === 2 && <span className="rounded-full border border-verified-500/30 px-2 py-0.5 text-[11px] text-verified-400">Evidence verified ✓</span>}</div>
               <div className="mt-4 rounded-xl border border-ledger-800 bg-ledger-950 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-copper-400">Why this happened</p>
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ledger-200">{humanExplanation(item, treasury)}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ledger-200">{humanExplanation(item)}</p>
                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-ledger-500">
                   <span>Policy result: <span className="text-ledger-300">{item.reason === 0 ? "All checks passed" : reasonLabel(item.reason)}</span></span>
                   {amountLabel && <span>Action size: <span className="text-ledger-300">{amountLabel}</span></span>}
