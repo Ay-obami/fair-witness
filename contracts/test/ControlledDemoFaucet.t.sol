@@ -21,7 +21,8 @@ contract ControlledDemoFaucetTest is Test {
         factory = new FactoryRegistryStub();
         wctc = new MockERC20("fwWCTC", "fwWCTC", 18);
         stable = new MockERC20("fwUSD", "fwUSD", 6);
-        faucet = new ControlledDemoFaucet(address(factory), address(wctc), address(stable), 70 ether, 30_000_000);
+        faucet = new ControlledDemoFaucet(address(wctc), address(stable), 70 ether, 30_000_000);
+        faucet.configureFactory(address(factory));
         wctc.mint(address(faucet), 700 ether);
         stable.mint(address(faucet), 300_000_000);
         factory.setTreasury(treasury, true);
@@ -44,9 +45,27 @@ contract ControlledDemoFaucetTest is Test {
     }
 
     function test_claimRevertsWhenUnderfundedWithoutConsumingClaim() public {
-        ControlledDemoFaucet empty = new ControlledDemoFaucet(address(factory), address(wctc), address(stable), 1 ether, 1_000_000);
+        ControlledDemoFaucet empty = new ControlledDemoFaucet(address(wctc), address(stable), 1 ether, 1_000_000);
+        empty.configureFactory(address(factory));
         vm.expectRevert(ControlledDemoFaucet.FaucetUnderfunded.selector);
         empty.claim(treasury);
         assertFalse(empty.claimed(treasury));
+    }
+
+    function test_factoryMustBeConfiguredOnceByDeployer() public {
+        ControlledDemoFaucet fresh = new ControlledDemoFaucet(address(wctc), address(stable), 1 ether, 1_000_000);
+        vm.expectRevert(ControlledDemoFaucet.FactoryNotConfigured.selector);
+        fresh.claim(treasury);
+
+        vm.prank(address(0xCAFE));
+        vm.expectRevert(ControlledDemoFaucet.NotConfigurator.selector);
+        fresh.configureFactory(address(factory));
+
+        fresh.configureFactory(address(factory));
+        assertTrue(fresh.factoryConfigured());
+        assertEq(address(fresh.FACTORY()), address(factory));
+
+        vm.expectRevert(ControlledDemoFaucet.FactoryAlreadyConfigured.selector);
+        fresh.configureFactory(address(factory));
     }
 }
