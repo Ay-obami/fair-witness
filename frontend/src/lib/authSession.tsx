@@ -1,21 +1,21 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Account } from "thirdweb/wallets";
 import { client, thirdwebConfigured, wallet } from "./thirdweb";
 
+type WalletAccount = NonNullable<ReturnType<typeof wallet.getAccount>>;
 type AuthSessionValue = {
-  account: Account | undefined;
+  account: WalletAccount | undefined;
   resolving: boolean;
-  setSessionAccount: (account: Account | undefined) => void;
-  refreshSession: () => Promise<Account | undefined>;
+  setSessionAccount: (account: WalletAccount | undefined) => void;
+  refreshSession: () => Promise<WalletAccount | undefined>;
 };
 
 const AuthSessionContext = createContext<AuthSessionValue | null>(null);
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  const [account, setAccount] = useState<Account | undefined>(() => wallet.getAccount());
+  const [account, setAccount] = useState<WalletAccount | undefined>(() => wallet.getAccount());
   const [resolving, setResolving] = useState(() => thirdwebConfigured && !wallet.getAccount());
 
-  async function refreshSession() {
+  async function refreshSession(): Promise<WalletAccount | undefined> {
     if (!thirdwebConfigured) {
       setResolving(false);
       return undefined;
