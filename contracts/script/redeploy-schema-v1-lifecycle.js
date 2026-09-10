@@ -174,7 +174,7 @@ async function main() {
       FACTORY_DEPLOYMENT_BLOCK: String(factoryDeployment.receipt.blockNumber),
       VITE_FACTORY_ADDRESS: factoryAddress,
       VITE_FACTORY_DEPLOYMENT_BLOCK: String(factoryDeployment.receipt.blockNumber),
-      VITE_CONTROLLED_DEMO_FAUCET: faucetAddress,
+      VITE_DEMO_FAUCET_ADDRESS: faucetAddress,
     },
   };
   fs.writeFileSync(OUTPUT_FILE, `${json(output)}\n`);
