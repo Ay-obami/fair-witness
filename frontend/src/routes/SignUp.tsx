@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Layout } from "../components/layout";
 import { useNavigate } from "react-router-dom";
 import { preAuthenticate } from "thirdweb/wallets/in-app";
-import { creditcoinTestnet, wallet, thirdwebClient } from "../lib/thirdweb";
+import { creditcoinTestnet, wallet, thirdwebClient, thirdwebConfigured } from "../lib/thirdweb";
 import { SecurityBoundaryNotice } from "../components/SecurityBoundaryNotice";
 
 const ONBOARDING_KEY = "fair-witness:onboarding";
@@ -17,6 +17,7 @@ export default function SignUp() {
 
   async function start(e: React.FormEvent) {
     e.preventDefault();
+    if (!thirdwebConfigured) return setError("Embedded-wallet signup is not configured on this deployment. Add VITE_THIRDWEB_CLIENT_ID and redeploy.");
     if (!email.includes("@")) return setError("Enter a valid email address.");
     setBusy(true); setError(null);
     try {
@@ -29,6 +30,7 @@ export default function SignUp() {
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
+    if (!thirdwebConfigured) return setError("Embedded-wallet signup is not configured on this deployment.");
     setBusy(true); setError(null);
     try {
       const account = await wallet.connect({ client: thirdwebClient, chain: creditcoinTestnet, strategy: "email", email, verificationCode: otp });
@@ -44,10 +46,11 @@ export default function SignUp() {
     <h1 className="mt-2 text-3xl font-semibold text-ledger-100">Create your non-custodial account</h1>
     <p className="mt-3 text-sm leading-relaxed text-ledger-400">Your embedded wallet becomes the owner of a dedicated schema-v1 Fair Witness treasury. The AI never controls this wallet or the treasury.</p>
     <div className="mt-5"><SecurityBoundaryNotice /></div>
+    {!thirdwebConfigured && <p className="mt-5 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">Signup is disabled until the public VITE_THIRDWEB_CLIENT_ID is configured. Read-only product and evidence pages remain available.</p>}
     {error && <p className="mt-5 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
     {step === "email" ? <form onSubmit={start} className="mt-8">
       <label className="block text-xs text-ledger-400">Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-2 w-full rounded border border-ledger-700 bg-ledger-900 px-4 py-3 text-ledger-100" placeholder="you@example.com" required /></label>
-      <button disabled={busy} className="mt-4 w-full rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Sending code…" : "Continue"}</button>
+      <button disabled={busy || !thirdwebConfigured} className="mt-4 w-full rounded bg-copper-500 px-5 py-3 font-semibold text-ledger-950 disabled:opacity-50">{busy ? "Sending code…" : "Continue"}</button>
     </form> : <form onSubmit={verify} className="mt-8">
       <p className="text-sm text-ledger-400">Enter the one-time code sent to <span className="text-ledger-200">{email}</span>.</p>
       <input value={otp} onChange={e=>setOtp(e.target.value)} className="mt-4 w-full rounded border border-ledger-700 bg-ledger-900 px-4 py-3 text-ledger-100" placeholder="Verification code" required autoFocus />
