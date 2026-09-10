@@ -116,7 +116,7 @@ contract FairWitnessRiskReductionTest is Test {
         assertEq(treasury.riskReductionUsedByDay(block.timestamp / 1 days), 0);
     }
 
-    function test_OversizedAndSmallerAmountsAreJournaledWithoutMovement() public {
+    function test_OversizedAmountIsJournaledWithoutMovement() public {
         _fund(treasury, 80e18, 20e6);
         uint256 beforeBalance = wctc.balanceOf(address(treasury));
         T.Proposal memory p = _proposal(treasury, 4, address(wctc), address(stable), 7_000e18);
@@ -124,14 +124,24 @@ contract FairWitnessRiskReductionTest is Test {
         (uint64 id, T.ReasonCode above) = treasury.submitProposal(p, _source(), _confirm());
         assertEq(uint8(above), uint8(T.ReasonCode.AmountExceedsPolicy));
         assertEq(treasury.getAttempt(id).permittedValueE6, 10e6);
-        p = _proposal(treasury, 5, address(wctc), address(stable), 9e18);
-        vm.prank(agent);
-        (, T.ReasonCode below) = treasury.submitProposal(p, _source(), _confirm());
-        assertEq(uint8(below), uint8(T.ReasonCode.AmountMismatch));
         assertEq(wctc.balanceOf(address(treasury)), beforeBalance);
         assertEq(wctc.allowance(address(treasury), address(adapter)), 0);
         assertEq(treasury.executionCount(), 0);
         assertEq(treasury.riskReductionUsedByDay(block.timestamp / 1 days), 0);
+    }
+
+    function test_SmallerRiskReductionExecutesWithinCeiling() public {
+        _fund(treasury, 80e18, 20e6);
+        uint256 beforeBalance = wctc.balanceOf(address(treasury));
+        T.Proposal memory p = _proposal(treasury, 5, address(wctc), address(stable), 9e18);
+        vm.prank(agent);
+        (uint64 id, T.ReasonCode reason) = treasury.submitProposal(p, _source(), _confirm());
+        assertEq(uint8(reason), uint8(T.ReasonCode.None));
+        assertEq(treasury.getAttempt(id).amountInActual, 9e18);
+        assertEq(treasury.getAttempt(id).permittedValueE6, 10e6);
+        assertEq(wctc.balanceOf(address(treasury)), beforeBalance - 9e18);
+        assertEq(treasury.executionCount(), 1);
+        assertEq(treasury.riskReductionUsedByDay(block.timestamp / 1 days), 10e6);
     }
 
     function testFuzz_MaliciousOversizeCannotMoveCapital(uint96 excess) public {
