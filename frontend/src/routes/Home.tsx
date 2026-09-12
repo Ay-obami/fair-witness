@@ -63,11 +63,10 @@ export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [rejectionIndex, setRejectionIndex] = useState(0);
   const rejection = REJECTIONS[rejectionIndex];
-  const hero = HERO_MESSAGES[heroIndex];
   const launchPath = account ? "/dashboard" : "/signup";
 
   useEffect(() => {
-    const id = window.setInterval(() => setHeroIndex((current) => (current + 1) % HERO_MESSAGES.length), 4200);
+    const id = window.setInterval(() => setHeroIndex((current) => (current + 1) % HERO_MESSAGES.length), 5800);
     return () => window.clearInterval(id);
   }, []);
 
@@ -87,12 +86,22 @@ export default function Home() {
         <div className="relative">
           <div className="mb-5 flex sm:mb-6"><NetworkIndicator /></div>
           <p className="text-[11px] uppercase tracking-[0.22em] text-copper-400 sm:text-xs sm:tracking-[0.28em]">Attestcoin-powered autonomous finance on Creditcoin</p>
-          <div className="mt-5 min-h-[10.5rem] sm:min-h-[11.5rem] md:min-h-[12.5rem]">
-            <h1 key={heroIndex} className="max-w-4xl text-4xl font-bold leading-[1.04] text-ledger-100 transition-all duration-500 sm:text-5xl md:text-7xl">
-              {hero.lead} <span className="text-verified-400">{hero.accent}</span>
-            </h1>
+          <div className="relative mt-5 min-h-[10.5rem] sm:min-h-[11.5rem] md:min-h-[12.5rem]">
+            {HERO_MESSAGES.map((message, index) => <h1
+              key={message.lead}
+              aria-hidden={index !== heroIndex}
+              className={`absolute inset-0 max-w-4xl text-4xl font-bold leading-[1.04] text-ledger-100 transition-all duration-700 ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-5xl md:text-7xl ${index === heroIndex ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}
+            >
+              {message.lead} <span className="text-verified-400">{message.accent}</span>
+            </h1>)}
           </div>
-          <p key={`support-${heroIndex}`} className="mt-4 max-w-2xl text-lg leading-relaxed text-ledger-300 transition-opacity duration-500 sm:mt-6 sm:text-xl">{hero.supporting}</p>
+          <div className="relative mt-4 min-h-[4.75rem] sm:mt-6 sm:min-h-[3.75rem]">
+            {HERO_MESSAGES.map((message, index) => <p
+              key={message.supporting}
+              aria-hidden={index !== heroIndex}
+              className={`absolute inset-x-0 top-0 max-w-2xl text-lg leading-relaxed text-ledger-300 transition-all delay-75 duration-700 ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xl ${index === heroIndex ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`}
+            >{message.supporting}</p>)}
+          </div>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ledger-400 sm:text-base">Fair Witness lets autonomous financial agents reason over Attestcoin-verified cross-chain evidence while a user-owned Creditcoin treasury remains the final authority over every movement of capital.</p>
           <div className="mt-7 grid gap-3 sm:mt-8 sm:flex sm:flex-wrap sm:gap-4">
             <Link
@@ -103,7 +112,7 @@ export default function Home() {
             <button type="button" onClick={scrollToHowItWorks} className="cursor-pointer rounded-lg border border-ledger-600 px-6 py-3 text-sm font-semibold text-ledger-200 transition hover:border-verified-500/50 hover:bg-ledger-900 hover:text-verified-400">See how it works ↓</button>
           </div>
           <div className="mt-7 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-ledger-400 sm:mt-8 sm:flex sm:flex-wrap sm:gap-x-6"><span>✓ Non-custodial</span><span>✓ Attestcoin verified</span><span>✓ On-chain policy</span><span>✓ Replay protected</span></div>
-          <div className="mt-6 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all ${index === heroIndex ? "w-8 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
+          <div className="mt-6 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all duration-500 ${index === heroIndex ? "w-9 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
         </div>
 
         <div className="relative rounded-2xl border border-verified-500/20 bg-ledger-900 p-5 shadow-2xl shadow-black/20 sm:p-6">
