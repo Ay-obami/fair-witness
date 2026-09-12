@@ -180,6 +180,8 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
         <span className={`rounded-full border px-3 py-1 text-xs ${view.closed ? "border-ledger-600 bg-ledger-800 text-ledger-300" : active ? "border-verified-500/40 bg-verified-500/5 text-verified-400" : "border-alert-500/40 bg-alert-500/5 text-alert-400"}`}>● {view.closed ? "CLOSED" : active ? "ACTIVE" : "PAUSED"}</span>
       </div>
 
+      <TreasuryAddressRow address={view.address} />
+
       <section className="mt-7">
         <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-end sm:gap-3">
           <div><p className="text-xs uppercase tracking-widest text-ledger-500">Treasury assets</p><h3 className="mt-1 text-lg font-semibold text-ledger-100">Current token balances</h3></div>
@@ -227,6 +229,43 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
   </article>;
 }
 
+function TreasuryAddressRow({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = address;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    }
+  }
+
+  return <div className="mt-5 rounded-xl border border-ledger-800 bg-ledger-950/70 p-3 sm:p-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-widest text-ledger-500">Treasury funding address</p>
+        <p className="mt-1 break-all font-data text-xs text-ledger-200 sm:text-sm">{address}</p>
+        <p className="mt-1 text-xs text-ledger-500">Send supported assets to this treasury address when funding it manually.</p>
+      </div>
+      <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+        <button type="button" onClick={() => void copyAddress()} className="cursor-pointer rounded-lg border border-ledger-600 px-3 py-2 text-xs font-semibold text-ledger-200 transition hover:border-copper-500 hover:bg-ledger-900">{copied ? "✓ Copied" : "⧉ Copy address"}</button>
+        <a href={`${config.explorerBaseUrl}/address/${address}`} target="_blank" rel="noreferrer" className="rounded-lg border border-ledger-700 px-3 py-2 text-center text-xs text-ledger-400 transition hover:border-ledger-500 hover:text-ledger-200">Explorer ↗</a>
+      </div>
+    </div>
+  </div>;
+}
+
 function AssetCard({ symbol, balance, allocation, address }: { symbol: string; balance: number; allocation: number; address: string }) {
   return <div className="rounded-2xl border border-ledger-700 bg-ledger-950 p-4 sm:p-5 md:p-6">
     <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-ledger-500">{symbol}</p><p className="mt-2 break-all text-3xl font-semibold tracking-tight text-ledger-100 sm:text-4xl md:text-5xl">{balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p><p className="mt-2 text-sm text-ledger-400">{symbol} held by this treasury</p></div><span className="shrink-0 rounded-full border border-verified-500/30 bg-verified-500/5 px-3 py-1 text-xs font-medium text-verified-400">{allocation}%</span></div>
@@ -238,4 +277,4 @@ function Metric({ title, value, detail }: { title: string; value: string; detail
   return <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-4 sm:p-5"><p className="text-xs text-ledger-500">{title}</p><p className="mt-1 text-2xl font-semibold text-ledger-100">{value}</p><p className="mt-3 text-xs leading-relaxed text-ledger-400">{detail}</p></div>;
 }
 function SignedOut() { return <section className="mt-8 rounded-xl border border-ledger-700 bg-ledger-900 p-5 sm:p-6"><h2 className="text-lg font-semibold text-ledger-100">Sign in to your Fair Witness account</h2><p className="mt-2 text-sm text-ledger-400">Use the same Google, Apple, or email identity that owns your treasury.</p><Link to="/signup" className="mt-4 inline-block rounded bg-copper-500 px-4 py-2 text-sm font-semibold text-ledger-950">Sign in</Link></section>; }
-function Empty() { return <section className="mt-8 rounded-xl border border-ledger-700 bg-ledger-900 p-5 sm:p-6"><p className="text-ledger-300">No treasury found for this wallet on the current Fair Witness factory.</p><Link to="/signup?intent=new" className="mt-4 inline-block text-copper-400">Create your first treasury →</Link></section>; }
+function Empty() { return <section className="mt-8 rounded-xl border border-ledger-700 bg-ledger-900 p-5 sm:p-6"><p className="text-ledger-300">No treasury found for this account on the current Fair Witness factory.</p><Link to="/mandate" className="mt-4 inline-block text-copper-400">Create your first treasury →</Link></section>; }
