@@ -41,7 +41,9 @@ jobs:
       - name: Reject stale committed client ABIs
         run: |
           node script/update-abis.js
-          git diff --exit-code -- ../agent/src/abi ../frontend/src/abi
+          # update-abis intentionally normalizes JSON formatting. Ignore whitespace-only
+          # differences while still failing on every ABI field/order/content change.
+          git diff -w --exit-code -- ../agent/src/abi ../frontend/src/abi
 
   agent:
     name: vitest (agent)
