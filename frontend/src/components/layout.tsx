@@ -30,6 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { account, resolving, logout } = useAuthSession();
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const newTreasuryPath = account ? "/mandate" : "/signup?intent=new";
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
 
@@ -69,7 +70,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className="hidden rounded-md border border-ledger-700 px-3 py-1.5 font-data text-xs text-ledger-400 lg:inline">{short(account.address)}</span>
             <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-alert-500/50 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
           </> : !resolving ? <Link to="/signup" className="rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-copper-500 hover:text-ledger-100">Sign in</Link> : null}
-          <Link to="/signup?intent=new" className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
+          <Link to={newTreasuryPath} className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
         </div>
 
         <button
@@ -95,7 +96,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <div className="flex items-center justify-between rounded-lg border border-ledger-800 px-4 py-3 text-xs text-ledger-400"><span>Connected wallet</span><span className="font-data">{short(account.address)}</span></div>
               <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-lg border border-ledger-700 px-4 py-3 text-sm text-ledger-300 transition hover:border-alert-500/50 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
             </> : !resolving ? <Link to="/signup" className="rounded-lg border border-ledger-700 px-4 py-3 text-center text-sm text-ledger-200">Sign in</Link> : null}
-            <Link to="/signup?intent=new" className="rounded-lg bg-copper-500 px-4 py-3 text-center text-sm font-semibold text-ledger-950">New treasury</Link>
+            <Link to={newTreasuryPath} className="rounded-lg bg-copper-500 px-4 py-3 text-center text-sm font-semibold text-ledger-950">New treasury</Link>
           </div>
         </div>
       </div>}
