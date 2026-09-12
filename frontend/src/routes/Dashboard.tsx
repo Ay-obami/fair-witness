@@ -163,15 +163,19 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
   const active = !view.closed && view.automationMode === 1 && view.registered;
   const wctc = Number(ethers.formatUnits(view.wctcBalance, 18));
   const usd = Number(ethers.formatUnits(view.stableBalance, 6));
-  const total = wctc + usd;
-  const allocation = total ? Math.round((wctc / total) * 100) : 0;
-  const stableAllocation = total ? Math.max(0, 100 - allocation) : 0;
+  const hasPrice = view.wctcPriceE6 > 0n || view.wctcBalance === 0n;
+  const wctcValueE6 = view.wctcPriceE6 > 0n ? view.wctcBalance * view.wctcPriceE6 / 10n ** 18n : 0n;
+  const totalValueE6 = wctcValueE6 + view.stableBalance;
+  const allocationBps = hasPrice && totalValueE6 > 0n ? Number(wctcValueE6 * 10_000n / totalValueE6) : null;
+  const allocation = allocationBps === null ? null : allocationBps / 100;
+  const stableAllocation = allocation === null ? null : Math.max(0, 100 - allocation);
   const target = Number(view.rebalance.targetWctcBps) / 100;
   const tolerance = Number(view.rebalance.toleranceBps) / 100;
   const latest = view.activities[0];
   const lastText = !latest ? "Waiting for first proposal" : latest.result === 1 ? "Executed" : latest.result === 2 ? "Execution failed" : "Rejected";
   const stateTitle = view.closed ? "Treasury Closed" : active ? "Agent Active" : "Agent Paused";
   const stateDetail = view.closed ? "Permanently inactive · historical journal preserved" : active ? "Operating within your on-chain mandate" : "No autonomous proposal can execute";
+  const priceText = view.wctcPriceE6 > 0n ? `${Number(ethers.formatUnits(view.wctcPriceE6, 6)).toLocaleString(undefined, { maximumFractionDigits: 6 })} fwUSD / WCTC` : "Price unavailable";
 
   return <article className="overflow-hidden rounded-2xl border border-ledger-700 bg-ledger-900">
     <div className="border-b border-ledger-800 p-4 sm:p-6 md:p-7">
@@ -195,9 +199,9 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-ledger-800 bg-ledger-950 p-4 sm:p-5">
-          <div className="flex items-end justify-between gap-4"><div><p className="text-xs text-ledger-500">WCTC allocation</p><p className="mt-1 text-3xl font-semibold text-ledger-100">{allocation}%</p></div><p className="text-right text-xs text-ledger-400">Target {target}%<br/>Allowed band {target - tolerance}%–{target + tolerance}%</p></div>
-          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-ledger-800"><div className="h-full bg-verified-500 transition-all duration-500" style={{ width: `${Math.min(100, allocation)}%` }} /></div>
-          <p className="mt-3 text-xs leading-relaxed text-ledger-500">Allocation is shown separately from token balances so the actual asset amounts remain the primary financial information.</p>
+          <div className="flex items-end justify-between gap-4"><div><p className="text-xs text-ledger-500">WCTC allocation</p><p className="mt-1 text-3xl font-semibold text-ledger-100">{allocation === null ? "—" : `${allocation.toFixed(2).replace(/\.00$/, "")}%`}</p></div><p className="text-right text-xs text-ledger-400">Target {target}%<br/>Allowed band {target - tolerance}%–{target + tolerance}%</p></div>
+          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-ledger-800"><div className="h-full bg-verified-500 transition-all duration-500" style={{ width: `${allocation === null ? 0 : Math.min(100, allocation)}%` }} /></div>
+          <p className="mt-3 text-xs leading-relaxed text-ledger-500">Allocation values WCTC with the destination adapter's current 300-second TWAP. Price used: <span className="text-ledger-300">{priceText}</span>.</p>
         </div>
         <Metric title="Latest on-chain decision" value={lastText} detail={latest ? reasonLabel(latest.reason) : "Agent is ready for a policy-bounded candidate."} />
       </div>
@@ -266,9 +270,9 @@ function TreasuryAddressRow({ address }: { address: string }) {
   </div>;
 }
 
-function AssetCard({ symbol, balance, allocation, address }: { symbol: string; balance: number; allocation: number; address: string }) {
+function AssetCard({ symbol, balance, allocation, address }: { symbol: string; balance: number; allocation: number | null; address: string }) {
   return <div className="rounded-2xl border border-ledger-700 bg-ledger-950 p-4 sm:p-5 md:p-6">
-    <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-ledger-500">{symbol}</p><p className="mt-2 break-all text-3xl font-semibold tracking-tight text-ledger-100 sm:text-4xl md:text-5xl">{balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p><p className="mt-2 text-sm text-ledger-400">{symbol} held by this treasury</p></div><span className="shrink-0 rounded-full border border-verified-500/30 bg-verified-500/5 px-3 py-1 text-xs font-medium text-verified-400">{allocation}%</span></div>
+    <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-xs uppercase tracking-widest text-ledger-500">{symbol}</p><p className="mt-2 break-all text-3xl font-semibold tracking-tight text-ledger-100 sm:text-4xl md:text-5xl">{balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p><p className="mt-2 text-sm text-ledger-400">{symbol} held by this treasury</p></div><span className="shrink-0 rounded-full border border-verified-500/30 bg-verified-500/5 px-3 py-1 text-xs font-medium text-verified-400">{allocation === null ? "—" : `${allocation.toFixed(2).replace(/\.00$/, "")}%`}</span></div>
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ledger-800 pt-4"><span className="text-xs text-ledger-500">Token contract</span><a href={`${config.explorerBaseUrl}/address/${address}`} target="_blank" rel="noreferrer" className="font-data text-xs text-ledger-400 hover:text-verified-400">{short(address)} ↗</a></div>
   </div>;
 }
