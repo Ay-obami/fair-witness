@@ -81,6 +81,7 @@ export default function SignUpDone() {
     setError(null);
     try {
       const s = await signer();
+      const signerAddress = await s.getAddress();
       const treasuryAddress = ethers.getAddress(address);
       const treasury = new ethers.Contract(treasuryAddress, FAIR_WITNESS_TREASURY_ABI, s);
       const faucet = new ethers.Contract(config.faucetAddress, FAUCET_ABI, s);
@@ -88,7 +89,7 @@ export default function SignUpDone() {
       // Re-read before every step. This makes retries safe when a previous transaction
       // succeeded but a later activation step failed or the browser lost connectivity.
       let state = await readState();
-      if (state.owner.toLowerCase() !== s.address.toLowerCase()) {
+      if (state.owner.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new Error("Connected wallet is not this treasury's owner.");
       }
 
