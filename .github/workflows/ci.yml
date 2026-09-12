@@ -105,8 +105,18 @@ jobs:
             exit 1
           fi
       - name: Reject public email persistence in user_instances
+        shell: bash
         run: |
-          if grep -RniE '\bemail\b' frontend/src/lib/instanceStore.ts frontend/supabase/migrations/0001_user_instances.sql | grep -vE 'do not store|NOT persisted|email is not|required'; then
-            echo "Public instance projection still appears to persist email"
+          set -euo pipefail
+          if grep -Eq '^[[:space:]]*email[[:space:]]+text' frontend/supabase/migrations/0001_user_instances.sql; then
+            echo "user_instances still defines an email column"
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*email[?:]?:' frontend/src/lib/instanceStore.ts; then
+            echo "instanceStore still exposes an email field"
+            exit 1
+          fi
+          if grep -Eq '\.(select|upsert)\([^\n]*email' frontend/src/lib/instanceStore.ts; then
+            echo "instanceStore still reads or writes email"
             exit 1
           fi
