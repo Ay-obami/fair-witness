@@ -2,99 +2,199 @@
   {
     "type": "constructor",
     "inputs": [
-      { "name": "validator_", "type": "address", "internalType": "address" },
-      { "name": "adapter_", "type": "address", "internalType": "address" },
-      { "name": "demoReserve_", "type": "address", "internalType": "address" },
-      { "name": "creationCodeStoreA_", "type": "address", "internalType": "address" },
-      { "name": "creationCodeStoreB_", "type": "address", "internalType": "address" },
-      { "name": "creationCodeHash_", "type": "bytes32", "internalType": "bytes32" },
-      { "name": "creationCodeSize_", "type": "uint32", "internalType": "uint32" }
+      {
+        "name": "validator_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "adapter_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "demoReserve_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeStoreA_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeStoreB_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeHash_",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "creationCodeSize_",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
     ],
     "stateMutability": "nonpayable"
-  },
-  { "type": "error", "name": "CreationCodeMismatch", "inputs": [] },
-  { "type": "error", "name": "InvalidConfiguration", "inputs": [] },
-  { "type": "error", "name": "TreasuryDeploymentFailed", "inputs": [] },
-  {
-    "type": "event",
-    "name": "TreasuryCreated",
-    "inputs": [
-      { "name": "treasury", "type": "address", "indexed": true, "internalType": "address" },
-      { "name": "owner", "type": "address", "indexed": true, "internalType": "address" },
-      { "name": "creator", "type": "address", "indexed": true, "internalType": "address" },
-      { "name": "mandateHash", "type": "bytes32", "indexed": false, "internalType": "bytes32" }
-    ],
-    "anonymous": false
   },
   {
     "type": "function",
     "name": "CREATION_CODE_STORE_A",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "CREATION_CODE_STORE_B",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "DEMO_RESERVE",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "DEX_ADAPTER",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "FACT_VALIDATOR",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "TREASURY_CREATION_CODE_HASH",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "TREASURY_CREATION_CODE_SIZE",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "uint32", "internalType": "uint32" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "createTreasury",
     "inputs": [
-      { "name": "owner", "type": "address", "internalType": "address" },
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "universal",
         "type": "tuple",
         "internalType": "struct IFairWitnessTypes.UniversalPolicy",
         "components": [
-          { "name": "enabledStrategies", "type": "uint8", "internalType": "uint8" },
-          { "name": "maxActionValueE6", "type": "uint128", "internalType": "uint128" },
-          { "name": "maxSlippageBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "maxSourceDriftBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "maxSpotTwapDeviationBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "minSourceLiquidity", "type": "uint128", "internalType": "uint128" },
-          { "name": "minDestinationLiquidity", "type": "uint128", "internalType": "uint128" },
-          { "name": "maxExecutionsPerEpoch", "type": "uint16", "internalType": "uint16" },
-          { "name": "epochLength", "type": "uint32", "internalType": "uint32" },
-          { "name": "maxAttemptsPerEpoch", "type": "uint16", "internalType": "uint16" }
+          {
+            "name": "enabledStrategies",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "maxActionValueE6",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "maxSlippageBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxSourceDriftBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxSpotTwapDeviationBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "minSourceLiquidity",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "minDestinationLiquidity",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "maxExecutionsPerEpoch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "maxAttemptsPerEpoch",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
         ]
       },
       {
@@ -102,8 +202,16 @@
         "type": "tuple",
         "internalType": "struct IFairWitnessTypes.ArbitragePolicy",
         "components": [
-          { "name": "minNetEdgeBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "maxArbitrageValueE6", "type": "uint128", "internalType": "uint128" }
+          {
+            "name": "minNetEdgeBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxArbitrageValueE6",
+            "type": "uint128",
+            "internalType": "uint128"
+          }
         ]
       },
       {
@@ -111,9 +219,21 @@
         "type": "tuple",
         "internalType": "struct IFairWitnessTypes.RebalancePolicy",
         "components": [
-          { "name": "targetWctcBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "toleranceBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "maxRebalanceValueE6", "type": "uint128", "internalType": "uint128" }
+          {
+            "name": "targetWctcBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "toleranceBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxRebalanceValueE6",
+            "type": "uint128",
+            "internalType": "uint128"
+          }
         ]
       },
       {
@@ -121,22 +241,96 @@
         "type": "tuple",
         "internalType": "struct IFairWitnessTypes.RiskPolicy",
         "components": [
-          { "name": "maxWctcExposureBps", "type": "uint16", "internalType": "uint16" },
-          { "name": "maxRiskReductionValueE6", "type": "uint128", "internalType": "uint128" },
-          { "name": "dailyRiskReductionValueE6", "type": "uint128", "internalType": "uint128" }
+          {
+            "name": "maxWctcExposureBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxRiskReductionValueE6",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "dailyRiskReductionValueE6",
+            "type": "uint128",
+            "internalType": "uint128"
+          }
         ]
       }
     ],
     "outputs": [
-      { "name": "treasury", "type": "address", "internalType": "contract FairWitnessTreasury" }
+      {
+        "name": "treasury",
+        "type": "address",
+        "internalType": "contract FairWitnessTreasury"
+      }
     ],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "isFactoryTreasury",
-    "inputs": [{ "name": "", "type": "address", "internalType": "address" }],
-    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "TreasuryCreated",
+    "inputs": [
+      {
+        "name": "treasury",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "mandateHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "CreationCodeMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidConfiguration",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TreasuryDeploymentFailed",
+    "inputs": []
   }
 ]
