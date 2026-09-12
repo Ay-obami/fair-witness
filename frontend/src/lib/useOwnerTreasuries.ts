@@ -36,8 +36,10 @@ export interface TreasuryView {
   demoReserve: string;
   wctc: string;
   stable: string;
+  venue: string;
   wctcBalance: bigint;
   stableBalance: bigint;
+  wctcPriceE6: bigint;
   universal: any;
   arbitrage: any;
   rebalance: any;
@@ -54,6 +56,9 @@ const LIFECYCLE_READ_ABI = [
   "function closed() view returns(bool)",
   "function demoMode() view returns(bool)",
   "function demoReserve() view returns(address)",
+];
+const MARKET_STATE_ABI = [
+  "function marketState() view returns(uint256 twapPriceE6,int24 arithmeticMeanTick,uint256 spotPriceE6,uint128 currentLiquidity)",
 ];
 const cache = new Map<string, TreasuryView[]>();
 
@@ -111,9 +116,9 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
   const readTreasury = useCallback(async (address: string, createdBlock?: number): Promise<TreasuryView> => {
     const normalized = ethers.getAddress(address);
     const c = new ethers.Contract(normalized, FAIR_WITNESS_TREASURY_ABI, provider);
-    const [ownerAddress, mode, hash, epoch, registered, wctc, stable, universal, arbitrage, risk, rebalance, activities] = await Promise.all([
+    const [ownerAddress, mode, hash, epoch, registered, wctc, stable, venue, universal, arbitrage, risk, rebalance, activities] = await Promise.all([
       c.owner(), c.automationMode(), c.currentPolicyHash(), c.policyEpoch(), c.registeredAgents(config.agentSubmitAddress),
-      c.WCTC(), c.STABLE(), c.universalPolicy(), c.arbitragePolicy(), c.riskPolicy(), c.rebalancePolicy(), readActivities(c),
+      c.WCTC(), c.STABLE(), c.VENUE(), c.universalPolicy(), c.arbitragePolicy(), c.riskPolicy(), c.rebalancePolicy(), readActivities(c),
     ]);
 
     let closed = false;
@@ -133,10 +138,14 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
     }
 
     const tokenAbi = ["function balanceOf(address) view returns(uint256)"];
-    const [wctcBalance, stableBalance] = await Promise.all([
+    const market = new ethers.Contract(venue, MARKET_STATE_ABI, provider);
+    const [wctcBalance, stableBalance, marketState] = await Promise.all([
       new ethers.Contract(wctc, tokenAbi, provider).balanceOf(normalized),
       new ethers.Contract(stable, tokenAbi, provider).balanceOf(normalized),
+      market.marketState().catch(() => null),
     ]);
+    const wctcPriceE6 = marketState ? BigInt(marketState.twapPriceE6) : 0n;
+
     let createdAt: number | undefined;
     if (createdBlock) {
       try { createdAt = (await provider.getBlock(createdBlock))?.timestamp; } catch { /* optional */ }
@@ -144,7 +153,7 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
     return {
       address: normalized, owner: ownerAddress, automationMode: Number(mode), policyHash: hash, policyEpoch: BigInt(epoch),
       registered: Boolean(registered), closed, demoMode, demoReserve,
-      wctc, stable, wctcBalance: BigInt(wctcBalance), stableBalance: BigInt(stableBalance),
+      wctc, stable, venue, wctcBalance: BigInt(wctcBalance), stableBalance: BigInt(stableBalance), wctcPriceE6,
       universal, arbitrage, risk, rebalance, activities, createdBlock, createdAt,
     };
   }, [provider, readActivities]);

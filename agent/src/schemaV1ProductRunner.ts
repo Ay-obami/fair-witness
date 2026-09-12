@@ -15,6 +15,7 @@ import { buildProposal } from "./proposals/builder.js";
 import { hashEvidence } from "./proposals/hashing.js";
 import { PolicySubmitter } from "./policySubmitter.js";
 import { parseAiDecision } from "./domain/aiDecision.js";
+import { updateRuntimeHealth } from "./runtimeHealth.js";
 import {
   AutomationMode,
   DecisionOutcome,
@@ -40,14 +41,15 @@ import type { AttestedProof } from "./attestcoinClient.js";
  * - re-reads mutable destination/portfolio state immediately before submission;
  * - AI returns only EXECUTE/WAIT + rationale and cannot choose execution fields;
  * - ProposalBuilder controls every execution field;
+ * - static preflight must approve before a transaction is broadcast;
  * - FairWitnessTreasury re-verifies proof, market state, portfolio state and policy on-chain.
  */
 
 const repo = resolve(process.cwd(), "..");
-const manifest = JSON.parse(readFileSync(resolve(repo, "contracts/deployments/controlled-demo-schema-v1.json"), "utf8"));
-const SOURCE_CHAIN_KEY = Number(process.env.SOURCE_CHAIN_KEY ?? "1");
-const SOURCE_CHAIN_ID = Number(process.env.SOURCE_CHAIN_ID ?? "11155111");
-const DEST_CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? "102031");
+const manifest = JSON.parse(readFileSync(resolve(repo, "contracts/deployments/controlled-demo-schema-v1-lifecycle.json"), "utf8"));
+const SOURCE_CHAIN_KEY = Number(process.env.SOURCE_CHAIN_KEY ?? manifest.source.attestcoinChainKey ?? "1");
+const SOURCE_CHAIN_ID = Number(process.env.SOURCE_CHAIN_ID ?? manifest.source.chainId ?? "11155111");
+const DEST_CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? manifest.destination.chainId ?? manifest.chainId ?? "102031");
 const SOURCE_RPC = process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com";
 const DEST_RPC = process.env.CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network";
 const FACTORY = process.env.FACTORY_ADDRESS ?? manifest.destination.factory;
@@ -57,7 +59,7 @@ const SOURCE_POOL = process.env.SOURCE_POOL_ADDRESS ?? manifest.source.pool;
 const PROOF_BUILDER_URL = process.env.CREDITCOIN_PROOF_BUILDER_URL;
 const POLL_MS = Number(process.env.POLL_INTERVAL_MS ?? "45000");
 const CONFIRM_DELAY_MS = Number(process.env.CONFIRM_OBSERVATION_DELAY_MS ?? "15000");
-const FACTORY_FROM_BLOCK = Number(process.env.FACTORY_DEPLOYMENT_BLOCK ?? "0");
+const FACTORY_FROM_BLOCK = Number(process.env.FACTORY_DEPLOYMENT_BLOCK ?? manifest.destination.factoryDeploymentBlock ?? "0");
 const MAX_TENANTS = Math.max(1, Number(process.env.MAX_TENANTS_PER_CYCLE ?? "50"));
 const FACTORY_LOG_CHUNK = Math.max(1, Number(process.env.FACTORY_LOG_CHUNK_SIZE ?? "25000"));
 const MAX_JIT_REBUILDS = 3;
@@ -123,7 +125,7 @@ async function publishObservation(): Promise<Observation> {
     try { return observer.interface.parseLog(entry); } catch { return null; }
   }).find((entry: ethers.LogDescription | null) => entry?.name === "MarketPriceObserved");
   if (!event) throw new Error("MarketPriceObserved event missing from source observation receipt");
-  return {
+  const observation = {
     blockHeight: BigInt(receipt.blockNumber),
     priceE6: BigInt(event.args.priceE6),
     meanTick: BigInt(event.args.arithmeticMeanTick),
@@ -132,6 +134,11 @@ async function publishObservation(): Promise<Observation> {
     reporter: asAddress(event.args.reporter),
     transactionHash: receipt.hash,
   };
+  updateRuntimeHealth({
+    lastSourceObservationAt: new Date().toISOString(),
+    lastSourceObservationBlock: observation.blockHeight.toString(),
+  });
+  return observation;
 }
 
 async function proofFor(observation: Observation): Promise<AttestedProof> {
@@ -153,12 +160,19 @@ async function proofFor(observation: Observation): Promise<AttestedProof> {
     proof.merkleProof as never, proof.continuityProof as never,
   );
   if (!valid) throw new Error(`Attestcoin local proof verification failed for ${observation.transactionHash}`);
+  updateRuntimeHealth({ lastProofBuiltAt: new Date().toISOString() });
   return proof;
 }
 
 async function refreshTreasuryIndex(): Promise<void> {
   const latest = await destinationProvider.getBlockNumber();
-  if (nextFactoryBlock > latest) return;
+  if (nextFactoryBlock > latest) {
+    updateRuntimeHealth({
+      lastFactoryScanAt: new Date().toISOString(),
+      indexedTreasuryCount: treasuryIndex.length,
+    });
+    return;
+  }
 
   for (let from = nextFactoryBlock; from <= latest; from += FACTORY_LOG_CHUNK) {
     const to = Math.min(latest, from + FACTORY_LOG_CHUNK - 1);
@@ -174,6 +188,10 @@ async function refreshTreasuryIndex(): Promise<void> {
     }
     nextFactoryBlock = to + 1;
   }
+  updateRuntimeHealth({
+    lastFactoryScanAt: new Date().toISOString(),
+    indexedTreasuryCount: treasuryIndex.length,
+  });
 }
 
 async function discoverTreasuryBatch(): Promise<Address[]> {
@@ -371,7 +389,18 @@ async function runTenant(
       continue;
     }
 
+    if (preview.reason !== REASON_NONE) {
+      log("WAIT on-chain preflight rejected proposal", {
+        treasury: mandate.treasuryAddress,
+        strategy: executionCandidate.strategy,
+        previewReason: preview.reason,
+        destinationBlock: executionContext.destination.readBlockNumber,
+      });
+      return;
+    }
+
     const result = await submitter.submit(proposal, sourceProof, confirmationProof);
+    updateRuntimeHealth({ lastProposalResolvedAt: new Date().toISOString() });
     log("proposal resolved", {
       treasury: mandate.treasuryAddress,
       strategy: executionCandidate.strategy,
@@ -384,21 +413,13 @@ async function runTenant(
     return;
   }
 
-  const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({
-    initialCandidate,
-    executionCandidate,
-    decision,
-    destinationBlock: executionContext.destination.readBlockNumber,
-    jitRebuildsExhausted: true,
-  }, bigintJson))));
-  const proposal = makeProposal(executionCandidate, mandate, decisionHash, BigInt(MAX_JIT_REBUILDS));
-  const result = await submitter.submit(proposal, sourceProof, confirmationProof);
-  log("proposal resolved after JIT rebuild limit", {
+  log("WAIT JIT rebuild limit reached; refusing stale broadcast", {
     treasury: mandate.treasuryAddress,
     strategy: executionCandidate.strategy,
     decision: decision.decision,
     rationale: decision.rationale,
-    ...result,
+    destinationBlock: executionContext.destination.readBlockNumber,
+    jitRebuilds: MAX_JIT_REBUILDS,
   });
 }
 
@@ -419,6 +440,7 @@ async function runMarketQueue(
 }
 
 async function cycle() {
+  updateRuntimeHealth({ lastCycleStartedAt: new Date().toISOString(), lastError: null });
   const sourceNetwork = await sourceProvider.getNetwork();
   const destNetwork = await destinationProvider.getNetwork();
   if (Number(sourceNetwork.chainId) !== SOURCE_CHAIN_ID || Number(destNetwork.chainId) !== DEST_CHAIN_ID) throw new Error("RPC chain id mismatch");
@@ -436,7 +458,10 @@ async function cycle() {
     eligible: mandates.length,
     nextCursor: tenantCursor,
   });
-  if (mandates.length === 0) return;
+  if (mandates.length === 0) {
+    updateRuntimeHealth({ lastSuccessfulCycleAt: new Date().toISOString() });
+    return;
+  }
 
   const source = await publishObservation();
   await sleep(CONFIRM_DELAY_MS);
@@ -447,6 +472,7 @@ async function cycle() {
   // One queue per mutable destination market. This deployment has one configured adapter/pool,
   // so writes are intentionally serialized: each treasury observes the state left by the prior one.
   await runMarketQueue(mandates, source, confirmation, sourceProof, confirmationProof);
+  updateRuntimeHealth({ lastSuccessfulCycleAt: new Date().toISOString() });
 }
 
 async function main() {
@@ -458,9 +484,19 @@ async function main() {
     maxTenantsPerCycle: MAX_TENANTS,
   });
   while (true) {
-    try { await cycle(); } catch (error) { log("cycle failed; will retry", { error: String(error) }); }
+    try {
+      await cycle();
+    } catch (error) {
+      const message = String(error);
+      updateRuntimeHealth({ lastError: message });
+      log("cycle failed; will retry", { error: message });
+    }
     await sleep(POLL_MS);
   }
 }
 
-void main().catch((error) => { console.error("Fatal schema-v1 runner error", error); process.exit(1); });
+void main().catch((error) => {
+  updateRuntimeHealth({ lastError: String(error) });
+  console.error("Fatal schema-v1 runner error", error);
+  process.exit(1);
+});

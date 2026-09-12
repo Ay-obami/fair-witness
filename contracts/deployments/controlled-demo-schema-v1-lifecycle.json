@@ -1,14 +1,28 @@
 {
+  "schemaVersion": 1,
+  "status": "CURRENT_LIFECYCLE_GENERATION",
   "generatedAt": "2026-09-10T21:46:32.323Z",
+  "label": "Controlled demonstration markets and liquidity. Token equivalence and price conditions are configured for demonstration and do not represent a production bridge, natural arbitrage, or economic profitability.",
   "chainId": "102031",
+  "source": {
+    "chainId": "11155111",
+    "attestcoinChainKey": "1",
+    "pool": "0xB88deB0436eAD37A6Dd625e9140AE45D5024424f",
+    "observer": "0x9bAF94da27d5C71c42b40D25b43070083DE7296E",
+    "stable": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+    "wctc": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c"
+  },
   "previous": {
     "factory": "0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd",
     "faucet": null,
-    "factoryDeploymentBlock": null
+    "factoryDeploymentBlock": 5456821,
+    "note": "Historical schema-v1 generation retained only for provenance and public evidence. New product treasuries use destination.factory below."
   },
   "destination": {
+    "chainId": "102031",
     "validator": "0x13Dd030815550080Ef80Ff3499fAE8d971A119f5",
     "adapter": "0x9bAF94da27d5C71c42b40D25b43070083DE7296E",
+    "pool": "0xC696be12663762324fDb0438c4fd85678bd79e78",
     "wctc": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
     "stable": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c",
     "treasuryCreationCode": {
@@ -21,10 +35,14 @@
     "factoryDeploymentBlock": 5465730,
     "faucet": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A",
     "demoReserve": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A",
-    "faucetBalance": {
+    "faucetSeedAtDeployment": {
+      "claims": 10,
       "fwWCTC": "1000000000000000000000",
       "fwUSD": "5000000000"
     }
+  },
+  "roles": {
+    "agentSubmitter": "0xB1D19F71d68c4e7065749e8593D338E9A30D654f"
   },
   "environmentUpdates": {
     "FACTORY_ADDRESS": "0x494490bBF748e59a659227F46510535BF3818442",
@@ -32,5 +50,6 @@
     "VITE_FACTORY_ADDRESS": "0x494490bBF748e59a659227F46510535BF3818442",
     "VITE_FACTORY_DEPLOYMENT_BLOCK": "5465730",
     "VITE_DEMO_FAUCET_ADDRESS": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A"
-  }
+  },
+  "historicalEvidenceManifest": "contracts/deployments/controlled-demo-schema-v1.json"
 }

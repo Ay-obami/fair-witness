@@ -11,9 +11,73 @@
         "name": "adapter_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "demoReserve_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeStoreA_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeStoreB_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "creationCodeHash_",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "creationCodeSize_",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "CREATION_CODE_STORE_A",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "CREATION_CODE_STORE_B",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "DEMO_RESERVE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -37,6 +101,32 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TREASURY_CREATION_CODE_HASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TREASURY_CREATION_CODE_SIZE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -230,7 +320,17 @@
   },
   {
     "type": "error",
+    "name": "CreationCodeMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidConfiguration",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TreasuryDeploymentFailed",
     "inputs": []
   }
 ]

@@ -17,10 +17,33 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: stable
-      - name: Install Foundry dependencies
+      - name: Install pinned Foundry dependencies
         run: ./install-deps.sh
-      - run: forge test -vvv
-      - run: forge build --sizes
+      - name: Run contract tests
+        run: forge test -vvv
+      - name: Build and enforce size limits
+        run: forge build --sizes
+      - name: Verify current deployed treasury creation-code commitment
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="out/FairWitnessTreasury.sol/FairWitnessTreasury.json"
+          manifest="deployments/controlled-demo-schema-v1-lifecycle.json"
+          bytecode=$(jq -r '.bytecode.object' "$artifact")
+          actual_hash=$(cast keccak "$bytecode")
+          expected_hash=$(jq -r '.destination.treasuryCreationCode.hash' "$manifest")
+          actual_size=$(( (${#bytecode} - 2) / 2 ))
+          expected_size=$(jq -r '.destination.treasuryCreationCode.size' "$manifest")
+          echo "creation code hash: $actual_hash"
+          echo "creation code size: $actual_size"
+          test "${actual_hash,,}" = "${expected_hash,,}"
+          test "$actual_size" -eq "$expected_size"
+      - name: Reject stale committed client ABIs
+        run: |
+          node script/update-abis.js
+          # update-abis intentionally normalizes JSON formatting. Ignore whitespace-only
+          # differences while still failing on every ABI field/order/content change.
+          git diff -w --exit-code -- ../agent/src/abi ../frontend/src/abi
 
   agent:
     name: vitest (agent)
@@ -62,12 +85,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify current release references agree
+        run: node scripts/check-release-consistency.mjs
       - name: Require release source-of-truth files and complete handoff chain
         run: |
           test -f master_instruction.md
           test -f docs/RELEASE_AUDIT.md
           test -f docs/architecture/ARCHITECTURE_LOCK.md
-          test -f contracts/deployments/controlled-demo-schema-v1.json
+          test -f contracts/deployments/controlled-demo-schema-v1-lifecycle.json
+          test -f docs/PRE_SUBMISSION_CHECKLIST.md
           for phase in $(seq 1 13); do
             test -f "docs/handoffs/PHASE_${phase}_HANDOFF.md"
           done
@@ -75,5 +104,21 @@ jobs:
         run: |
           if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '\.env\.example$'; then
             echo "Tracked private environment file detected"
+            exit 1
+          fi
+      - name: Reject public email persistence in user_instances
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq '^[[:space:]]*email[[:space:]]+text' frontend/supabase/migrations/0001_user_instances.sql; then
+            echo "user_instances still defines an email column"
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*email[?:]?:' frontend/src/lib/instanceStore.ts; then
+            echo "instanceStore still exposes an email field"
+            exit 1
+          fi
+          if grep -Eq '\.(select|upsert)\([^\n]*email' frontend/src/lib/instanceStore.ts; then
+            echo "instanceStore still reads or writes email"
             exit 1
           fi

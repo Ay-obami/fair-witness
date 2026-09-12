@@ -1,88 +1,126 @@
 # Final Release Audit
 
-Date: 2026-09-09
-Migration phase: 12
+Date updated: 2026-09-12  
 Release classification: **CONTROLLED-DEMO READY WITH DISCLOSED LIMITATIONS**
 
-This is an evidence-backed development release, not a production deployment or profitability claim.
+This is an evidence-backed hackathon release, not a production deployment or profitability claim.
 
 ## Release statement
 
-Fair Witness implements one trust-minimized execution boundary for three closed strategies: arbitrage, rebalancing, and risk reduction. AI output is confined to `EXECUTE` or `WAIT`; deterministic code derives execution terms, the schema-v1 treasury enforces policy, and the fixed adapter is the only capital-moving path.
+Fair Witness implements a trust-minimized execution boundary for three closed strategies: Risk Reduction, Rebalancing, and Arbitrage. The AI reasoning layer is confined to `EXECUTE` or `WAIT` for a deterministic candidate. It cannot own treasury funds or choose arbitrary assets, venue, route, recipient, calldata, policy or an amount above the treasury-computed ceiling.
 
-The contracts are deployed on public Sepolia and Creditcoin testnets against explicitly controlled `fwUSD`/`fwWCTC` pools. Those tokens are demonstrations only: they are not bridged, redeemable, economically pegged, or evidence of naturally occurring profitable arbitrage.
+The current product creates user-owned lifecycle treasuries from a permissionless factory. A treasury independently validates Attestcoin evidence, source/destination market quality, replay state, policy, portfolio state, balance, execution-rate limits and maximum permitted sizing before calling one immutable V3 adapter.
 
-## Evidence inventory
+The public markets and tokens are controlled demonstrations only. They do not represent a bridge, redemption relationship, natural market arbitrage or production profitability.
+
+## Current deployment generation
+
+The authoritative current deployment record is:
+
+`contracts/deployments/controlled-demo-schema-v1-lifecycle.json`
+
+Current lifecycle values:
+
+| Component | Network | Address / value |
+|---|---|---|
+| Source observer | Sepolia | `0x9bAF94da27d5C71c42b40D25b43070083DE7296E` |
+| Source V3 pool | Sepolia | `0xB88deB0436eAD37A6Dd625e9140AE45D5024424f` |
+| Fixed destination adapter | Creditcoin CC3 | `0x9bAF94da27d5C71c42b40D25b43070083DE7296E` |
+| Attestcoin fact validator | Creditcoin CC3 | `0x13Dd030815550080Ef80Ff3499fAE8d971A119f5` |
+| **Current lifecycle factory** | Creditcoin CC3 | `0x494490bBF748e59a659227F46510535BF3818442` |
+| Factory deployment block | Creditcoin CC3 | `5465730` |
+| Controlled faucet / recycle reserve | Creditcoin CC3 | `0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A` |
+
+The deployed lifecycle factory commits to `FairWitnessTreasury` creation-code hash `0x74a08f82b8271ed2008a6b27b0398ef4d6065536febf6a2850eb4e3a2ab45afc` and size `24,986` bytes through immutable external bytecode stores. CI rebuilds the treasury with pinned Foundry dependencies and verifies both values against the lifecycle manifest.
+
+## Historical public evidence
+
+The earlier schema-v1 generation remains a valid public evidence set and is documented by `contracts/deployments/controlled-demo-schema-v1.json`. It is **historical evidence**, not the factory used for new product treasuries.
+
+Captured receipts:
+
+- Risk Reduction execution: `0x05b04421472d9318e297b255ad233d974839518e88d6f7ee981d64d4ec3e58a4`
+- Rebalancing execution: `0x776b2e1e2f43625352b8ad2e8f76d67871d082f3b18c1d57cf92be06c6d3dd3f`
+- Arbitrage execution: `0xf023d109ca5e021f933a47aceffafcdcde41797c93fe3186c6c2c6fb4bb62a39`
+- Oversized Risk Reduction rejection: `0x2fe2274948f467da43fe0ec5f13bc2e80ba01c02fd64d47f03ff2fb296358bdc`
+
+These prove public-testnet execution/rejection mechanics for the earlier schema-v1 treasury. They must not be presented as receipts from a newly created lifecycle treasury.
+
+## Security evidence inventory
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Three strategy policy branches | Foundry contract tests and TypeScript strategy tests | Verified locally |
-| Malicious AI cannot choose execution terms | `securityBoundary.integration.test.ts`, domain/schema tests | Verified locally |
-| Rejections preserve capital | Foundry adversarial matrix, including 256-run oversized-risk fuzz | Verified locally |
-| Schema-v1 deployment and immutable readback | Frozen deployment manifest and Phase 10 deployment record | Verified on public testnets |
-| Genuine Attestcoin-backed execution | Risk-reduction smoke receipt recorded in the deployment record | Verified on public testnets |
-| Paused policy rejection | Rejection receipt and unchanged balances recorded in the deployment record | Verified on public testnet |
-| Arbitrage live demo | Genuine observations/proofs, Gemini EXECUTE, attempt 4 and public execution receipt | Verified on controlled public testnets |
-| Rebalancing live demo | Genuine observations/proofs, Gemini REBALANCE/EXECUTE, attempt 5 and public execution receipt | Verified on controlled public testnets |
-| Oversized risk rejection live demo | Genuine observations/proofs, attempt 3, reason 28 and protected-state assertions | Verified on public testnet |
-| Supabase audit projection | Migration, static schema tests, in-memory index/reconciliation tests | Not applied to a live Supabase project |
+| Three closed strategy policy branches | Foundry + TypeScript strategy tests | Verified in CI |
+| AI cannot choose arbitrary execution terms | domain/integration tests + treasury validation | Verified in CI |
+| Oversized/replayed/invalid proposals preserve protected capital | Foundry adversarial/fuzz tests | Verified in CI |
+| Genuine Attestcoin proof boundary | validator/decoder tests + historical public receipts | Verified |
+| Current treasury bytecode equals deployed factory commitment | pinned dependency build + CI hash/size gate | Verified in CI |
+| Current deployment references are internally consistent | release-consistency script | Verified in CI |
+| Public wallet/treasury cache stores no user email | migration/client structural CI gate | Verified in CI |
+| Current browser/hosted end-to-end rehearsal after this hardening pass | `docs/PRE_SUBMISSION_CHECKLIST.md` | **Must be rerun operationally before submission** |
 
-Exact addresses, transaction hashes, readbacks, and controlled-market disclosure are in `docs/deployments/CONTROLLED_SCHEMA_V1_DEPLOYMENT_2026-09-09.md` and `contracts/deployments/controlled-demo-schema-v1.json`.
+## Security boundary
 
-## Security invariants and test references
+The treasury and adapter—not the model, frontend, Supabase, RPC provider or agent host—are the capital authorization boundary.
 
-`docs/ADVERSARIAL_TEST_MATRIX.md` maps every mandatory malicious, stale, replayed, unauthorized, oversized, strategy-invalid, and valid-execution case to a concrete test. Contract execution remains fixed-pair, fixed-venue, exact-input, policy-derived, replay protected, and fail-closed on evidence or market failure.
+Relevant protections include:
 
-The treasury owner and registered agent are distinct. The deployed treasury is paused outside supervised runs. Supabase, the frontend, the model, RPC providers, and the agent host are not authorization authorities.
+- fixed WCTC/stable pair and immutable adapter/venue;
+- immutable validator and Attestcoin source identities;
+- proposal, nonce and evidence replay protection;
+- policy-hash binding and policy epochs;
+- owner-only agent registration and pause/autonomous lifecycle state;
+- maximum action, strategy-specific and daily risk ceilings;
+- source drift, source liquidity, destination liquidity and destination spot/TWAP checks;
+- deadline/slippage/rate limits;
+- deterministic strategy priority `Risk Reduction → Rebalancing → Arbitrage`;
+- exact-input swaps through the fixed adapter while proposal size is bounded by a deterministic **maximum permitted amount**, not an exact-equality requirement;
+- permanent treasury close semantics; controlled demo balances recycle to the configured reserve.
 
-## Deployment consistency
-
-- Source: Sepolia, chain ID `11155111`.
-- Destination: Creditcoin testnet, chain ID `102031`.
-- Treasury: `0x7fF88afF5D8AEA666582730AD81F49b3C303A3d3`.
-- Treasury owner: `0xF40003d36567478489BcCF1a1fEd094f87EeC9a5`.
-- Registered agent: `0xB1D19F71d68c4e7065749e8593D338E9A30D654f`.
-- Recorded final mode: paused; attempt count 6; execution count 4 after the public-request rehearsal.
-
-A post-Phase 13 RPC smoke re-confirmed the owner, registered agent, paused mode, attempt count 6, and execution count 4. The current policy hash differs from the creation-time manifest readback because supervised enable/pause transitions monotonically advanced the policy epoch, as designed.
-
-Public request `0302054a-aa7e-466d-bc59-77733440a75d` was processed through the service-role operator queue and completed as Arbitrage attempt 6 (`0xe9ea7fa5b420bbc310c6d1b1f7eed24e9a0df025cfda3ced47447b582ab7752a`). The controlled market was reset and temporary approvals were zero afterward.
-
-The root README, frontend controlled-demo constants, deployment record, frozen manifest, and master instruction use these schema-v1 addresses. Historical documents retain their content behind explicit superseded/legacy banners.
+The production-shaped runner additionally performs static on-chain preflight. A normal proposal is broadcast only if preflight returns reason `None`. Known preflight rejections are logged as `WAIT`, and JIT state-change retries fail closed rather than broadcasting after exhaustion.
 
 ## Release checks
 
-The release gate runs:
+CI runs:
 
-- all Foundry tests and contract size reporting;
+- pinned Foundry dependency installation;
+- all Foundry tests;
+- `forge build --sizes`;
+- deployed treasury creation-code hash and size verification;
+- generated ABI drift detection;
 - all agent tests and TypeScript build;
-- all frontend tests, lint, and production build;
-- required source-of-truth file and Phase 1–12 handoff checks;
-- rejection of tracked private `.env` files.
+- all frontend tests, lint and production build;
+- release/source-of-truth consistency checks;
+- required architecture/handoff/checklist presence;
+- tracked private `.env` rejection;
+- public `user_instances` email-persistence rejection.
 
-The factory runtime is 24,521 bytes, only 55 bytes below EIP-170. Any future contract change requires an immediate size check.
+## Privacy and optional projections
 
-## Secrets review
+Supabase remains non-authoritative. The browser-facing `user_instances` projection stores only public wallet↔treasury information. Login email/social identity is not persisted there. The dashboard independently verifies cached instances against the current factory and on-chain owner.
 
-Private runtime values remain in ignored environment files. No private environment file may be tracked; CI enforces this. Example environment files contain placeholders only. A historical credential exposure is documented as rotated; repository history should still be rewritten before any stricter public-production release if that history remains reachable.
+## Demo abuse boundaries
+
+The factory is permissionless and does not impose a per-user treasury quota. The controlled faucet therefore remains vulnerable to Sybil depletion if distributed broadly. For the hackathon release this is mitigated operationally by deliberately limited faucet inventory and manual refilling.
+
+The gas sponsor adds a process-level daily budget, per-address cooldown and maximum top-up. Those are demo safeguards, not production authentication or Sybil resistance.
 
 ## Known limitations
 
-- Controlled markets do not establish real token equivalence, natural arbitrage, or profitability.
-- All three controlled strategies now have genuine Attestcoin-backed public receipts, and oversized Risk Reduction has a public rejection receipt.
-- Rebalancing's AI rationale incorrectly described arbitrage even though its typed choice was `REBALANCE/EXECUTE`; deterministic policy ignored the prose and enforced the correct strategy math. Preserve this disclosure.
-- The default `agent/src/index.ts` entrypoint remains the legacy runner. Schema-v1 demonstrations use the controlled scripts/runbook.
-- Supabase has not been migrated or smoke-tested against a live project.
-- Schema-v1 observer, adapter, validator, factory, and treasury source are verified on Blockscout. The canonical Vercel deployment passed desktop/mobile fresh-browser rehearsal on 2026-09-10.
-- The frontend build retains a non-blocking large-bundle warning.
-- This is testnet demonstration software and has not received an independent production security audit.
+- Controlled market conditions do not establish production-grade oracle economics or natural profitability.
+- The autonomous worker is a single-process hackathon service rather than a durable distributed job/lease system.
+- Public RPC, prover and model latency can interrupt a cycle; the authorization path fails closed.
+- Source/destination liquidity floors in the current controlled-product mandate are demonstration settings and are not suitable as production market-manipulation protection.
+- The faucet is finite and not Sybil-resistant.
+- Historical and current deployment generations coexist in Git for provenance; active release documentation explicitly distinguishes them.
+- This software has not received an independent production security audit.
 
 ## Allowed and prohibited claims
 
-Allowed: Fair Witness demonstrates that an untrusted AI can recommend actions while deterministic policy and a non-custodial agent boundary constrain treasury execution.
+Allowed: Fair Witness demonstrates that an untrusted AI reasoning layer can recommend actions while genuine Attestcoin evidence and deterministic non-custodial treasury policy constrain capital movement on Creditcoin.
 
-Prohibited: production-ready, production-profitable, naturally occurring cross-chain arbitrage, bridged/redeemable demo tokens, unrestricted AI trading, or completion of live scenarios without their receipts.
+Prohibited: production-ready, production-profitable, naturally occurring cross-chain arbitrage, bridged/redeemable demo tokens, unrestricted AI trading, or completion of a current lifecycle end-to-end rehearsal that has not actually been run.
 
-## Final determination
+## Final submission gate
 
-The Phase 0–12 migration is implementation-complete for a controlled hackathon demonstration. Remaining items are clearly scoped operational evidence and production-hardening work; they do not weaken the locked architecture, but they constrain what may be claimed.
+Run `docs/PRE_SUBMISSION_CHECKLIST.md` against the deployed Vercel and Railway services after this hardening branch is released. If that clean-browser rehearsal passes, freeze the submission build. Do not create another contract generation unless the rehearsal exposes a protocol-level custody, authorization, replay, evidence-verification or lifecycle invariant failure.

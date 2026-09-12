@@ -29,26 +29,36 @@ export default function SignUpDone() {
   useEffect(() => { if (!address) navigate("/signup"); }, [address, navigate]);
   useEffect(() => { wallet.autoConnect({ client: thirdwebClient }).then(() => setAccount(wallet.getAccount())).catch(() => {}); }, []);
 
-  async function refresh() {
-    if (!address) return;
-    const treasury = new ethers.Contract(ethers.getAddress(address), FAIR_WITNESS_TREASURY_ABI, provider);
+  async function readState() {
+    if (!address) throw new Error("Treasury address is missing.");
+    const treasuryAddress = ethers.getAddress(address);
+    const treasury = new ethers.Contract(treasuryAddress, FAIR_WITNESS_TREASURY_ABI, provider);
     const [o, h, r, m] = await Promise.all([
       treasury.owner(),
       treasury.currentPolicyHash(),
       treasury.registeredAgents(config.agentSubmitAddress),
       treasury.automationMode(),
     ]);
-    setOwner(o);
-    setPolicyHash(h);
-    setRegistered(Boolean(r));
-    setMode(Number(m));
+    let faucetClaimed = false;
     if (config.faucetAddress) {
-      try {
-        setFunded(Boolean(await new ethers.Contract(config.faucetAddress, FAUCET_ABI, provider).claimed(address)));
-      } catch {
-        setFunded(false);
-      }
+      faucetClaimed = Boolean(await new ethers.Contract(config.faucetAddress, FAUCET_ABI, provider).claimed(treasuryAddress));
     }
+    return {
+      owner: String(o),
+      policyHash: String(h),
+      registered: Boolean(r),
+      mode: Number(m),
+      funded: faucetClaimed,
+    };
+  }
+
+  async function refresh() {
+    const state = await readState();
+    setOwner(state.owner);
+    setPolicyHash(state.policyHash);
+    setRegistered(state.registered);
+    setMode(state.mode);
+    setFunded(state.funded);
   }
 
   useEffect(() => { void refresh().catch(e => setError(humanError(e, "Could not load treasury status."))); }, [address]);
@@ -71,17 +81,48 @@ export default function SignUpDone() {
     setError(null);
     try {
       const s = await signer();
+      const signerAddress = await s.getAddress();
       const treasuryAddress = ethers.getAddress(address);
       const treasury = new ethers.Contract(treasuryAddress, FAIR_WITNESS_TREASURY_ABI, s);
       const faucet = new ethers.Contract(config.faucetAddress, FAUCET_ABI, s);
 
-      if (!funded) await (await faucet.claim(treasuryAddress)).wait();
-      if (!registered) await (await treasury.registerAgent(config.agentSubmitAddress)).wait();
-      if (mode !== 1) await (await treasury.setAutomationMode(1)).wait();
+      // Re-read before every step. This makes retries safe when a previous transaction
+      // succeeded but a later activation step failed or the browser lost connectivity.
+      let state = await readState();
+      if (state.owner.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error("Connected wallet is not this treasury's owner.");
+      }
+
+      if (!state.funded) {
+        const receipt = await (await faucet.claim(treasuryAddress)).wait();
+        if (!receipt || receipt.status !== 1) throw new Error("Demo funding transaction did not confirm successfully.");
+        state = await readState();
+        if (!state.funded) throw new Error("Faucet transaction confirmed, but the treasury is not marked funded.");
+        setFunded(true);
+      }
+
+      if (!state.registered) {
+        const receipt = await (await treasury.registerAgent(config.agentSubmitAddress)).wait();
+        if (!receipt || receipt.status !== 1) throw new Error("Agent authorization transaction did not confirm successfully.");
+        state = await readState();
+        if (!state.registered) throw new Error("Agent authorization confirmed, but registration was not visible on-chain.");
+        setRegistered(true);
+      }
+
+      if (state.mode !== 1) {
+        const receipt = await (await treasury.setAutomationMode(1)).wait();
+        if (!receipt || receipt.status !== 1) throw new Error("Autonomous-mode transaction did not confirm successfully.");
+        state = await readState();
+        if (state.mode !== 1) throw new Error("Autonomous-mode transaction confirmed, but the treasury is still paused.");
+        setMode(1);
+      }
 
       await refresh();
     } catch (e) {
-      setError(humanError(e, "Fair Witness could not finish launching this treasury."));
+      // Refresh whatever did succeed before surfacing the error so the next click resumes
+      // from the actual on-chain state instead of replaying completed steps.
+      try { await refresh(); } catch { /* preserve original error */ }
+      setError(humanError(e, "Fair Witness could not finish launching this treasury. Safe steps that already confirmed will not be repeated on retry."));
     } finally {
       setBusy(false);
     }
@@ -95,7 +136,7 @@ export default function SignUpDone() {
     <p className="text-xs uppercase tracking-widest text-verified-400">Treasury deployed</p>
     <h1 className="mt-2 text-3xl font-semibold text-ledger-100">Fund your treasury</h1>
     <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ledger-400">
-      Add controlled test assets and Fair Witness will finish the required launch setup automatically. Agent authorization and autonomous mode are part of the product, so you do not need to configure them as separate onboarding steps.
+      Add controlled test assets and Fair Witness will finish the required launch setup automatically. The launch flow is retry-safe: any step already confirmed on-chain is detected and skipped.
     </p>
 
     <section className="mt-7 rounded-xl border border-ledger-700 bg-ledger-900 p-6">
@@ -105,7 +146,7 @@ export default function SignUpDone() {
           <code className="mt-2 block break-all text-sm text-verified-400">{treasuryAddress}</code>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs ${ready ? "border-verified-500/30 bg-verified-500/5 text-verified-400" : "border-ledger-700 text-ledger-400"}`}>
-          {ready ? "READY ✓" : "AWAITING FUNDING"}
+          {ready ? "READY ✓" : "AWAITING LAUNCH"}
         </span>
       </div>
 
@@ -116,16 +157,16 @@ export default function SignUpDone() {
           <p className="mt-2 text-xs leading-relaxed text-ledger-500">Assets go directly to your treasury. The agent never receives custody.</p>
         </div>
         <div className="rounded-lg border border-ledger-800 bg-ledger-950 p-4">
-          <p className="text-xs text-ledger-500">After funding</p>
-          <p className="mt-1 text-lg font-semibold text-ledger-100">Autonomous by default</p>
-          <p className="mt-2 text-xs leading-relaxed text-ledger-500">Fair Witness binds the bounded submitter and enables your on-chain mandate automatically.</p>
+          <p className="text-xs text-ledger-500">Launch sequence</p>
+          <p className="mt-1 text-lg font-semibold text-ledger-100">Fund → authorize → enable</p>
+          <p className="mt-2 text-xs leading-relaxed text-ledger-500">Each completed step is re-read from chain before the next one begins.</p>
         </div>
       </div>
 
       {!ready && config.faucetAddress && <button
         disabled={busy}
         onClick={() => void fundAndLaunch()}
-        className="mt-6 w-full rounded-lg bg-copper-500 px-5 py-3 text-sm font-semibold text-ledger-950 transition hover:bg-copper-400 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 w-full cursor-pointer rounded-lg bg-copper-500 px-5 py-3 text-sm font-semibold text-ledger-950 transition hover:bg-copper-400 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Funding & launching…" : "Fund & launch treasury"}
       </button>}
@@ -153,6 +194,7 @@ export default function SignUpDone() {
       <div className="mt-3 space-y-2">
         <p>Owner <span className="font-data break-all text-ledger-300">{owner || "Loading…"}</span></p>
         <p>Policy hash <span className="font-data break-all text-ledger-300">{policyHash || "Loading…"}</span></p>
+        <p>Demo funding <span className="text-ledger-300">{funded ? "Confirmed" : "Not yet confirmed"}</span></p>
         <p>Bounded agent <span className="text-ledger-300">{registered ? "Authorized" : "Will be authorized during launch"}</span></p>
         <p>Autonomous mode <span className="text-ledger-300">{mode === 1 ? "Enabled" : "Will be enabled during launch"}</span></p>
       </div>

@@ -63,7 +63,7 @@ export default function Mandate() {
       if (!created) throw new Error("TreasuryCreated event was not found in the deployment receipt.");
       const treasury = ethers.getAddress(created.args.treasury);
       if (!await factory.isFactoryTreasury(treasury)) throw new Error("Factory did not recognize the new treasury.");
-      try { await saveInstanceMapping({email:onboarding.email ?? onboarding.authMethod ?? "session",walletAddress:connected.address,instanceAddress:treasury}); } catch {}
+      try { await saveInstanceMapping({walletAddress:connected.address,instanceAddress:treasury}); } catch {}
       sessionStorage.setItem(ONBOARDING_KEY, JSON.stringify({...onboarding, walletAddress: connected.address}));
       sessionStorage.setItem("fair-witness:new-treasury", treasury);
       navigate(`/signup/done?address=${treasury}`);
