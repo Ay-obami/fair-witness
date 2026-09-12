@@ -27,7 +27,14 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!forceNew && !resolving && account) navigate("/dashboard", { replace: true });
+    if (resolving || !account) return;
+    if (forceNew) {
+      const existing = sessionStorage.getItem(ONBOARDING_KEY);
+      if (!existing) sessionStorage.setItem(ONBOARDING_KEY, JSON.stringify({ walletAddress: account.address, authMethod: "session" }));
+      navigate("/mandate", { replace: true });
+      return;
+    }
+    navigate("/dashboard", { replace: true });
   }, [account, forceNew, navigate, resolving]);
 
   async function findExistingTreasury(owner: string): Promise<string | null> {
@@ -101,16 +108,16 @@ export default function SignUp() {
     } finally { setBusy(false); }
   }
 
-  if (!forceNew && (resolving || account)) {
-    return <Layout><main className="mx-auto max-w-2xl px-4 py-16 sm:px-6"><div className="rounded-2xl border border-ledger-700 bg-ledger-900 p-6 text-center"><p className="text-sm text-ledger-300">{account ? "Opening your dashboard…" : "Restoring your session…"}</p></div></main></Layout>;
+  if (resolving || account) {
+    return <Layout><main className="mx-auto max-w-2xl px-4 py-16 sm:px-6"><div className="rounded-2xl border border-ledger-700 bg-ledger-900 p-6 text-center"><p className="text-sm text-ledger-300">{account ? (forceNew ? "Opening the mandate builder…" : "Opening your dashboard…") : "Restoring your session…"}</p></div></main></Layout>;
   }
 
   return <Layout><main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
     <p className="text-xs uppercase tracking-widest text-copper-400">{forceNew ? "New treasury" : "Access Fair Witness"}</p>
     <h1 className="mt-2 text-3xl font-semibold text-ledger-100 sm:text-4xl">{forceNew ? "Create another treasury" : "Sign in to Fair Witness"}</h1>
     <p className="mt-3 text-sm leading-relaxed text-ledger-400">{forceNew
-      ? "Authenticate with the identity that will own the new treasury. Your existing treasuries remain unchanged."
-      : "Sign in with the same Google, Apple, or email identity you used before. If that wallet already owns a Fair Witness treasury, you will go straight to your dashboard instead of creating another one."}</p>
+      ? "Sign in once with the Fair Witness account that should own this treasury. If your session is already active, you will skip this screen automatically."
+      : "Sign in with the same Google, Apple, or email identity you used before. If that account already owns a Fair Witness treasury, you will go straight to your dashboard instead of creating another one."}</p>
     <div className="mt-5"><SecurityBoundaryNotice /></div>
     <p className="mt-5 rounded-xl border border-copper-700/40 bg-copper-500/5 p-3 text-sm text-ledger-300">Fair Witness sponsors onboarding transactions on Creditcoin testnet, so you do not need testnet CTC to create and activate a treasury.</p>
     {!thirdwebConfigured && <p className="mt-5 rounded-xl border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">Authentication is disabled until the public VITE_THIRDWEB_CLIENT_ID is configured. Read-only product and evidence pages remain available.</p>}
