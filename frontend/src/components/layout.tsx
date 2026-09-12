@@ -36,12 +36,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   async function handleLogout() {
     setLoggingOut(true);
-    try {
-      await logout();
-      navigate("/");
-    } finally {
-      setLoggingOut(false);
-    }
+    try { await logout(); navigate("/"); }
+    finally { setLoggingOut(false); }
   }
 
   const navLink = (to: string, label: string, mobile = false) => {
@@ -50,27 +46,28 @@ export function Layout({ children }: { children: ReactNode }) {
       key={to}
       to={to}
       aria-current={active ? "page" : undefined}
-      className={`${mobile ? "block w-full px-4 py-3" : "relative rounded-md px-3 py-1.5"} transition ${active ? "bg-ledger-800 text-ledger-100" : "text-text-secondary hover:bg-ledger-900 hover:text-text-primary"}`}
+      className={`${mobile ? "block w-full px-4 py-3" : "relative rounded-lg px-3 py-2"} transition ${active ? "bg-ledger-800/75 text-ledger-100" : "text-text-secondary hover:bg-ledger-900/70 hover:text-text-primary"}`}
     >
       {label}
-      {!mobile && active && <span className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded bg-copper-400" />}
+      {!mobile && active && <span className="absolute inset-x-3 -bottom-[14px] h-0.5 rounded-full bg-gradient-to-r from-copper-400 to-verified-400 shadow-[0_0_12px_rgba(213,143,63,.35)]" />}
     </Link>;
   };
 
-  return <div className="flex min-h-screen flex-col bg-background">
-    <nav className="relative z-40 shrink-0 border-b border-hairline bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link to="/" aria-label="Fair Witness home" className="flex shrink-0 items-center">
-          <img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-9 w-auto sm:h-11" />
+  return <div className="flex min-h-screen flex-col bg-background/40">
+    <nav className="sticky top-0 z-40 shrink-0 border-b border-hairline bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/65">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+        <Link to="/" aria-label="Fair Witness home" className="group flex shrink-0 items-center gap-3">
+          <img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-9 w-auto transition group-hover:brightness-110 sm:h-11" />
+          <span className="hidden items-center gap-2 rounded-full border border-ledger-800 bg-ledger-950/60 px-2.5 py-1 text-[9px] uppercase tracking-widest text-ledger-500 xl:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-verified-400 shadow-[0_0_10px_rgba(36,217,165,.55)]" /> CC3 live</span>
         </Link>
 
-        <div className="hidden items-center gap-x-3 text-sm md:flex lg:gap-x-4">
+        <div className="hidden items-center gap-x-2 text-sm md:flex lg:gap-x-3">
           {NAV_ITEMS.map(({to,label}) => navLink(to, label))}
           {!resolving && account ? <>
-            <span className="hidden rounded-md border border-ledger-700 px-3 py-1.5 font-data text-xs text-ledger-400 lg:inline">{short(account.address)}</span>
-            <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-alert-500/50 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
-          </> : !resolving ? <Link to="/signup" className="rounded-md border border-ledger-700 px-3 py-1.5 text-xs text-ledger-300 transition hover:border-copper-500 hover:text-ledger-100">Sign in</Link> : null}
-          <Link to={newTreasuryPath} className={`rounded-md px-4 py-1.5 text-xs font-semibold transition ${location.pathname === "/mandate" ? "bg-copper-400 text-ledger-950 ring-2 ring-copper-400/20" : "bg-copper-500 text-ledger-950 hover:bg-copper-400"}`}>New treasury</Link>
+            <span className="hidden rounded-lg border border-ledger-800 bg-ledger-950/50 px-3 py-2 font-data text-[10px] text-ledger-500 lg:inline">{short(account.address)}</span>
+            <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-lg border border-ledger-800 px-3 py-2 text-[11px] text-ledger-400 transition hover:border-alert-500/40 hover:bg-alert-500/5 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
+          </> : !resolving ? <Link to="/signup" className="fw-secondary-button rounded-lg px-3 py-2 text-[11px] text-ledger-300">Sign in</Link> : null}
+          <Link to={newTreasuryPath} className="fw-primary-button rounded-lg px-4 py-2 text-[11px] font-semibold">New treasury →</Link>
         </div>
 
         <button
@@ -78,25 +75,23 @@ export function Layout({ children }: { children: ReactNode }) {
           aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((open) => !open)}
-          className="cursor-pointer rounded-lg border border-ledger-700 bg-ledger-900 p-2.5 text-ledger-200 transition hover:border-copper-500 md:hidden"
+          className="fw-secondary-button cursor-pointer rounded-lg p-2.5 text-ledger-200 md:hidden"
         >
-          <span className="block h-0.5 w-5 bg-current" />
-          <span className="mt-1.5 block h-0.5 w-5 bg-current" />
-          <span className="mt-1.5 block h-0.5 w-5 bg-current" />
+          <span className={`block h-0.5 w-5 bg-current transition ${mobileOpen ? "translate-y-2 rotate-45" : ""}`} />
+          <span className={`mt-1.5 block h-0.5 w-5 bg-current transition ${mobileOpen ? "opacity-0" : ""}`} />
+          <span className={`mt-1.5 block h-0.5 w-5 bg-current transition ${mobileOpen ? "-translate-y-2 -rotate-45" : ""}`} />
         </button>
       </div>
 
-      {mobileOpen && <div className="absolute inset-x-0 top-full border-b border-ledger-800 bg-ledger-950 shadow-2xl md:hidden">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="overflow-hidden rounded-xl border border-ledger-800 bg-ledger-900/70">
-            {NAV_ITEMS.map(({to,label}) => navLink(to, label, true))}
-          </div>
+      {mobileOpen && <div className="absolute inset-x-0 top-full border-b border-ledger-800 bg-ledger-950/95 shadow-2xl backdrop-blur-xl md:hidden">
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <div className="overflow-hidden rounded-2xl border border-ledger-800 bg-ledger-900/60">{NAV_ITEMS.map(({to,label}) => navLink(to, label, true))}</div>
           <div className="mt-4 grid gap-3">
             {!resolving && account ? <>
-              <div className="flex items-center justify-between rounded-lg border border-ledger-800 px-4 py-3 text-xs text-ledger-400"><span>Connected wallet</span><span className="font-data">{short(account.address)}</span></div>
-              <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-lg border border-ledger-700 px-4 py-3 text-sm text-ledger-300 transition hover:border-alert-500/50 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
-            </> : !resolving ? <Link to="/signup" className="rounded-lg border border-ledger-700 px-4 py-3 text-center text-sm text-ledger-200">Sign in</Link> : null}
-            <Link to={newTreasuryPath} className="rounded-lg bg-copper-500 px-4 py-3 text-center text-sm font-semibold text-ledger-950">New treasury</Link>
+              <div className="flex items-center justify-between rounded-xl border border-ledger-800 bg-ledger-950/60 px-4 py-3 text-xs text-ledger-400"><span>Connected</span><span className="font-data">{short(account.address)}</span></div>
+              <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="fw-secondary-button cursor-pointer rounded-xl px-4 py-3 text-sm text-ledger-300 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
+            </> : !resolving ? <Link to="/signup" className="fw-secondary-button rounded-xl px-4 py-3 text-center text-sm text-ledger-200">Sign in</Link> : null}
+            <Link to={newTreasuryPath} className="fw-primary-button rounded-xl px-4 py-3 text-center text-sm font-semibold">New treasury →</Link>
           </div>
         </div>
       </div>}
@@ -104,40 +99,23 @@ export function Layout({ children }: { children: ReactNode }) {
 
     <div className="flex-1">{children}</div>
 
-    <footer className="shrink-0 border-t border-ledger-800 bg-ledger-950/80">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 md:py-12">
-        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-[1.4fr_.8fr_.8fr]">
+    <footer className="relative shrink-0 overflow-hidden border-t border-ledger-800 bg-ledger-950/90">
+      <div className="fw-ambient-orb -bottom-44 -left-32 h-80 w-80 bg-copper-500/10" />
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14">
+        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-[1.5fr_.75fr_.75fr]">
           <section className="sm:col-span-2 md:col-span-1">
-            <Link to="/" aria-label="Fair Witness home" className="inline-flex">
-              <img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-11 w-auto sm:h-12" />
-            </Link>
+            <Link to="/" aria-label="Fair Witness home" className="inline-flex"><img src="/fair-witness-logo.svg" alt="Fair Witness" className="h-11 w-auto sm:h-12" /></Link>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-ledger-400">Trust-minimized execution for autonomous financial agents on Creditcoin. AI proposes. Deterministic policy authorizes. Treasury executes.</p>
-            <div className="mt-5 flex flex-wrap gap-2 text-xs text-ledger-500">
-              <span className="rounded-full border border-ledger-800 px-3 py-1">Non-custodial</span>
-              <span className="rounded-full border border-ledger-800 px-3 py-1">Attestcoin verified</span>
-              <span className="rounded-full border border-ledger-800 px-3 py-1">On-chain policy</span>
-            </div>
+            <div className="mt-5 flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-ledger-500"><span className="fw-status-chip">Non-custodial</span><span className="fw-status-chip">Attestcoin verified</span><span className="fw-status-chip">Replay protected</span></div>
           </section>
 
-          <section>
-            <p className="text-xs font-semibold uppercase tracking-widest text-ledger-300">Product</p>
-            <div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">
-              {PRODUCT_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:text-ledger-200">{item.label}</Link>)}
-            </div>
-          </section>
-
-          <section>
-            <p className="text-xs font-semibold uppercase tracking-widest text-ledger-300">Protocol</p>
-            <div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">
-              {TECH_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:text-ledger-200">{item.label}</Link>)}
-              <a href={`${config.explorerBaseUrl}/address/${config.factoryAddress}`} target="_blank" rel="noreferrer" className="transition hover:text-ledger-200">Factory contract ↗</a>
-            </div>
-          </section>
+          <section><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-ledger-300">Product</p><div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">{PRODUCT_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:translate-x-0.5 hover:text-ledger-200">{item.label}</Link>)}</div></section>
+          <section><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-ledger-300">Protocol</p><div className="mt-4 flex flex-col gap-3 text-sm text-ledger-500">{TECH_LINKS.map(item => <Link key={item.to} to={item.to} className="transition hover:translate-x-0.5 hover:text-ledger-200">{item.label}</Link>)}<a href={`${config.explorerBaseUrl}/address/${config.factoryAddress}`} target="_blank" rel="noreferrer" className="transition hover:text-ledger-200">Factory contract ↗</a></div></section>
         </div>
 
-        <div className="mt-10 flex flex-col gap-3 border-t border-ledger-800 pt-6 text-xs text-ledger-600 sm:flex-row sm:items-center sm:justify-between">
-          <p>Fair Witness · Creditcoin CC3 public testnet</p>
-          <p>Controlled demo markets. Verification and policy execution are real on-chain.</p>
+        <div className="mt-10 flex flex-col gap-4 border-t border-ledger-800 pt-6 text-[10px] uppercase tracking-wide text-ledger-600 sm:flex-row sm:items-center sm:justify-between">
+          <p className="inline-flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-verified-400" /> Fair Witness · Creditcoin CC3 public testnet</p>
+          <p>Controlled market conditions · real verification and execution path</p>
         </div>
       </div>
     </footer>

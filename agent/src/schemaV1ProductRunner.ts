@@ -15,7 +15,7 @@ import { buildProposal } from "./proposals/builder.js";
 import { hashEvidence } from "./proposals/hashing.js";
 import { PolicySubmitter } from "./policySubmitter.js";
 import { parseAiDecision } from "./domain/aiDecision.js";
-import { updateRuntimeHealth } from "./runtimeHealth.js";
+import { patchTreasuryPipeline, updateRuntimeHealth, updateTreasuryPipeline } from "./runtimeHealth.js";
 import {
   AutomationMode,
   DecisionOutcome,
@@ -106,6 +106,7 @@ const bigintJson = (_key: string, value: unknown) => typeof value === "bigint" ?
 const sleep = (ms: number) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 const asAddress = (value: string) => ethers.getAddress(value) as Address;
 const asHex32 = (value: string) => value as Hex32;
+const strategyName = (strategy: number) => strategy === 0 ? "arbitrage" : strategy === 1 ? "rebalancing" : "risk reduction";
 
 interface Observation {
   blockHeight: bigint;
@@ -327,17 +328,40 @@ async function runTenant(
   confirmation: Observation,
   sourceProof: AttestedProof,
   confirmationProof: AttestedProof,
+  cycleId: string,
 ) {
+  updateTreasuryPipeline(mandate.treasuryAddress, {
+    stage: "reason",
+    status: "working",
+    detail: "Deriving a deterministic candidate from verified evidence",
+    cycleId,
+  });
   const initialContext = await makeContext(mandate, source, confirmation, sourceProof, confirmationProof);
   const initialCandidate = deriveCandidate(initialContext, mandate);
   if (!initialCandidate) {
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "reason",
+      status: "waiting",
+      detail: "No deterministic candidate this cycle",
+      cycleId,
+    });
     log("WAIT no deterministic candidate", { treasury: mandate.treasuryAddress, evidenceHash: initialContext.evidence.evidenceHash });
     return;
   }
 
+  patchTreasuryPipeline(mandate.treasuryAddress, {
+    status: "working",
+    detail: `Candidate found; reasoning layer evaluating ${strategyName(initialCandidate.strategy)}`,
+  });
   const decision = await decide(initialCandidate, initialCandidate.strategy);
   if (decision.decision !== DecisionOutcome.EXECUTE) {
     const decisionHash = asHex32(ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify({ candidate: initialCandidate, decision }, bigintJson))));
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "reason",
+      status: "waiting",
+      detail: `Reasoning layer returned WAIT for ${strategyName(initialCandidate.strategy)}`,
+      cycleId,
+    });
     log("AI WAIT", { treasury: mandate.treasuryAddress, strategy: initialCandidate.strategy, rationale: decision.rationale, decisionHash });
     return;
   }
@@ -347,9 +371,21 @@ async function runTenant(
   let executionContext = initialContext;
 
   for (let rebuild = 0; rebuild < MAX_JIT_REBUILDS; rebuild++) {
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "authorize",
+      status: "working",
+      detail: rebuild === 0 ? "Refreshing destination state and checking on-chain policy" : `Rechecking on-chain policy after state drift (${rebuild + 1}/${MAX_JIT_REBUILDS})`,
+      cycleId,
+    });
     executionContext = await makeContext(mandate, source, confirmation, sourceProof, confirmationProof);
     const refreshed = deriveCandidate(executionContext, mandate);
     if (!refreshed) {
+      updateTreasuryPipeline(mandate.treasuryAddress, {
+        stage: "authorize",
+        status: "waiting",
+        detail: "Candidate disappeared after destination state refresh",
+        cycleId,
+      });
       log("WAIT candidate disappeared before submission", {
         treasury: mandate.treasuryAddress,
         originalStrategy: initialCandidate.strategy,
@@ -358,6 +394,12 @@ async function runTenant(
       return;
     }
     if (!sameExecutionIntent(initialCandidate, refreshed)) {
+      updateTreasuryPipeline(mandate.treasuryAddress, {
+        stage: "authorize",
+        status: "waiting",
+        detail: "Execution intent changed after destination state refresh",
+        cycleId,
+      });
       log("WAIT execution intent changed before submission", {
         treasury: mandate.treasuryAddress,
         originalStrategy: initialCandidate.strategy,
@@ -379,6 +421,10 @@ async function runTenant(
     const preview = await submitter.preview(proposal, sourceProof, confirmationProof);
 
     if (preview.reason === REASON_AMOUNT_EXCEEDS_POLICY || preview.reason === REASON_AMOUNT_MISMATCH) {
+      patchTreasuryPipeline(mandate.treasuryAddress, {
+        status: "working",
+        detail: `Destination state changed; rebuilding proposal (${rebuild + 1}/${MAX_JIT_REBUILDS})`,
+      });
       log("JIT state changed; rebuilding proposal", {
         treasury: mandate.treasuryAddress,
         strategy: executionCandidate.strategy,
@@ -390,6 +436,12 @@ async function runTenant(
     }
 
     if (preview.reason !== REASON_NONE) {
+      updateTreasuryPipeline(mandate.treasuryAddress, {
+        stage: "authorize",
+        status: "blocked",
+        detail: `Deterministic policy blocked the proposal (reason ${preview.reason})`,
+        cycleId,
+      });
       log("WAIT on-chain preflight rejected proposal", {
         treasury: mandate.treasuryAddress,
         strategy: executionCandidate.strategy,
@@ -399,8 +451,20 @@ async function runTenant(
       return;
     }
 
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "execute",
+      status: "working",
+      detail: `Policy passed; broadcasting authorized ${strategyName(executionCandidate.strategy)} execution`,
+      cycleId,
+    });
     const result = await submitter.submit(proposal, sourceProof, confirmationProof);
     updateRuntimeHealth({ lastProposalResolvedAt: new Date().toISOString() });
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "execute",
+      status: result.result === 1 ? "executed" : "failed",
+      detail: result.result === 1 ? `Confirmed ${strategyName(executionCandidate.strategy)} execution` : `Execution transaction resolved with result ${result.result} / reason ${result.reason}`,
+      cycleId,
+    });
     log("proposal resolved", {
       treasury: mandate.treasuryAddress,
       strategy: executionCandidate.strategy,
@@ -413,6 +477,12 @@ async function runTenant(
     return;
   }
 
+  updateTreasuryPipeline(mandate.treasuryAddress, {
+    stage: "authorize",
+    status: "waiting",
+    detail: "JIT rebuild limit reached; stale broadcast refused",
+    cycleId,
+  });
   log("WAIT JIT rebuild limit reached; refusing stale broadcast", {
     treasury: mandate.treasuryAddress,
     strategy: executionCandidate.strategy,
@@ -429,18 +499,25 @@ async function runMarketQueue(
   confirmation: Observation,
   sourceProof: AttestedProof,
   confirmationProof: AttestedProof,
+  cycleId: string,
 ) {
   for (const mandate of mandates) {
     try {
-      await runTenant(mandate, source, confirmation, sourceProof, confirmationProof);
+      await runTenant(mandate, source, confirmation, sourceProof, confirmationProof, cycleId);
     } catch (error) {
+      patchTreasuryPipeline(mandate.treasuryAddress, {
+        status: "failed",
+        detail: `Agent cycle failed: ${String(error).slice(0, 180)}`,
+        cycleId,
+      });
       log("tenant cycle failed; continuing", { treasury: mandate.treasuryAddress, error: String(error) });
     }
   }
 }
 
 async function cycle() {
-  updateRuntimeHealth({ lastCycleStartedAt: new Date().toISOString(), lastError: null });
+  const cycleId = new Date().toISOString();
+  updateRuntimeHealth({ lastCycleStartedAt: cycleId, lastError: null });
   const sourceNetwork = await sourceProvider.getNetwork();
   const destNetwork = await destinationProvider.getNetwork();
   if (Number(sourceNetwork.chainId) !== SOURCE_CHAIN_ID || Number(destNetwork.chainId) !== DEST_CHAIN_ID) throw new Error("RPC chain id mismatch");
@@ -463,15 +540,45 @@ async function cycle() {
     return;
   }
 
+  for (const mandate of mandates) {
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "observe",
+      status: "working",
+      detail: "Publishing source-market observation on Sepolia",
+      cycleId,
+    });
+  }
   const source = await publishObservation();
+  for (const mandate of mandates) {
+    patchTreasuryPipeline(mandate.treasuryAddress, {
+      detail: `Source block ${source.blockHeight} observed; waiting ${Math.ceil(CONFIRM_DELAY_MS / 1000)}s for confirmation`,
+    });
+  }
   await sleep(CONFIRM_DELAY_MS);
   const confirmation = await publishObservation();
   if (confirmation.blockHeight <= source.blockHeight) throw new Error("confirmation observation did not advance the source chain");
+
+  for (const mandate of mandates) {
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "prove",
+      status: "working",
+      detail: `Waiting for Attestcoin proofs for source blocks ${source.blockHeight} and ${confirmation.blockHeight}`,
+      cycleId,
+    });
+  }
   const [sourceProof, confirmationProof] = await Promise.all([proofFor(source), proofFor(confirmation)]);
+  for (const mandate of mandates) {
+    updateTreasuryPipeline(mandate.treasuryAddress, {
+      stage: "reason",
+      status: "working",
+      detail: "Attestcoin proofs verified; queued for deterministic evaluation",
+      cycleId,
+    });
+  }
 
   // One queue per mutable destination market. This deployment has one configured adapter/pool,
   // so writes are intentionally serialized: each treasury observes the state left by the prior one.
-  await runMarketQueue(mandates, source, confirmation, sourceProof, confirmationProof);
+  await runMarketQueue(mandates, source, confirmation, sourceProof, confirmationProof, cycleId);
   updateRuntimeHealth({ lastSuccessfulCycleAt: new Date().toISOString() });
 }
 
