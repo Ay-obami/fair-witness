@@ -9,14 +9,14 @@ const ENGINE_STEPS = [
 ];
 
 export function LiveExecutionEngine({ compact = false }: { compact?: boolean }) {
-  return <div className={`fw-engine fw-glass rounded-3xl ${compact ? "p-4 sm:p-5" : "p-5 sm:p-6 lg:p-7"}`}>
+  return <div className={`fw-engine fw-glass rounded-2xl sm:rounded-3xl ${compact ? "p-4 sm:p-5" : "p-4 sm:p-6 lg:p-7"}`}>
     <div className="fw-scanline" />
-    <div className="mb-5 flex items-center justify-between gap-4">
-      <div>
-        <p className="text-[10px] uppercase tracking-[0.22em] text-ledger-500">Execution control plane</p>
+    <div className="mb-4 flex flex-col items-start gap-3 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between sm:mb-5">
+      <div className="min-w-0">
+        <p className="text-[9px] uppercase tracking-[0.18em] text-ledger-500 sm:text-[10px] sm:tracking-[0.22em]">Execution control plane</p>
         <p className="mt-1 text-sm font-medium text-ledger-200">Verified evidence → bounded action</p>
       </div>
-      <span className="fw-status-chip text-[10px] font-data"><span className="fw-status-dot" /> LIVE</span>
+      <span className="fw-status-chip shrink-0 text-[9px] font-data sm:text-[10px]"><span className="fw-status-dot" /> LIVE</span>
     </div>
 
     <div className="space-y-0">
@@ -24,19 +24,19 @@ export function LiveExecutionEngine({ compact = false }: { compact?: boolean }) 
         <div className={`fw-engine-node ${step.gate ? "fw-policy-gate" : ""}`}>
           {index === ENGINE_STEPS.length - 1 && <span className="fw-verified-ring" />}
           <div className="fw-node-icon">{step.code}</div>
-          <div className="min-w-0">
-            <p className={`text-sm font-semibold ${step.tone}`}>{step.title}</p>
-            <p className="mt-1 text-xs leading-relaxed text-ledger-500">{step.detail}</p>
+          <div className="min-w-0 pr-1">
+            <p className={`text-[13px] font-semibold sm:text-sm ${step.tone}`}>{step.title}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-ledger-500 sm:text-xs">{step.detail}</p>
           </div>
-          <div className="ml-auto font-data text-[10px] text-ledger-600">0{index + 1}</div>
+          <div className="ml-auto hidden shrink-0 font-data text-[10px] text-ledger-600 min-[380px]:block">0{index + 1}</div>
         </div>
         {index < ENGINE_STEPS.length - 1 && <div className="fw-engine-connector" />}
       </div>)}
     </div>
 
-    <div className="mt-5 rounded-xl border border-verified-500/20 bg-verified-500/5 p-3.5">
-      <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-widest text-ledger-500"><span>Security invariant</span><span className="text-verified-400">Enforced on-chain</span></div>
-      <p className="mt-2 text-xs leading-relaxed text-ledger-300">AI can recommend an action. It cannot rewrite strategy order, limits, evidence rules, replay protection or treasury authority.</p>
+    <div className="mt-4 rounded-xl border border-verified-500/20 bg-verified-500/5 p-3 sm:mt-5 sm:p-3.5">
+      <div className="flex flex-col gap-1 text-[9px] uppercase tracking-widest text-ledger-500 min-[430px]:flex-row min-[430px]:items-center min-[430px]:justify-between sm:text-[10px]"><span>Security invariant</span><span className="text-verified-400">Enforced on-chain</span></div>
+      <p className="mt-2 text-[11px] leading-relaxed text-ledger-300 sm:text-xs">AI can recommend an action. It cannot rewrite strategy order, limits, evidence rules, replay protection or treasury authority.</p>
     </div>
   </div>;
 }
@@ -52,8 +52,8 @@ export function ExecutionRail({ active = 5, labels = ["Observe", "Prove", "Reaso
 
 export function RealityStrip() {
   const items = ["Creditcoin CC3", "Attestcoin verified", "On-chain policy", "Replay protected", "Auditable journal"];
-  return <div className="flex flex-wrap items-center gap-2.5">
-    {items.map((item, index) => <span key={item} className="fw-status-chip text-[10px] uppercase tracking-wide"><span className={`h-1.5 w-1.5 rounded-full ${index < 2 ? "bg-external-400" : "bg-verified-400"}`} />{item}</span>)}
+  return <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+    {items.map((item, index) => <span key={item} className="fw-status-chip max-w-full text-[9px] uppercase tracking-wide sm:text-[10px]"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${index < 2 ? "bg-external-400" : "bg-verified-400"}`} /><span className="truncate">{item}</span></span>)}
   </div>;
 }
 
@@ -76,21 +76,23 @@ export function DecisionSequence({ result = "EXECUTED", blocked = false, reason 
 export function ProductMetric({ eyebrow, value, detail, icon }: { eyebrow: string; value: string; detail: string; icon?: ReactNode }) {
   return <div className="fw-command-surface rounded-2xl border p-4 sm:p-5">
     <div className="flex items-start justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-[0.16em] text-ledger-500">{eyebrow}</p>
-        <p className="mt-2 text-2xl font-semibold tracking-tight text-ledger-100">{value}</p>
+        <p className="mt-2 break-words text-2xl font-semibold tracking-tight text-ledger-100">{value}</p>
       </div>
-      {icon && <div className="grid h-9 w-9 place-items-center rounded-lg border border-ledger-800 bg-ledger-950/60 text-sm text-copper-400">{icon}</div>}
+      {icon && <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ledger-800 bg-ledger-950/60 text-sm text-copper-400">{icon}</div>}
     </div>
     <p className="mt-2 text-xs leading-relaxed text-ledger-500">{detail}</p>
   </div>;
 }
 
 export function ControlledMarketBadge() {
-  return <span className="group relative inline-flex items-center gap-2 rounded-full border border-alert-500/25 bg-alert-500/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-widest text-alert-400">
-    <span className="h-1.5 w-1.5 rounded-full bg-alert-400" /> Controlled test market
-    <span className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-72 rounded-xl border border-ledger-700 bg-ledger-950 p-3 text-left text-[11px] normal-case leading-relaxed tracking-normal text-ledger-300 shadow-2xl group-hover:block">
+  return <details className="group relative max-w-full">
+    <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-alert-500/25 bg-alert-500/5 px-3 py-1.5 text-[9px] font-medium uppercase tracking-widest text-alert-400 marker:hidden sm:text-[10px]">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-alert-400" /> Controlled test market
+    </summary>
+    <div className="absolute left-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-ledger-700 bg-ledger-950 p-3 text-left text-[11px] normal-case leading-relaxed tracking-normal text-ledger-300 shadow-2xl">
       Market conditions are synthetic for demonstration. Cross-chain transactions, Attestcoin verification, policy authorization and Creditcoin execution remain real public-testnet paths.
-    </span>
-  </span>;
+    </div>
+  </details>;
 }
