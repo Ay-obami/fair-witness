@@ -48,11 +48,9 @@ body {
 }
 
 /* Hero copy rotation
-   The rotating headline/supporting copy used absolute layers so the old and new
-   messages could crossfade. On narrower desktop columns, longer headlines are
-   taller than the fixed stage and visually collide with the supporting copy.
-   Keep only the active message in layout flow instead: the stage grows to the
-   actual wrapped headline height and the next message eases in cleanly. */
+   Keep only the active message in document flow so long wrapped headlines can never
+   collide with the supporting copy. Give the incoming message a gentle, slower ease
+   so the change feels intentional rather than like a hard content swap. */
 h1[aria-hidden="true"],
 p[aria-hidden="true"] {
   display: none;
@@ -62,17 +60,24 @@ h1[aria-hidden="false"],
 p[aria-hidden="false"] {
   position: relative !important;
   inset: auto !important;
-  animation: fair-witness-hero-copy-in 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fair-witness-hero-copy-in 920ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform, filter;
 }
 
 @keyframes fair-witness-hero-copy-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px) scale(0.997);
+    filter: blur(1.5px);
   }
-  to {
+  35% {
+    opacity: 0.55;
+    filter: blur(0.5px);
+  }
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
@@ -80,5 +85,6 @@ p[aria-hidden="false"] {
   h1[aria-hidden="false"],
   p[aria-hidden="false"] {
     animation: none;
+    will-change: auto;
   }
 }
