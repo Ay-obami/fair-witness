@@ -7,6 +7,7 @@ const RPC = process.env.CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoi
 const CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? "102031");
 const PORT = Number(process.env.PORT ?? "8080");
 const TARGET_WEI = BigInt(process.env.GAS_SPONSOR_TARGET_WEI ?? "250000000000000000"); // 0.25 CTC
+const MIN_BALANCE_WEI = BigInt(process.env.GAS_SPONSOR_MIN_BALANCE_WEI ?? "50000000000000000"); // 0.05 CTC
 const MAX_TOPUP_WEI = BigInt(process.env.GAS_SPONSOR_MAX_TOPUP_WEI ?? TARGET_WEI.toString());
 const DAILY_BUDGET_WEI = BigInt(process.env.GAS_SPONSOR_DAILY_BUDGET_WEI ?? (TARGET_WEI * 10n).toString());
 const ADDRESS_COOLDOWN_MS = Math.max(0, Number(process.env.GAS_SPONSOR_ADDRESS_COOLDOWN_MS ?? "86400000"));
@@ -14,6 +15,14 @@ const ALLOWED_ORIGINS = (process.env.SPONSOR_ALLOWED_ORIGINS ?? "https://fair-wi
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+
+if (MIN_BALANCE_WEI < 0n || MIN_BALANCE_WEI > TARGET_WEI) {
+  throw new Error("GAS_SPONSOR_MIN_BALANCE_WEI must be between 0 and GAS_SPONSOR_TARGET_WEI");
+}
+if (TARGET_WEI <= 0n || MAX_TOPUP_WEI <= 0n || DAILY_BUDGET_WEI <= 0n) {
+  throw new Error("gas sponsor target, max top-up and daily budget must all be positive");
+}
+
 const sponsorKey = process.env.GAS_SPONSOR_PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC, CHAIN_ID, { staticNetwork: true });
 const sponsor = sponsorKey ? new ethers.Wallet(sponsorKey, provider) : null;
@@ -67,11 +76,16 @@ async function topUpUnlocked(address: string) {
   const recipient = ethers.getAddress(address);
   const key = recipient.toLowerCase();
   const current = await provider.getBalance(recipient);
-  if (current >= TARGET_WEI) {
+
+  // A previously sponsored wallet should be able to perform many lifecycle writes
+  // without being refilled after every tiny gas spend. Only sponsor again once the
+  // account is genuinely running low, then refill toward TARGET_WEI.
+  if (current >= MIN_BALANCE_WEI) {
     return {
       address: recipient,
       funded: false,
       balanceWei: current.toString(),
+      minBalanceWei: MIN_BALANCE_WEI.toString(),
       targetWei: TARGET_WEI.toString(),
     };
   }
@@ -94,6 +108,8 @@ async function topUpUnlocked(address: string) {
     address: recipient,
     funded: true,
     amountWei: amount.toString(),
+    balanceBeforeWei: current.toString(),
+    minBalanceWei: MIN_BALANCE_WEI.toString(),
     txHash: receipt.hash,
     targetWei: TARGET_WEI.toString(),
   };
@@ -127,6 +143,7 @@ export function startSponsorServer() {
         chainId: CHAIN_ID,
         sponsor: {
           targetWei: TARGET_WEI.toString(),
+          minBalanceWei: MIN_BALANCE_WEI.toString(),
           maxTopupWei: MAX_TOPUP_WEI.toString(),
           dailyBudgetWei: DAILY_BUDGET_WEI.toString(),
           sponsoredTodayWei: sponsoredTodayWei.toString(),
@@ -156,7 +173,9 @@ export function startSponsorServer() {
     }
   });
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[sponsor] listening on :${PORT}; configured=${Boolean(sponsor)} targetWei=${TARGET_WEI} dailyBudgetWei=${DAILY_BUDGET_WEI}`);
+    console.log(
+      `[sponsor] listening on :${PORT}; configured=${Boolean(sponsor)} targetWei=${TARGET_WEI} minBalanceWei=${MIN_BALANCE_WEI} dailyBudgetWei=${DAILY_BUDGET_WEI}`,
+    );
   });
   return server;
 }
