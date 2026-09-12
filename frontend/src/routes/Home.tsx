@@ -77,7 +77,7 @@ export default function Home() {
 
           <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
             <Link to={launchPath} onClick={(event) => { if (resolving) event.preventDefault(); }} className="fw-primary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold">
-              {resolving ? "Checking session…" : account ? "Open command center →" : "Launch Fair Witness →"}
+              {resolving ? "Checking session…" : account ? "Open dashboard →" : "Launch app →"}
             </Link>
             <a href="#how-it-works" className="fw-secondary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold text-ledger-200">Explore the execution path ↓</a>
           </div>
