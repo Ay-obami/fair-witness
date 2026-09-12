@@ -22,6 +22,9 @@ for (const [name, value] of Object.entries(current)) {
 
 const files = {
   readme: read("README.md"),
+  runbook: read("docs/CONTROLLED_DEMO_RUNBOOK.md"),
+  deployment: read("docs/DEPLOYMENT.md"),
+  checklist: read("docs/PRE_SUBMISSION_CHECKLIST.md"),
   agentEnv: read("agent/.env.example"),
   frontendEnv: read("frontend/.env.example"),
   frontendConfig: read("frontend/src/lib/config.ts"),
@@ -35,9 +38,16 @@ function requireText(fileName, content, value, description) {
   }
 }
 
-requireText("README.md", files.readme, current.factory, "current factory");
-requireText("README.md", files.readme, current.faucet, "current faucet");
-requireText("README.md", files.readme, current.factoryDeploymentBlock, "current factory deployment block");
+for (const [name, content] of [
+  ["README.md", files.readme],
+  ["docs/CONTROLLED_DEMO_RUNBOOK.md", files.runbook],
+  ["docs/DEPLOYMENT.md", files.deployment],
+  ["docs/PRE_SUBMISSION_CHECKLIST.md", files.checklist],
+]) {
+  requireText(name, content, current.factory, "current factory");
+  requireText(name, content, current.faucet, "current faucet");
+  requireText(name, content, current.factoryDeploymentBlock, "current factory deployment block");
+}
 
 requireText("agent/.env.example", files.agentEnv, `FACTORY_ADDRESS=${current.factory}`, "current factory");
 requireText("agent/.env.example", files.agentEnv, `FACTORY_DEPLOYMENT_BLOCK=${current.factoryDeploymentBlock}`, "current deployment block");
