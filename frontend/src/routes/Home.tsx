@@ -51,34 +51,45 @@ export default function Home() {
   }, []);
 
   return <Layout><div className="overflow-hidden">
-    <section className="relative mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-16 lg:pb-28 lg:pt-24">
+    <section className="relative mx-auto max-w-7xl px-4 pb-14 pt-8 sm:px-6 sm:pb-20 sm:pt-14 lg:pb-24 lg:pt-20 xl:pb-28 xl:pt-24">
       <div className="fw-ambient-orb -left-40 top-0 h-96 w-96 bg-copper-500/20" />
       <div className="fw-ambient-orb -right-44 top-20 h-[30rem] w-[30rem] bg-verified-500/15" />
-      <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-16">
-        <div className="relative z-10">
-          <div className="mb-5 flex flex-wrap items-center gap-3"><NetworkIndicator /><ControlledMarketBadge /></div>
-          <p className="fw-kicker">Attestcoin-powered autonomous finance on Creditcoin</p>
-          <div className="relative mt-6 min-h-[15rem] sm:min-h-[17rem] lg:min-h-[19rem]">
-            {HERO_MESSAGES.map((message, index) => <div key={message.lead} data-active={index === heroIndex} className="fw-hero-copy absolute inset-0">
-              <h1 className="fw-hero-title max-w-5xl text-5xl font-semibold leading-[.96] text-ledger-100 sm:text-6xl lg:text-[5.6rem]">
+      <div className="grid items-start gap-10 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:gap-12 xl:gap-16">
+        <div className="relative z-10 min-w-0">
+          <div className="mb-5 flex flex-wrap items-center gap-2.5 sm:gap-3"><NetworkIndicator /><ControlledMarketBadge /></div>
+          <p className="fw-kicker max-w-full">Attestcoin-powered autonomous finance on Creditcoin</p>
+
+          <div className="mt-6 grid">
+            {HERO_MESSAGES.map((message, index) => <div
+              key={message.lead}
+              data-active={index === heroIndex}
+              aria-hidden={index !== heroIndex}
+              className="fw-hero-copy col-start-1 row-start-1 min-w-0"
+            >
+              <h1 className="fw-hero-title max-w-4xl text-[2.9rem] font-semibold leading-[.98] text-ledger-100 min-[390px]:text-[3.25rem] sm:text-[4.1rem] lg:text-[4.45rem] xl:text-[5rem]">
                 {message.lead} <span className="fw-gradient-text">{message.accent}</span>
               </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ledger-300 sm:text-xl">{message.supporting}</p>
+              <p className="mt-5 max-w-2xl text-base leading-relaxed text-ledger-300 sm:mt-6 sm:text-lg xl:text-xl">{message.supporting}</p>
             </div>)}
           </div>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ledger-400 sm:text-base">Fair Witness separates intelligence from authority. Autonomous agents reason over verified cross-chain evidence while a user-owned Creditcoin treasury remains the final authority over every movement of capital.</p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-ledger-400 sm:mt-6 sm:text-base">Fair Witness separates intelligence from authority. Autonomous agents reason over verified cross-chain evidence while a user-owned Creditcoin treasury remains the final authority over every movement of capital.</p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
             <Link to={launchPath} onClick={(event) => { if (resolving) event.preventDefault(); }} className="fw-primary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold">
               {resolving ? "Checking session…" : account ? "Open command center →" : "Launch Fair Witness →"}
             </Link>
             <a href="#how-it-works" className="fw-secondary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold text-ledger-200">Explore the execution path ↓</a>
           </div>
 
-          <div className="mt-8"><RealityStrip /></div>
-          <div className="mt-7 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all duration-500 ${index === heroIndex ? "w-10 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
+          <div className="mt-7 sm:mt-8"><RealityStrip /></div>
+          <div className="mt-6 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all duration-500 ${index === heroIndex ? "w-10 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
         </div>
-        <div className="relative z-10 lg:pl-4"><div className="fw-float"><LiveExecutionEngine /></div></div>
+
+        <div className="relative z-10 min-w-0 lg:pl-2 xl:pl-4">
+          <div className="mb-3 flex items-center justify-between lg:hidden"><p className="text-[10px] uppercase tracking-[.2em] text-ledger-500">Live execution path</p><span className="font-data text-[10px] text-verified-400">PUBLIC TESTNET</span></div>
+          <div className="fw-float"><LiveExecutionEngine /></div>
+        </div>
       </div>
     </section>
 
@@ -101,15 +112,15 @@ export default function Home() {
       </div>
     </section>
 
-    <section id="how-it-works" className="relative border-y border-ledger-800 bg-ledger-950/70">
+    <section id="how-it-works" className="relative scroll-mt-20 border-y border-ledger-800 bg-ledger-950/70">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
         <div className="max-w-3xl">
           <p className="fw-kicker">From fact to transaction</p>
           <h2 className="mt-5 text-3xl font-semibold tracking-tight text-ledger-100 sm:text-4xl">One execution path. Five independent trust boundaries.</h2>
           <p className="mt-4 text-base leading-relaxed text-ledger-400">The product is easiest to understand as a control plane: observe, prove, reason, authorize, execute.</p>
         </div>
-        <div className="mt-10 rounded-3xl border border-ledger-800 bg-ledger-900/55 p-5 sm:p-7 lg:p-8"><ExecutionRail /></div>
-        <div className="mt-8 grid gap-x-8 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 rounded-2xl border border-ledger-800 bg-ledger-900/55 p-4 sm:mt-10 sm:rounded-3xl sm:p-7 lg:p-8"><ExecutionRail /></div>
+        <div className="mt-8 grid gap-x-8 gap-y-8 sm:gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           {PIPELINE.map(step => <article key={step.n} className="group relative border-l border-ledger-700 pl-5 transition hover:border-copper-500/60">
             <span className="font-data text-xs text-copper-400">{step.n}</span>
             <h3 className="mt-2 text-xl font-semibold text-ledger-100">{step.title}</h3>
@@ -130,7 +141,7 @@ export default function Home() {
           </div>
         </div>
         <div className="fw-glass rounded-3xl p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[.2em] text-ledger-500">Live policy demonstration</p><h3 className="mt-2 text-xl font-semibold text-ledger-100">A bad proposal reaches the gate — and stops.</h3></div><span className="rounded-full border border-alert-500/25 bg-alert-500/5 px-2.5 py-1 text-[9px] uppercase tracking-widest text-alert-400">blocked</span></div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[10px] uppercase tracking-[.2em] text-ledger-500">Live policy demonstration</p><h3 className="mt-2 text-xl font-semibold text-ledger-100">A bad proposal reaches the gate — and stops.</h3></div><span className="self-start rounded-full border border-alert-500/25 bg-alert-500/5 px-2.5 py-1 text-[9px] uppercase tracking-widest text-alert-400">blocked</span></div>
           <div className="mt-5"><DecisionSequence blocked result="BLOCKED" reason={REJECTIONS[rejectionIndex].reason} /></div>
           <div className="mt-4 flex flex-wrap gap-2">{REJECTIONS.map((item, index) => <button key={item.title} onClick={() => setRejectionIndex(index)} className={`cursor-pointer rounded-full border px-3 py-1.5 text-[10px] transition ${index === rejectionIndex ? "border-alert-500/35 bg-alert-500/10 text-alert-400" : "border-ledger-800 text-ledger-500 hover:text-ledger-300"}`}>{item.title}</button>)}</div>
         </div>
@@ -152,7 +163,7 @@ export default function Home() {
     <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24">
       <div className="grid gap-10 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:gap-16">
         <div className="fw-glass rounded-3xl p-5 sm:p-7">
-          <div className="flex items-center justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] text-ledger-500">Treasury command center</p><h3 className="mt-2 text-2xl font-semibold text-ledger-100">Agent active</h3></div><span className="fw-status-chip text-[10px]"><span className="fw-status-dot" /> AUTONOMOUS</span></div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] uppercase tracking-[.2em] text-ledger-500">Treasury command center</p><h3 className="mt-2 text-2xl font-semibold text-ledger-100">Agent active</h3></div><span className="fw-status-chip self-start text-[10px] sm:self-auto"><span className="fw-status-dot" /> AUTONOMOUS</span></div>
           <div className="mt-6 grid gap-3 sm:grid-cols-3"><ProductMetric eyebrow="Allocation" value="40.2%" detail="WCTC target 40%" /><ProductMetric eyebrow="Latest decision" value="Executed" detail="Rebalancing · policy passed" /><ProductMetric eyebrow="Evidence" value="Fresh" detail="Attestcoin verified" /></div>
           <div className="mt-6 rounded-2xl border border-ledger-800 bg-ledger-950/60 p-4"><ExecutionRail active={5} /></div>
           <div className="mt-5"><DecisionSequence reason="AI proposed a deterministic rebalance candidate. Policy checks passed before the treasury authorized execution." /></div>
@@ -161,7 +172,7 @@ export default function Home() {
           <p className="fw-kicker">A product you can inspect</p>
           <h2 className="mt-5 text-3xl font-semibold tracking-tight text-ledger-100 sm:text-4xl">It observed. It proved. It reasoned. It still needed permission.</h2>
           <p className="mt-5 text-base leading-relaxed text-ledger-400">The dashboard is not a black-box performance screen. It is a command center for ownership, policy state, treasury balances and decision provenance.</p>
-          <div className="mt-7 flex flex-wrap gap-3"><Link to="/dashboard" className="fw-primary-button rounded-xl px-5 py-3 text-sm font-semibold">Open dashboard →</Link><Link to="/activity" className="fw-secondary-button rounded-xl px-5 py-3 text-sm font-semibold text-ledger-200">Inspect activity</Link></div>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap"><Link to="/dashboard" className="fw-primary-button rounded-xl px-5 py-3 text-center text-sm font-semibold">Open dashboard →</Link><Link to="/activity" className="fw-secondary-button rounded-xl px-5 py-3 text-center text-sm font-semibold text-ledger-200">Inspect activity</Link></div>
         </div>
       </div>
     </section>
