@@ -5,7 +5,8 @@
   "description": "Fair Witness monorepo deployment entrypoints.",
   "scripts": {
     "build:agent": "npm ci --prefix agent && npm run build --prefix agent",
-    "start:agent": "npm start --prefix agent"
+    "start:agent": "npm start --prefix agent",
+    "check:release": "node scripts/check-release-consistency.mjs"
   },
   "engines": {
     "node": ">=22 <25"
