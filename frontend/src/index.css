@@ -46,3 +46,47 @@ body {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* Hero copy rotation
+   Keep only the active message in document flow so long wrapped headlines can never
+   collide with the supporting copy. The active copy eases in very gradually with
+   only a tiny amount of motion, avoiding the sharp "swap" feeling while preserving
+   the overlap fix. */
+h1[aria-hidden="true"],
+p[aria-hidden="true"] {
+  display: none;
+}
+
+h1[aria-hidden="false"],
+p[aria-hidden="false"] {
+  position: relative !important;
+  inset: auto !important;
+  animation: fair-witness-hero-copy-in 1350ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+
+@keyframes fair-witness-hero-copy-in {
+  0% {
+    opacity: 0.18;
+    transform: translateY(3px);
+  }
+  22% {
+    opacity: 0.42;
+  }
+  55% {
+    opacity: 0.78;
+    transform: translateY(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  h1[aria-hidden="false"],
+  p[aria-hidden="false"] {
+    animation: none;
+    will-change: auto;
+  }
+}

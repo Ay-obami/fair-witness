@@ -1,41 +1,32 @@
 import { createThirdwebClient, defineChain } from "thirdweb";
 import { inAppWallet } from "thirdweb/wallets";
 
-// Creditcoin testnet (CC3) — the live chain where the factory and all treasury
-// instances are deployed. Chain ID confirmed from deploy-factory.js and
-// the DEVLOG Session 8 deployed-addresses table (chainId 102031).
 export const creditcoinTestnet = defineChain({
   id: 102031,
   name: "Creditcoin Testnet (CC3)",
-  nativeCurrency: {
-    name: "Testnet Credit",
-    symbol: "CTC",
-    decimals: 18,
-  },
-  // NOTE: thirdweb v5.121 expects a single rpc string here (not an array).
+  nativeCurrency: { name: "Testnet Credit", symbol: "CTC", decimals: 18 },
   rpc: "https://rpc.cc3-testnet.creditcoin.network",
-  blockExplorers: [
-    {
-      name: "Creditcoin Testnet Explorer (Blockscout)",
-      url: "https://creditcoin-testnet.blockscout.com",
-    },
-  ],
+  blockExplorers: [{ name: "Creditcoin Testnet Explorer (Blockscout)", url: "https://creditcoin-testnet.blockscout.com" }],
   testnet: true,
 });
 
-// Non-custodial embedded wallet — email/social sign-up creates an invisible
-// wallet; no seed phrase exposed, no MetaMask required. The client ID is public.
+const configuredClientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID?.trim();
+export const thirdwebConfigured = Boolean(configuredClientId);
 export const thirdwebClient = createThirdwebClient({
-  clientId: import.meta.env.VITE_THIRDWEB_CLIENT_ID ?? "",
+  clientId: configuredClientId || "fair-witness-unconfigured-client",
 });
 
-// Email-OTP auth is driven per-route via preAuthenticate + wallet.connect (see
-// routes/SignUp.tsx, routes/Dashboard.tsx). inAppWallet() takes no client — the
-// client is passed to each connect/preAuthenticate call (thirdweb v5.121 API).
-// executionMode "EOA" is explicit: the embedded wallet must be a plain EOA so it
-// can own treasury instances and sign createTreasury directly (no 4337 bundler —
-// CC3 isn't on thirdweb's account-abstraction allowlist).
-export const wallet = inAppWallet({ executionMode: { mode: "EOA" } });
+// Creditcoin CC3 does not currently expose the default Thirdweb ERC-4337 factory
+// expected by the SDK, so social authentication stays on the user's in-app EOA.
+// Fair Witness sponsors onboarding gas from its backend without taking ownership:
+// every treasury/activation transaction is still signed by this user-controlled EOA.
+export const wallet = inAppWallet({
+  auth: {
+    mode: "popup",
+    options: ["google", "apple", "email"],
+  },
+  executionMode: { mode: "EOA" },
+  metadata: { name: "Fair Witness" },
+});
 
 export { thirdwebClient as client };
-

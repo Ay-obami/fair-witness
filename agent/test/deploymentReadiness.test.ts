@@ -11,6 +11,9 @@ const manifest = JSON.parse(readFileSync(resolve(repo, "contracts/deployments/sc
 const controlled = JSON.parse(
   readFileSync(resolve(repo, "contracts/deployments/controlled-demo-schema-v1.json"), "utf8"),
 );
+const lifecycle = JSON.parse(
+  readFileSync(resolve(repo, "contracts/deployments/controlled-demo-schema-v1-lifecycle.json"), "utf8"),
+);
 
 describe("Phase 10 fail-closed deployment preparation", () => {
   it("keeps the live readiness audit read-only and free of signing primitives", () => {
@@ -78,8 +81,8 @@ describe("Phase 10 controlled-demo deployment record", () => {
     expect(controlled.mandate.expectedPolicyHash).toBe(controlled.destination.readback.policyHash);
   });
 
-  it("keeps release-facing frontend addresses bound to the frozen manifest", () => {
-    const publishedAddresses = [
+  it("keeps historical evidence addresses published while using the lifecycle factory generation", () => {
+    const historicalAddresses = [
       controlled.source.pool,
       controlled.source.observer,
       controlled.source.stable,
@@ -89,15 +92,22 @@ describe("Phase 10 controlled-demo deployment record", () => {
       controlled.destination.stable,
       controlled.destination.adapter,
       controlled.destination.validator,
-      controlled.destination.factory,
       controlled.destination.treasury,
       controlled.roles.treasuryOwner,
       controlled.roles.agentSubmitter,
     ];
 
-    for (const address of publishedAddresses) {
+    for (const address of historicalAddresses) {
       expect(frontendControlledDemo.toLowerCase()).toContain(address.toLowerCase());
     }
+
+    expect(lifecycle.previous.factory).toBe(controlled.destination.factory);
+    expect(lifecycle.destination.validator).toBe(controlled.destination.validator);
+    expect(lifecycle.destination.adapter).toBe(controlled.destination.adapter);
+    expect(lifecycle.destination.wctc).toBe(controlled.destination.wctc);
+    expect(lifecycle.destination.stable).toBe(controlled.destination.stable);
+    expect(frontendControlledDemo.toLowerCase()).toContain(lifecycle.destination.factory.toLowerCase());
+    expect(frontendControlledDemo.toLowerCase()).toContain(lifecycle.destination.faucet.toLowerCase());
   });
 });
 

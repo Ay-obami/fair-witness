@@ -1,269 +1,161 @@
-// Confirmation page — shows the deployed instance and next steps (fund it, register
-// the agent). The "Register the agent" card is the one-tx owner action that allowlists
-// the platform's low-privilege agent key as a submitter on the fresh instance — without
-// it, a newly deployed instance is never watched by the agent at all.
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Layout } from "../components/layout";
 import { ethers } from "ethers";
 import { ethers6Adapter } from "thirdweb/adapters/ethers6";
-import { creditcoinTestnet, wallet, client as thirdwebClient } from "../lib/thirdweb";
+import { creditcoinTestnet, wallet, thirdwebClient } from "../lib/thirdweb";
 import { config } from "../lib/config";
-import { fetchTreasuryInfo, fetchAgentRegistered } from "../lib/contractReader";
-import type { TreasuryInfo } from "../lib/types";
+import { FAIR_WITNESS_TREASURY_ABI } from "../lib/abi";
+import { CONTROLLED_DEMO } from "../lib/controlledDemo";
+import { humanError } from "../lib/humanError";
+import { ensureSponsoredGas } from "../lib/sponsor";
 
-// Owner-only write: add the platform agent to the instance's submitter allowlist.
-const REGISTER_AGENT_ABI = ["function registerAgent(address agent)"];
-
-function useQuery() {
-  return new URLSearchParams(useLocation().search);
-}
+function useQuery() { return new URLSearchParams(useLocation().search); }
+const FAUCET_ABI = ["function claimed(address) view returns(bool)", "function claim(address treasury)"];
 
 export default function SignUpDone() {
   const navigate = useNavigate();
-  const query = useQuery();
-  const addr = query.get("address");
-  const [treasury, setTreasury] = useState<TreasuryInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Agent-registration card state.
+  const address = useQuery().get("address");
   const [account, setAccount] = useState(() => wallet.getAccount());
-  const [agentStatus, setAgentStatus] = useState<"loading" | "unset" | "registered" | "error">("loading");
-  const [regState, setRegState] = useState<"idle" | "pending" | "done" | "error">("idle");
-  const [regError, setRegError] = useState<string | null>(null);
+  const [owner, setOwner] = useState("");
+  const [policyHash, setPolicyHash] = useState("");
+  const [registered, setRegistered] = useState(false);
+  const [mode, setMode] = useState(0);
+  const [funded, setFunded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const provider = useMemo(() => new ethers.JsonRpcProvider(config.creditcoinRpcUrl), []);
 
-  useEffect(() => {
-    if (!addr) {
-      navigate("/signup");
-      return;
-    }
-    const checksummed = ethers.getAddress(addr);
-    void fetchTreasuryInfo(checksummed)
-      .then(setTreasury)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [addr, navigate]);
+  useEffect(() => { if (!address) navigate("/signup"); }, [address, navigate]);
+  useEffect(() => { wallet.autoConnect({ client: thirdwebClient }).then(() => setAccount(wallet.getAccount())).catch(() => {}); }, []);
 
-  // Restore the embedded-wallet session — the wallet that just deployed (or a
-  // returning session in this browser) is the instance owner, the only address
-  // allowed to call registerAgent.
-  useEffect(() => {
-    let cancelled = false;
-    wallet
-      .autoConnect({ client: thirdwebClient })
-      .then(() => {
-        if (!cancelled) setAccount(wallet.getAccount());
-      })
-      .catch(() => {
-        /* no stored session in this browser — the card offers the dashboard route */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Public on-chain read: is the platform agent already allowlisted on THIS instance?
-  useEffect(() => {
-    if (!addr) return;
-    let cancelled = false;
-    void (async () => {
-      await Promise.resolve();
-      if (cancelled) return;
-      setAgentStatus("loading");
+  async function refresh() {
+    if (!address) return;
+    const treasury = new ethers.Contract(ethers.getAddress(address), FAIR_WITNESS_TREASURY_ABI, provider);
+    const [o, h, r, m] = await Promise.all([
+      treasury.owner(),
+      treasury.currentPolicyHash(),
+      treasury.registeredAgents(config.agentSubmitAddress),
+      treasury.automationMode(),
+    ]);
+    setOwner(o);
+    setPolicyHash(h);
+    setRegistered(Boolean(r));
+    setMode(Number(m));
+    if (config.faucetAddress) {
       try {
-        const ok = await fetchAgentRegistered(ethers.getAddress(addr), config.agentSubmitAddress);
-        if (!cancelled) setAgentStatus(ok ? "registered" : "unset");
+        setFunded(Boolean(await new ethers.Contract(config.faucetAddress, FAUCET_ABI, provider).claimed(address)));
       } catch {
-        if (!cancelled) setAgentStatus("error");
+        setFunded(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [addr]);
-
-  async function handleRegisterAgent() {
-    if (!account || !addr) return;
-    if (!config.agentSubmitAddress) {
-      setRegError("Build is missing VITE_AGENT_SUBMIT_ADDRESS — cannot register.");
-      setRegState("error");
-      return;
-    }
-    setRegError(null);
-    setRegState("pending");
-    try {
-      const checksummed = ethers.getAddress(addr);
-      const signer = await ethers6Adapter.signer.toEthers({
-        client: thirdwebClient,
-        chain: creditcoinTestnet,
-        account,
-      });
-      const instance = new ethers.Contract(checksummed, REGISTER_AGENT_ABI, signer);
-      const tx = await instance.registerAgent(config.agentSubmitAddress);
-      const receipt = await tx.wait();
-      if (receipt?.status !== 1) throw new Error("Transaction reverted (status 0).");
-      const ok = await fetchAgentRegistered(checksummed, config.agentSubmitAddress);
-      setAgentStatus(ok ? "registered" : "error");
-      setRegState("done");
-    } catch (err) {
-      setRegState("error");
-      const msg = err instanceof Error ? err.message : String(err);
-      setRegError(
-        /user rejected|user denied|user cancelled/i.test(msg)
-          ? "Transaction was rejected in your wallet — nothing was sent."
-          : msg
-      );
     }
   }
 
-  if (!addr) return null;
+  useEffect(() => { void refresh().catch(e => setError(humanError(e, "Could not load treasury status."))); }, [address]);
 
-  const explorerBase = config.explorerBaseUrl;
-  const checksummed = ethers.getAddress(addr);
-  const BASE_ASSET = "0x0bFA6eF009f8739c727b292849029608bd6b115A";
+  async function signer() {
+    if (!account) throw new Error("Reconnect through Launch Fair Witness to perform owner actions.");
+    if (owner && account.address.toLowerCase() !== owner.toLowerCase()) throw new Error("Connected wallet is not this treasury's owner.");
+    await ensureSponsoredGas(account.address);
+    return ethers6Adapter.signer.toEthers({ client: thirdwebClient, chain: creditcoinTestnet, account });
+  }
 
-  return (
-    <Layout>
-      <div className="mx-auto max-w-3xl px-6 py-16">
-        <div className="mb-6 text-4xl font-bold text-verified-400">✓</div>
-        <h1 className="text-2xl font-bold text-ledger-100">Your instance is deployed</h1>
-        <p className="mt-3 text-sm leading-relaxed text-ledger-400">
-          Congratulations. You now own a unique treasury contract on the Creditcoin CC3 testnet.
-          This contract holds your funds and enforces your guardrails as immutable code — no one
-          can loosen your limits, not even you, not the agent, not Fair Witness.
-        </p>
+  async function fundAndLaunch() {
+    if (!address) return;
+    if (!config.faucetAddress) {
+      setError("The controlled demo faucet has not been deployed/configured yet.");
+      return;
+    }
 
-        <div className="mt-8 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-wider text-ledger-400">Your contract</p>
-            <a
-              href={`${explorerBase}/address/${checksummed}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-data text-verified-400 hover:underline"
-            >
-              View on explorer
-            </a>
-          </div>
-          <code className="mt-2 block font-data text-sm text-verified-400 break-all py-2">
-            {checksummed}
-          </code>
+    setBusy(true);
+    setError(null);
+    try {
+      const s = await signer();
+      const treasuryAddress = ethers.getAddress(address);
+      const treasury = new ethers.Contract(treasuryAddress, FAIR_WITNESS_TREASURY_ABI, s);
+      const faucet = new ethers.Contract(config.faucetAddress, FAUCET_ABI, s);
+
+      if (!funded) await (await faucet.claim(treasuryAddress)).wait();
+      if (!registered) await (await treasury.registerAgent(config.agentSubmitAddress)).wait();
+      if (mode !== 1) await (await treasury.setAutomationMode(1)).wait();
+
+      await refresh();
+    } catch (e) {
+      setError(humanError(e, "Fair Witness could not finish launching this treasury."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!address) return null;
+  const treasuryAddress = ethers.getAddress(address);
+  const ready = funded && registered && mode === 1;
+
+  return <Layout><main className="mx-auto max-w-3xl px-6 py-14">
+    <p className="text-xs uppercase tracking-widest text-verified-400">Treasury deployed</p>
+    <h1 className="mt-2 text-3xl font-semibold text-ledger-100">Fund your treasury</h1>
+    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ledger-400">
+      Add controlled test assets and Fair Witness will finish the required launch setup automatically. Agent authorization and autonomous mode are part of the product, so you do not need to configure them as separate onboarding steps.
+    </p>
+
+    <section className="mt-7 rounded-xl border border-ledger-700 bg-ledger-900 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-ledger-500">Your treasury</p>
+          <code className="mt-2 block break-all text-sm text-verified-400">{treasuryAddress}</code>
         </div>
+        <span className={`rounded-full border px-3 py-1 text-xs ${ready ? "border-verified-500/30 bg-verified-500/5 text-verified-400" : "border-ledger-700 text-ledger-400"}`}>
+          {ready ? "READY ✓" : "AWAITING FUNDING"}
+        </span>
+      </div>
 
-        {loading && <p className="mt-6 text-sm text-ledger-400">Reading your guardrails…</p>}
-        {error && <p className="mt-4 text-sm text-alert-400">{error}</p>}
-
-        {treasury && (
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold text-ledger-100">Your immutable guardrails</h2>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <GuardrailRow label="Max trade size" value={`${Number(BigInt(treasury.guardrails.maxTradeSize)) / 1_000_000} USDC`} />
-              <GuardrailRow label="Max slippage" value={`${treasury.guardrails.maxSlippageBps} bps`} />
-              <GuardrailRow label="Min arb width" value={`${treasury.guardrails.minArbWidthBps} bps`} />
-              <GuardrailRow label="Max drift" value={`${treasury.guardrails.maxDriftBps} bps`} />
-              <GuardrailRow label="Max confirm gap" value={`${treasury.guardrails.maxConfirmGapBlocks} blocks`} />
-              <GuardrailRow label="Actions per epoch" value={treasury.guardrails.maxActionsPerEpoch.toString()} />
-              <GuardrailRow label="Epoch length" value={`${Math.round(Number(treasury.guardrails.epochLength) / 3600)} hours`} />
-            </div>
-          </div>
-        )}
-
-        <div className="mt-8 rounded-md border border-verified-500/30 bg-verified-500/5 p-6">
-          <p className="text-sm font-semibold text-verified-400">Next step: fund your contract</p>
-          <p className="mt-1 text-sm text-ledger-400">
-            Send test USDC (BASE_ASSET) from{" "}
-            <a
-              href={`${explorerBase}/address/${BASE_ASSET}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-verified-400"
-            >
-              {`${BASE_ASSET.slice(0, 8)}…${BASE_ASSET.slice(-4)}`}
-            </a>
-            ) to your contract above. The public mint function is available on testnet.
-            Once funded, your agent will begin watching for arbitrage opportunities.
-          </p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-lg border border-ledger-800 bg-ledger-950 p-4">
+          <p className="text-xs text-ledger-500">Funding</p>
+          <p className="mt-1 text-lg font-semibold text-ledger-100">100 fwWCTC + 500 fwUSD</p>
+          <p className="mt-2 text-xs leading-relaxed text-ledger-500">Assets go directly to your treasury. The agent never receives custody.</p>
         </div>
-
-        {/* One-tx owner action: allowlist the platform agent as a submitter. */}
-        <div className="mt-6 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-wider text-ledger-400">Fair Witness agent</p>
-            {agentStatus === "registered" && (
-              <span className="text-xs font-data text-verified-400">registered ✓</span>
-            )}
-          </div>
-          <p className="mt-2 text-sm leading-relaxed text-ledger-400">
-            Register the platform's agent key as an allowed submitter on your contract. It
-            is a separate low-privilege key that holds gas money only — it can never move
-            your funds, and every action it takes is still hard-checked against the
-            immutable guardrails above.
-          </p>
-          {agentStatus === "loading" && (
-            <p className="mt-3 text-sm text-ledger-400">Checking registration…</p>
-          )}
-          {agentStatus === "error" && (
-            <p className="mt-3 text-sm text-alert-400">
-              Couldn't read agent status from the chain — check the RPC config and reload.
-            </p>
-          )}
-          {agentStatus === "registered" ? (
-            <p className="mt-3 text-sm text-verified-400">
-              ✓ Registered. Once your contract is funded, the agent will begin watching it.
-            </p>
-          ) : (
-            <>
-              {agentStatus === "unset" && (
-                <p className="mt-3 text-sm text-ledger-400">
-                  Not registered yet — one transaction from you (the owner) enables it.
-                </p>
-              )}
-              {account && config.agentSubmitAddress ? (
-                <>
-                  <button
-                    onClick={handleRegisterAgent}
-                    disabled={regState === "pending"}
-                    className="mt-4 rounded-md bg-copper-500 px-5 py-2 text-sm font-semibold text-text-primary hover:bg-copper-400 transition disabled:opacity-50"
-                  >
-                    {regState === "pending" ? "Confirm in your wallet…" : "Register the agent"}
-                  </button>
-                  {regError && <p className="mt-3 text-sm text-alert-400">{regError}</p>}
-                </>
-              ) : (
-                <p className="mt-3 text-xs text-ledger-500">
-                  {config.agentSubmitAddress ? (
-                    <>
-                      No wallet session in this browser — sign in via the{" "}
-                      <Link to="/dashboard" className="underline hover:text-verified-400">Dashboard</Link>{" "}
-                      to register.
-                    </>
-                  ) : (
-                    "Build config missing VITE_AGENT_SUBMIT_ADDRESS."
-                  )}
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="mt-6">
-          <Link
-            to="/verify"
-            className="text-sm text-ledger-400 hover:text-verified-400 transition"
-          >
-            ← Back to verify an action
-          </Link>
+        <div className="rounded-lg border border-ledger-800 bg-ledger-950 p-4">
+          <p className="text-xs text-ledger-500">After funding</p>
+          <p className="mt-1 text-lg font-semibold text-ledger-100">Autonomous by default</p>
+          <p className="mt-2 text-xs leading-relaxed text-ledger-500">Fair Witness binds the bounded submitter and enables your on-chain mandate automatically.</p>
         </div>
       </div>
-    </Layout>
-  );
-}
 
-function GuardrailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between rounded-md border border-ledger-800 bg-ledger-950 px-3 py-2">
-      <span className="text-xs text-ledger-400">{label}</span>
-      <span className="font-data text-xs text-ledger-100">{value}</span>
-    </div>
-  );
+      {!ready && config.faucetAddress && <button
+        disabled={busy}
+        onClick={() => void fundAndLaunch()}
+        className="mt-6 w-full rounded-lg bg-copper-500 px-5 py-3 text-sm font-semibold text-ledger-950 transition hover:bg-copper-400 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy ? "Funding & launching…" : "Fund & launch treasury"}
+      </button>}
+
+      {!config.faucetAddress && <>
+        <div className="mt-6 space-y-1 font-data text-xs text-ledger-300"><p>fwWCTC: {CONTROLLED_DEMO.destination.wctc}</p><p>fwUSD: {CONTROLLED_DEMO.destination.stable}</p></div>
+        <p className="mt-3 text-xs text-alert-400">The demo faucet address is not configured.</p>
+      </>}
+
+      {ready && <div className="mt-6 rounded-lg border border-verified-500/30 bg-verified-500/5 p-4">
+        <p className="text-sm font-semibold text-verified-400">Treasury is funded and autonomous ✓</p>
+        <p className="mt-1 text-xs text-ledger-400">Your mandate is active and the bounded Fair Witness agent can now submit policy-checked proposals.</p>
+      </div>}
+
+      {error && <p className="mt-5 rounded border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{error}</p>}
+
+      <div className="mt-6 flex flex-wrap gap-4">
+        {ready && <Link to={`/dashboard?treasury=${treasuryAddress}`} className="rounded bg-verified-500 px-4 py-2 text-sm font-semibold text-ledger-950">Open dashboard</Link>}
+        <a className="px-1 py-2 text-sm text-copper-400" href={`${config.explorerBaseUrl}/address/${treasuryAddress}`} target="_blank" rel="noreferrer">View treasury on explorer ↗</a>
+      </div>
+    </section>
+
+    <details className="mt-5 rounded-lg border border-ledger-800 bg-ledger-950 p-4 text-xs text-ledger-500">
+      <summary className="cursor-pointer text-ledger-400">Technical deployment details</summary>
+      <div className="mt-3 space-y-2">
+        <p>Owner <span className="font-data break-all text-ledger-300">{owner || "Loading…"}</span></p>
+        <p>Policy hash <span className="font-data break-all text-ledger-300">{policyHash || "Loading…"}</span></p>
+        <p>Bounded agent <span className="text-ledger-300">{registered ? "Authorized" : "Will be authorized during launch"}</span></p>
+        <p>Autonomous mode <span className="text-ledger-300">{mode === 1 ? "Enabled" : "Will be enabled during launch"}</span></p>
+      </div>
+    </details>
+  </main></Layout>;
 }

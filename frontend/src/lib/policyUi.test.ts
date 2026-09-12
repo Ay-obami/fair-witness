@@ -1,15 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { reasonLabel, strategyLabel, validateMandate, type MandateDraft } from "./policyUi";
+import { RECOMMENDED_MANDATE, reasonLabel, strategyLabel, strategyMask, toContractPolicies, validateMandate, type MandateDraft } from "./policyUi";
 
 const valid: MandateDraft = {
-  capitalInstructions: "Fund after review",
+  ...RECOMMENDED_MANDATE,
   enabledStrategies: { Arbitrage: true, Rebalancing: true, "Risk Reduction": true },
-  targetWctcBps: 4000, toleranceBps: 500, maxWctcExposureBps: 6000,
-  maxActionValue: "1000", maxSlippageBps: 150,
-  wctc: "0x1111111111111111111111111111111111111111",
-  stable: "0x2222222222222222222222222222222222222222",
-  venue: "0x3333333333333333333333333333333333333333",
-  automation: "Paused",
 };
 
 describe("schema-v1 UI vocabulary", () => {
@@ -27,18 +21,33 @@ describe("schema-v1 UI vocabulary", () => {
   });
 });
 
-describe("mandate draft validation", () => {
-  it("accepts a bounded draft", () => expect(validateMandate(valid)).toEqual([]));
+describe("schema-v1 mandate builder", () => {
+  it("accepts the recommended bounded mandate", () => {
+    expect(validateMandate(valid)).toEqual([]);
+  });
 
-  it("rejects disabled strategies, malformed addresses and bounds above ceilings", () => {
+  it("rejects disabled strategies and values above protocol ceilings", () => {
     const errors = validateMandate({
       ...valid,
       enabledStrategies: { Arbitrage: false, Rebalancing: false, "Risk Reduction": false },
       maxSlippageBps: 1001,
-      venue: "ordinary-api-response",
     });
     expect(errors).toContain("Enable at least one strategy.");
     expect(errors).toContain("Maximum slippage cannot exceed the protocol ceiling of 1,000 bps.");
-    expect(errors).toContain("venue must be a valid address.");
+  });
+
+  it("encodes the closed strategy set into the Solidity bit mask", () => {
+    expect(strategyMask(valid.enabledStrategies)).toBe(7);
+    expect(strategyMask({ Arbitrage: false, Rebalancing: true, "Risk Reduction": true })).toBe(6);
+  });
+
+  it("builds the exact four policy objects expected by the schema-v1 factory", () => {
+    const policy = toContractPolicies(valid);
+    expect(policy.universal.enabledStrategies).toBe(7);
+    expect(policy.universal.maxActionValueE6).toBe(100_000_000n);
+    expect(policy.universal.maxSlippageBps).toBe(300);
+    expect(policy.arbitrage).toEqual({ minNetEdgeBps: 100, maxArbitrageValueE6: 100_000_000n });
+    expect(policy.rebalance).toEqual({ targetWctcBps: 4000, toleranceBps: 500, maxRebalanceValueE6: 100_000_000n });
+    expect(policy.risk).toEqual({ maxWctcExposureBps: 6000, maxRiskReductionValueE6: 100_000_000n, dailyRiskReductionValueE6: 300_000_000n });
   });
 });

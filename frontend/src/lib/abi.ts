@@ -1,7 +1,8 @@
-// ABI exports for frontend contract interactions.
-// Sourced from Foundry build artifacts to stay in sync with on-chain contracts.
-import factoryArtifact from "../abi/ASCTreasuryFactory.json";
-import journalArtifact from "../abi/ASCTreasuryJournal.json";
+// Schema-v1 ABI exports for product contract interactions.
+// Keep legacy artifacts out of the production path so onboarding cannot
+// accidentally deploy the pre-schema arbitrage treasury.
+import factoryArtifact from "../abi/FairWitnessTreasuryFactory.json";
+import treasuryArtifact from "../abi/FairWitnessTreasury.json";
 
-export const FACTORY_ABI = (factoryArtifact as any).abi ?? factoryArtifact;
-export const JOURNAL_ABI = (journalArtifact as any).abi ?? journalArtifact;
+export const FAIR_WITNESS_FACTORY_ABI = (factoryArtifact as any).abi ?? factoryArtifact;
+export const FAIR_WITNESS_TREASURY_ABI = (treasuryArtifact as any).abi ?? treasuryArtifact;

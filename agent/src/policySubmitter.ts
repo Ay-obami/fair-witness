@@ -10,6 +10,11 @@ export interface PolicySubmissionResult {
   txHash: string;
 }
 
+export interface PolicyPreviewResult {
+  attemptId: bigint;
+  reason: number;
+}
+
 /** Schema-v1 submitter. It transports typed artifacts and has no execution authority. */
 export class PolicySubmitter {
   private readonly contract: ethers.Contract;
@@ -18,6 +23,14 @@ export class PolicySubmitter {
   }
   async alreadyExecuted(executionKey: string): Promise<boolean> {
     return this.contract.executedEvidence(executionKey);
+  }
+  async preview(proposal: ProposalV1, source: AttestedProof, confirmation: AttestedProof): Promise<PolicyPreviewResult> {
+    const proof = (value: AttestedProof) => ({
+      chainKey: value.chainKey, blockHeight: value.blockHeight, transactionIndex: value.transactionIndex,
+      encodedTransaction: value.encodedTransaction, merkleProof: value.merkleProof, continuityProof: value.continuityProof,
+    });
+    const result = await this.contract.submitProposal.staticCall(proposal, proof(source), proof(confirmation));
+    return { attemptId: BigInt(result[0]), reason: Number(result[1]) };
   }
   async submit(proposal: ProposalV1, source: AttestedProof, confirmation: AttestedProof): Promise<PolicySubmissionResult> {
     const proof = (value: AttestedProof) => ({

@@ -165,23 +165,41 @@ contract FairWitnessArbitrageTest is Test {
         assertEq(uint8(stale), uint8(T.ReasonCode.EvidenceStale));
     }
 
-    function test_DriftDirectionAmountAndDestinationDeviationReject() public {
+    function test_DriftDirectionAndConservativeAmountBehavior() public {
         validator.configure(1e6, 1_020_000, 1_000);
         T.Proposal memory p = _proposal(4, address(wctc), address(stable), 100e18);
         vm.prank(agent);
         (, T.ReasonCode drift) = treasury.submitProposal(p, _source(), _confirm());
         assertEq(uint8(drift), uint8(T.ReasonCode.SourceDriftTooHigh));
+
         validator.configure(1e6, 1e6, 1_000);
         p = _proposal(5, address(stable), address(wctc), 100e6);
         vm.prank(agent);
         (, T.ReasonCode direction) = treasury.submitProposal(p, _source(), _confirm());
         assertEq(uint8(direction), uint8(T.ReasonCode.WrongDirection));
+
         p = _proposal(6, address(wctc), address(stable), 99e18);
+        uint256 stableBefore = stable.balanceOf(address(treasury));
         vm.prank(agent);
-        (, T.ReasonCode amount) = treasury.submitProposal(p, _source(), _confirm());
-        assertEq(uint8(amount), uint8(T.ReasonCode.AmountMismatch));
+        (, T.ReasonCode conservative) = treasury.submitProposal(p, _source(), _confirm());
+        assertEq(uint8(conservative), uint8(T.ReasonCode.None));
+        assertGt(stable.balanceOf(address(treasury)), stableBefore);
+    }
+
+    function test_OversizedAmountStillRejects() public {
+        T.Proposal memory p = _proposal(26, address(wctc), address(stable), 101e18);
+        uint256 beforeBalance = wctc.balanceOf(address(treasury));
+        vm.prank(agent);
+        (uint64 id, T.ReasonCode reason) = treasury.submitProposal(p, _source(), _confirm());
+        assertEq(uint8(reason), uint8(T.ReasonCode.AmountExceedsPolicy));
+        assertEq(uint8(treasury.getAttempt(id).result), uint8(T.AttemptResult.Rejected));
+        assertEq(wctc.balanceOf(address(treasury)), beforeBalance);
+        assertEq(treasury.executionCount(), 0);
+    }
+
+    function test_DestinationDeviationRejects() public {
         adapter.configure(1_100_000, 1_200_000, 1_000);
-        p = _proposal(7, address(wctc), address(stable), 100e18);
+        T.Proposal memory p = _proposal(7, address(wctc), address(stable), 100e18);
         vm.prank(agent);
         (, T.ReasonCode deviation) = treasury.submitProposal(p, _source(), _confirm());
         assertEq(uint8(deviation), uint8(T.ReasonCode.DestinationDeviationTooHigh));

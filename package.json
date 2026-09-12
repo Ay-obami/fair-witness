@@ -1,0 +1,13 @@
+{
+  "name": "fair-witness-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fair Witness monorepo deployment entrypoints.",
+  "scripts": {
+    "build:agent": "npm ci --prefix agent && npm run build --prefix agent",
+    "start:agent": "npm start --prefix agent"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  }
+}
