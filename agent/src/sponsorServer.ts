@@ -1,12 +1,15 @@
 import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { ethers } from "ethers";
+import { runtimeHealthSnapshot } from "./runtimeHealth.js";
 
 const RPC = process.env.CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network";
 const CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? "102031");
 const PORT = Number(process.env.PORT ?? "8080");
 const TARGET_WEI = BigInt(process.env.GAS_SPONSOR_TARGET_WEI ?? "250000000000000000"); // 0.25 CTC
 const MAX_TOPUP_WEI = BigInt(process.env.GAS_SPONSOR_MAX_TOPUP_WEI ?? TARGET_WEI.toString());
+const DAILY_BUDGET_WEI = BigInt(process.env.GAS_SPONSOR_DAILY_BUDGET_WEI ?? (TARGET_WEI * 10n).toString());
+const ADDRESS_COOLDOWN_MS = Math.max(0, Number(process.env.GAS_SPONSOR_ADDRESS_COOLDOWN_MS ?? "86400000"));
 const ALLOWED_ORIGINS = (process.env.SPONSOR_ALLOWED_ORIGINS ?? "https://fair-witness.vercel.app")
   .split(",")
   .map((value) => value.trim())
@@ -14,7 +17,10 @@ const ALLOWED_ORIGINS = (process.env.SPONSOR_ALLOWED_ORIGINS ?? "https://fair-wi
 const sponsorKey = process.env.GAS_SPONSOR_PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC, CHAIN_ID, { staticNetwork: true });
 const sponsor = sponsorKey ? new ethers.Wallet(sponsorKey, provider) : null;
-const inFlight = new Map<string, Promise<unknown>>();
+const lastFundedAt = new Map<string, number>();
+let budgetDay = Math.floor(Date.now() / 86_400_000);
+let sponsoredTodayWei = 0n;
+let sponsorSerial: Promise<void> = Promise.resolve();
 
 function allowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
@@ -46,30 +52,63 @@ async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
   return parsed as Record<string, unknown>;
 }
 
-async function topUp(address: string) {
+function refreshDailyBudget() {
+  const currentDay = Math.floor(Date.now() / 86_400_000);
+  if (currentDay !== budgetDay) {
+    budgetDay = currentDay;
+    sponsoredTodayWei = 0n;
+  }
+}
+
+async function topUpUnlocked(address: string) {
   if (!sponsor) throw new Error("GAS_SPONSOR_PRIVATE_KEY is not configured");
+  refreshDailyBudget();
+
   const recipient = ethers.getAddress(address);
+  const key = recipient.toLowerCase();
   const current = await provider.getBalance(recipient);
   if (current >= TARGET_WEI) {
-    return { address: recipient, funded: false, balanceWei: current.toString(), targetWei: TARGET_WEI.toString() };
-  }
-  const amount = TARGET_WEI - current;
-  if (amount > MAX_TOPUP_WEI) throw new Error("requested top-up exceeds sponsor ceiling");
-  const existing = inFlight.get(recipient.toLowerCase());
-  if (existing) return existing;
-  const task = (async () => {
-    const tx = await sponsor.sendTransaction({ to: recipient, value: amount });
-    const receipt = await tx.wait();
     return {
       address: recipient,
-      funded: true,
-      amountWei: amount.toString(),
-      txHash: receipt?.hash ?? tx.hash,
+      funded: false,
+      balanceWei: current.toString(),
       targetWei: TARGET_WEI.toString(),
     };
-  })().finally(() => inFlight.delete(recipient.toLowerCase()));
-  inFlight.set(recipient.toLowerCase(), task);
-  return task;
+  }
+
+  const last = lastFundedAt.get(key);
+  if (last && Date.now() - last < ADDRESS_COOLDOWN_MS) {
+    throw new Error("address sponsorship cooldown is still active");
+  }
+
+  const amount = TARGET_WEI - current;
+  if (amount > MAX_TOPUP_WEI) throw new Error("requested top-up exceeds sponsor ceiling");
+  if (sponsoredTodayWei + amount > DAILY_BUDGET_WEI) throw new Error("daily sponsor budget exhausted");
+
+  const tx = await sponsor.sendTransaction({ to: recipient, value: amount });
+  const receipt = await tx.wait();
+  if (!receipt || receipt.status !== 1) throw new Error("sponsor transaction was not confirmed successfully");
+  sponsoredTodayWei += amount;
+  lastFundedAt.set(key, Date.now());
+  return {
+    address: recipient,
+    funded: true,
+    amountWei: amount.toString(),
+    txHash: receipt.hash,
+    targetWei: TARGET_WEI.toString(),
+  };
+}
+
+async function topUp(address: string) {
+  let release!: () => void;
+  const previous = sponsorSerial;
+  sponsorSerial = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try {
+    return await topUpUnlocked(address);
+  } finally {
+    release();
+  }
 }
 
 export function startSponsorServer() {
@@ -81,10 +120,27 @@ export function startSponsorServer() {
       return res.end();
     }
     if (req.method === "GET" && req.url === "/health") {
-      return json(res, 200, { ok: true, sponsorConfigured: Boolean(sponsor), chainId: CHAIN_ID });
+      refreshDailyBudget();
+      return json(res, 200, {
+        ok: true,
+        sponsorConfigured: Boolean(sponsor),
+        chainId: CHAIN_ID,
+        sponsor: {
+          targetWei: TARGET_WEI.toString(),
+          maxTopupWei: MAX_TOPUP_WEI.toString(),
+          dailyBudgetWei: DAILY_BUDGET_WEI.toString(),
+          sponsoredTodayWei: sponsoredTodayWei.toString(),
+          remainingDailyBudgetWei: (DAILY_BUDGET_WEI > sponsoredTodayWei ? DAILY_BUDGET_WEI - sponsoredTodayWei : 0n).toString(),
+          addressCooldownMs: ADDRESS_COOLDOWN_MS,
+        },
+        agent: runtimeHealthSnapshot(),
+      });
     }
     if (req.method !== "POST" || req.url !== "/sponsor-gas") return json(res, 404, { error: "not found" });
     if (!allowedOrigin(origin)) return json(res, 403, { error: "origin not allowed" });
+    if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+      return json(res, 415, { error: "application/json is required" });
+    }
     try {
       const payload = await body(req);
       if (typeof payload.address !== "string" || !ethers.isAddress(payload.address)) {
@@ -95,11 +151,12 @@ export function startSponsorServer() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("[sponsor] request failed", message);
-      return json(res, 500, { error: message });
+      const status = message.includes("cooldown") || message.includes("budget") ? 429 : 500;
+      return json(res, status, { error: message });
     }
   });
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[sponsor] listening on :${PORT}; configured=${Boolean(sponsor)} targetWei=${TARGET_WEI}`);
+    console.log(`[sponsor] listening on :${PORT}; configured=${Boolean(sponsor)} targetWei=${TARGET_WEI} dailyBudgetWei=${DAILY_BUDGET_WEI}`);
   });
   return server;
 }
