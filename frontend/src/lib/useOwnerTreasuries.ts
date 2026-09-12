@@ -47,7 +47,7 @@ export interface TreasuryView {
   activities: ActivityItem[];
 }
 
-const DEFAULT_FACTORY_DEPLOYMENT_BLOCK = 5_456_821;
+const DEFAULT_FACTORY_DEPLOYMENT_BLOCK = 5_465_730;
 const LOG_CHUNK_SIZE = 25_000;
 const ACTIVITY_BATCH_SIZE = 20;
 const LIFECYCLE_READ_ABI = [
@@ -58,7 +58,10 @@ const LIFECYCLE_READ_ABI = [
 const cache = new Map<string, TreasuryView[]>();
 
 export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | null) {
-  const key = owner?.toLowerCase() ?? "";
+  // Scope the cache to the active factory generation as well as the owner. This prevents
+  // a browser session that previously loaded the old factory from resurfacing legacy
+  // treasuries after a lifecycle/factory migration.
+  const key = owner ? `${config.factoryAddress.toLowerCase()}:${owner.toLowerCase()}` : "";
   const provider = useMemo(() => new ethers.JsonRpcProvider(config.creditcoinRpcUrl), []);
   const factory = useMemo(() => new ethers.Contract(config.factoryAddress, FAIR_WITNESS_FACTORY_ABI, provider), [provider]);
   const [treasuries, setTreasuries] = useState<TreasuryView[]>(() => key ? cache.get(key) ?? [] : []);
@@ -113,8 +116,6 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       c.WCTC(), c.STABLE(), c.universalPolicy(), c.arbitragePolicy(), c.riskPolicy(), c.rebalancePolicy(), readActivities(c),
     ]);
 
-    // Lifecycle methods only exist on the new generation. Older deployed treasuries
-    // remain readable and default to open/production-like UI semantics.
     let closed = false;
     let demoMode = false;
     let demoReserve = ethers.ZeroAddress;
@@ -126,7 +127,10 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       closed = Boolean(closedValue);
       demoMode = Boolean(demoValue);
       demoReserve = String(reserveValue);
-    } catch { /* pre-lifecycle treasury */ }
+    } catch {
+      // A current-generation factory treasury is expected to expose lifecycle reads.
+      // Keep the read resilient, but discovery below will only admit current-factory instances.
+    }
 
     const tokenAbi = ["function balanceOf(address) view returns(uint256)"];
     const [wctcBalance, stableBalance] = await Promise.all([
@@ -145,6 +149,11 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
     };
   }, [provider, readActivities]);
 
+  const isCurrentFactoryTreasury = useCallback(async (address: string) => {
+    try { return Boolean(await factory.isFactoryTreasury(address)); }
+    catch { return false; }
+  }, [factory]);
+
   const discover = useCallback(async (background = false) => {
     if (!owner) return;
     if (background || cache.get(key)?.length) setRefreshing(true); else setLoading(true);
@@ -153,7 +162,7 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       const found = new Map<string, number | undefined>();
       if (requestedTreasury && ethers.isAddress(requestedTreasury)) {
         const address = ethers.getAddress(requestedTreasury);
-        try { if (await factory.isFactoryTreasury(address)) found.set(address, undefined); } catch { /* continue */ }
+        if (await isCurrentFactoryTreasury(address)) found.set(address, undefined);
       }
 
       const latest = await provider.getBlockNumber();
@@ -170,11 +179,20 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
         } catch (e) { console.warn("factory log chunk failed", e); }
       }
 
+      // Supabase is only an optimization. Never trust a cached instance as belonging to
+      // the active factory generation without checking the factory itself. This prevents
+      // old pre-lifecycle treasuries from receiving controls they do not implement.
       try {
-        for (const row of await fetchInstancesForWallet(owner) ?? []) {
-          if (!ethers.isAddress(row.instanceAddress)) continue;
-          const address = ethers.getAddress(row.instanceAddress);
-          if (!found.has(address)) found.set(address, undefined);
+        const rows = await fetchInstancesForWallet(owner) ?? [];
+        const candidates = rows
+          .map((row) => row.instanceAddress)
+          .filter((address): address is string => ethers.isAddress(address));
+        const checks = await Promise.all(candidates.map(async (rawAddress) => {
+          const address = ethers.getAddress(rawAddress);
+          return { address, current: await isCurrentFactoryTreasury(address) };
+        }));
+        for (const item of checks) {
+          if (item.current && !found.has(item.address)) found.set(item.address, undefined);
         }
       } catch { /* optional cache */ }
 
@@ -192,14 +210,14 @@ export function useOwnerTreasuries(owner?: string, requestedTreasury?: string | 
       setLoading(false);
       setRefreshing(false);
     }
-  }, [factory, key, owner, provider, readTreasury, requestedTreasury]);
+  }, [factory, isCurrentFactoryTreasury, key, owner, provider, readTreasury, requestedTreasury]);
 
   useEffect(() => {
     if (!owner) { setTreasuries([]); setLoading(false); return; }
     const cached = cache.get(key);
     if (cached) setTreasuries(cached);
     void discover(Boolean(cached?.length));
-  }, [key, owner, requestedTreasury]);
+  }, [discover, key, owner, requestedTreasury]);
 
   useEffect(() => {
     if (!owner) return;
