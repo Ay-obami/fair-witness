@@ -39,6 +39,7 @@ export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [rejectionIndex, setRejectionIndex] = useState(0);
   const launchPath = account ? "/dashboard" : "/signup";
+  const heroMessage = HERO_MESSAGES[heroIndex];
 
   useEffect(() => {
     const id = window.setInterval(() => setHeroIndex((current) => (current + 1) % HERO_MESSAGES.length), 5600);
@@ -59,31 +60,24 @@ export default function Home() {
           <div className="mb-5 flex flex-wrap items-center gap-2.5 sm:gap-3"><NetworkIndicator /><ControlledMarketBadge /></div>
           <p className="fw-kicker max-w-full">Attestcoin-powered autonomous finance on Creditcoin</p>
 
-          <div className="mt-6 grid">
-            {HERO_MESSAGES.map((message, index) => <div
-              key={message.lead}
-              data-active={index === heroIndex}
-              aria-hidden={index !== heroIndex}
-              className="fw-hero-copy col-start-1 row-start-1 min-w-0"
-            >
-              <h1 className="fw-hero-title max-w-4xl text-[2.9rem] font-semibold leading-[.98] text-ledger-100 min-[390px]:text-[3.25rem] sm:text-[4.1rem] lg:text-[4.45rem] xl:text-[5rem]">
-                {message.lead} <span className="fw-gradient-text">{message.accent}</span>
-              </h1>
-              <p className="mt-5 max-w-2xl text-base leading-relaxed text-ledger-300 sm:mt-6 sm:text-lg xl:text-xl">{message.supporting}</p>
-            </div>)}
+          <div key={heroMessage.lead} className="fw-hero-copy mt-5 min-w-0" data-active="true">
+            <h1 className="fw-hero-title max-w-4xl text-[2.9rem] font-semibold leading-[.98] text-ledger-100 min-[390px]:text-[3.25rem] sm:text-[4.1rem] lg:text-[4.45rem] xl:text-[5rem]">
+              {heroMessage.lead} {heroMessage.accent}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-ledger-300 sm:text-lg xl:text-xl">{heroMessage.supporting}</p>
           </div>
 
-          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-ledger-400 sm:mt-6 sm:text-base">Fair Witness separates intelligence from authority. Autonomous agents reason over verified cross-chain evidence while a user-owned Creditcoin treasury remains the final authority over every movement of capital.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ledger-400 sm:text-base">Fair Witness separates intelligence from authority. Autonomous agents reason over verified cross-chain evidence while a user-owned Creditcoin treasury remains the final authority over every movement of capital.</p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link to={launchPath} onClick={(event) => { if (resolving) event.preventDefault(); }} className="fw-primary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold">
               {resolving ? "Checking session…" : account ? "Open dashboard →" : "Launch app →"}
             </Link>
             <a href="#how-it-works" className="fw-secondary-button rounded-xl px-6 py-3.5 text-center text-sm font-semibold text-ledger-200">Explore the execution path ↓</a>
           </div>
 
-          <div className="mt-7 sm:mt-8"><RealityStrip /></div>
-          <div className="mt-6 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all duration-500 ${index === heroIndex ? "w-10 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
+          <div className="mt-5"><RealityStrip /></div>
+          <div className="mt-4 flex gap-2" aria-label="Hero message progress">{HERO_MESSAGES.map((_, index) => <button key={index} type="button" aria-label={`Show message ${index + 1}`} onClick={() => setHeroIndex(index)} className={`h-1.5 cursor-pointer rounded-full transition-all duration-500 ${index === heroIndex ? "w-10 bg-copper-400" : "w-4 bg-ledger-700 hover:bg-ledger-600"}`} />)}</div>
         </div>
 
         <div className="relative z-10 min-w-0 lg:pl-2 xl:pl-4">
