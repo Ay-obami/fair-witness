@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ethers } from "ethers";
 import { ethers6Adapter } from "thirdweb/adapters/ethers6";
 import { Layout } from "../components/layout";
 import { OnChainLoading, RefreshIndicator } from "../components/OnChainLoading";
-import { ControlledMarketBadge, DecisionSequence, ExecutionRail, ProductMetric } from "../components/ProductVisuals";
+import { ControlledMarketBadge, DecisionSequence, ProductMetric } from "../components/ProductVisuals";
 import { FAIR_WITNESS_TREASURY_ABI } from "../lib/abi";
 import { config } from "../lib/config";
 import { reasonLabel } from "../lib/policyUi";
@@ -26,10 +26,77 @@ const LIFECYCLE_WRITE_ABI = [
   "error TreasuryClosed()",
 ];
 
+type PipelineStage = "observe" | "prove" | "reason" | "authorize" | "execute";
+type PipelineStatus = "working" | "waiting" | "blocked" | "executed" | "failed";
+
+type PipelineSnapshot = {
+  treasury: string;
+  stage: PipelineStage;
+  status: PipelineStatus;
+  detail: string;
+  cycleId: string;
+  updatedAt: string;
+};
+
+type AgentHealthPayload = {
+  agent?: {
+    treasuryPipelines?: Record<string, PipelineSnapshot>;
+  };
+};
+
+const PIPELINE_STEPS: Array<{ key: PipelineStage; label: string; caption: string }> = [
+  { key: "observe", label: "Observe", caption: "Source market" },
+  { key: "prove", label: "Prove", caption: "Attestcoin" },
+  { key: "reason", label: "Reason", caption: "Candidate + AI" },
+  { key: "authorize", label: "Authorize", caption: "On-chain policy" },
+  { key: "execute", label: "Execute", caption: "Creditcoin tx" },
+];
+
+function useAgentPipelines() {
+  const [pipelines, setPipelines] = useState<Record<string, PipelineSnapshot>>({});
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    if (!config.sponsorApiUrl) {
+      setConnected(false);
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+    const poll = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch(`${config.sponsorApiUrl}/health`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`agent health HTTP ${response.status}`);
+        const payload = await response.json() as AgentHealthPayload;
+        if (cancelled) return;
+        setPipelines(payload.agent?.treasuryPipelines ?? {});
+        setConnected(true);
+      } catch {
+        if (!cancelled) setConnected(false);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), 2_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return { pipelines, connected };
+}
+
 export default function Dashboard() {
   const [params] = useSearchParams();
   const { account, resolving } = useAuthSession();
   const { treasuries, loading, refreshing, error, refreshedAt, refresh } = useOwnerTreasuries(account?.address, params.get("treasury"));
+  const { pipelines, connected: pipelineConnected } = useAgentPipelines();
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -138,14 +205,14 @@ export default function Dashboard() {
     {!resolving && account && loading && treasuries.length === 0 && <OnChainLoading />}
     {!resolving && account && !loading && treasuries.length === 0 && <Empty />}
 
-    {account && treasuries.length > 0 && <div className="mt-8 space-y-8">{treasuries.map((view, index) => <OverviewCard key={view.address} view={view} index={treasuries.length - index} busy={busy === view.address} onMode={setAutomation} onWithdraw={withdraw} onClose={closeTreasury} />)}</div>}
+    {account && treasuries.length > 0 && <div className="mt-8 space-y-8">{treasuries.map((view, index) => <OverviewCard key={view.address} view={view} index={treasuries.length - index} busy={busy === view.address} pipeline={pipelines[view.address.toLowerCase()]} pipelineConnected={pipelineConnected} onMode={setAutomation} onWithdraw={withdraw} onClose={closeTreasury} />)}</div>}
     {actionNotice && <p className="mt-5 rounded-xl border border-verified-500/30 bg-verified-500/5 p-3 text-sm text-verified-400">{actionNotice}</p>}
     {(error || actionError) && <p className="mt-5 rounded-xl border border-alert-500/30 bg-alert-500/5 p-3 text-sm text-alert-400">{actionError ?? error}</p>}
   </main></Layout>;
 }
 
-function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
-  view: TreasuryView; index: number; busy: boolean;
+function OverviewCard({ view, index, busy, pipeline, pipelineConnected, onMode, onWithdraw, onClose }: {
+  view: TreasuryView; index: number; busy: boolean; pipeline?: PipelineSnapshot; pipelineConnected: boolean;
   onMode: (view: TreasuryView, next: number) => Promise<void>;
   onWithdraw: (view: TreasuryView, asset: string, symbol: string, decimals: number, balance: bigint) => Promise<void>;
   onClose: (view: TreasuryView) => Promise<void>;
@@ -166,7 +233,6 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
   const stateTitle = view.closed ? "Treasury closed" : active ? "Agent active" : "Agent paused";
   const stateDetail = view.closed ? "Permanently inactive · historical journal preserved" : active ? "Operating inside the owner-defined mandate" : "No autonomous proposal can execute";
   const priceText = view.wctcPriceE6 > 0n ? `${Number(ethers.formatUnits(view.wctcPriceE6, 6)).toLocaleString(undefined, { maximumFractionDigits: 6 })} fwUSD / WCTC` : "Price unavailable";
-  const railActive = view.closed ? 0 : active ? 5 : 3;
 
   return <article className="fw-command-surface overflow-hidden rounded-3xl border">
     <div className="border-b border-ledger-800 p-5 sm:p-7">
@@ -177,10 +243,7 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
 
       <TreasuryAddressRow address={view.address} />
 
-      <div className="mt-6 rounded-2xl border border-ledger-800 bg-ledger-950/55 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.18em] text-ledger-500">Live execution pipeline</p><p className="mt-1 text-xs text-ledger-400">Observe → prove → reason → authorize → execute</p></div>{active && <span className="font-data text-[9px] text-verified-400">READY</span>}</div>
-        <div className="mt-5"><ExecutionRail active={railActive} /></div>
-      </div>
+      <LiveTreasuryPipeline active={active} closed={view.closed} connected={pipelineConnected} snapshot={pipeline} />
 
       <section className="mt-7">
         <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-end"><div><p className="text-[10px] uppercase tracking-[.18em] text-ledger-500">Treasury assets</p><h3 className="mt-1 text-lg font-semibold text-ledger-100">Current token balances</h3></div><p className="text-xs text-ledger-500">Read directly from Creditcoin</p></div>
@@ -219,6 +282,106 @@ function OverviewCard({ view, index, busy, onMode, onWithdraw, onClose }: {
       </section>
     </div>
   </article>;
+}
+
+function LiveTreasuryPipeline({ active, closed, connected, snapshot }: { active: boolean; closed: boolean; connected: boolean; snapshot?: PipelineSnapshot }) {
+  const stageIndex = snapshot ? PIPELINE_STEPS.findIndex((step) => step.key === snapshot.stage) : -1;
+  const status = closed ? "closed" : !active ? "paused" : !connected ? "offline" : snapshot?.status ?? "ready";
+  const working = status === "working";
+
+  const headline = closed ? "Pipeline disabled"
+    : !active ? "Agent paused"
+      : !connected ? "Connecting to agent telemetry"
+        : !snapshot ? "Agent ready"
+          : snapshot.status === "working" ? `${PIPELINE_STEPS[Math.max(0, stageIndex)]?.label ?? "Cycle"} in progress`
+            : snapshot.status === "executed" ? "Execution confirmed"
+              : snapshot.status === "blocked" ? "Policy blocked proposal"
+                : snapshot.status === "failed" ? "Cycle failed"
+                  : "Waiting for next cycle";
+
+  const detail = closed ? "This treasury cannot run another autonomous cycle."
+    : !active ? "No autonomous proposal can execute while this treasury is paused."
+      : !connected ? "The dashboard is waiting for the Railway agent health feed."
+        : snapshot?.detail ?? "Waiting for the next scheduled market observation.";
+
+  const statusTone = status === "executed" ? "text-verified-400"
+    : status === "blocked" || status === "failed" ? "text-alert-400"
+      : working ? "text-external-400"
+        : "text-ledger-400";
+
+  const updated = snapshot?.updatedAt ? new Date(snapshot.updatedAt) : null;
+  const ageSeconds = updated ? Math.max(0, Math.floor((Date.now() - updated.getTime()) / 1000)) : null;
+
+  const stepState = (index: number) => {
+    if (closed || !active || !snapshot) return "idle" as const;
+    if (snapshot.status === "executed") return index <= stageIndex ? "complete" as const : "idle" as const;
+    if (index < stageIndex) return "complete" as const;
+    if (index > stageIndex) return "idle" as const;
+    if (snapshot.status === "working") return "active" as const;
+    if (snapshot.status === "blocked") return "blocked" as const;
+    if (snapshot.status === "failed") return "failed" as const;
+    return "waiting" as const;
+  };
+
+  const dotClasses = (state: ReturnType<typeof stepState>) => state === "complete"
+    ? "border-verified-500/60 bg-verified-500/10 text-verified-400"
+    : state === "active" ? "border-external-500/70 bg-external-500/10 text-external-400 shadow-[0_0_20px_rgba(79,158,232,.22)]"
+      : state === "blocked" || state === "failed" ? "border-alert-500/70 bg-alert-500/10 text-alert-400"
+        : state === "waiting" ? "border-copper-500/60 bg-copper-500/10 text-copper-400"
+          : "border-ledger-700 bg-ledger-950/70 text-ledger-600";
+
+  const connectorComplete = (index: number) => snapshot && active && index < stageIndex;
+  const connectorWorking = (index: number) => snapshot && active && working && index === stageIndex - 1;
+
+  return <section className="mt-6 rounded-2xl border border-ledger-800 bg-ledger-950/55 p-4 sm:p-5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-[.18em] text-ledger-500">Live agent cycle</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className={`text-sm font-semibold ${statusTone}`}>{headline}</p>
+          {working && <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-external-400 opacity-60"/><span className="relative inline-flex h-2 w-2 rounded-full bg-external-400"/></span>}
+        </div>
+        <p className="mt-1 max-w-3xl text-xs leading-relaxed text-ledger-400">{detail}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 font-data text-[9px] uppercase tracking-wide text-ledger-600">
+        {snapshot && <span>cycle {snapshot.cycleId.slice(11, 19)}Z</span>}
+        {ageSeconds !== null && <span>· {ageSeconds}s ago</span>}
+      </div>
+    </div>
+
+    <div className="mt-5 hidden sm:flex sm:items-start">
+      {PIPELINE_STEPS.map((step, index) => {
+        const state = stepState(index);
+        return <div key={step.key} className={`flex min-w-0 items-start ${index < PIPELINE_STEPS.length - 1 ? "flex-1" : ""}`}>
+          <div className="flex w-20 shrink-0 flex-col items-center text-center">
+            <div className={`relative grid h-9 w-9 place-items-center rounded-full border font-data text-[10px] transition-all duration-300 ${dotClasses(state)} ${state === "active" ? "animate-pulse" : ""}`}>
+              {state === "complete" ? "✓" : String(index + 1).padStart(2, "0")}
+            </div>
+            <p className={`mt-2 text-[9px] font-semibold uppercase tracking-wide ${state === "idle" ? "text-ledger-600" : state === "blocked" || state === "failed" ? "text-alert-400" : "text-ledger-300"}`}>{step.label}</p>
+            <p className="mt-0.5 text-[9px] text-ledger-600">{step.caption}</p>
+          </div>
+          {index < PIPELINE_STEPS.length - 1 && <div className={`relative mt-[18px] h-px flex-1 overflow-visible ${connectorComplete(index) ? "bg-verified-500/50" : "bg-ledger-800"}`}>
+            {connectorWorking(index + 1) && <span className="absolute -top-[3px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 animate-ping rounded-full bg-external-400" />}
+          </div>}
+        </div>;
+      })}
+    </div>
+
+    <div className="mt-5 space-y-0 sm:hidden">
+      {PIPELINE_STEPS.map((step, index) => {
+        const state = stepState(index);
+        return <div key={step.key}>
+          <div className="flex items-center gap-3">
+            <div className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full border font-data text-[10px] ${dotClasses(state)} ${state === "active" ? "animate-pulse" : ""}`}>
+              {state === "complete" ? "✓" : String(index + 1).padStart(2, "0")}
+            </div>
+            <div className="min-w-0"><p className={`text-xs font-semibold ${state === "blocked" || state === "failed" ? "text-alert-400" : state === "idle" ? "text-ledger-600" : "text-ledger-200"}`}>{step.label}</p><p className="mt-0.5 text-[10px] text-ledger-600">{step.caption}</p></div>
+          </div>
+          {index < PIPELINE_STEPS.length - 1 && <div className={`relative ml-[17px] h-6 w-px ${connectorComplete(index) ? "bg-verified-500/50" : "bg-ledger-800"}`}>{connectorWorking(index + 1) && <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 animate-bounce rounded-full bg-external-400" />}</div>}
+        </div>;
+      })}
+    </div>
+  </section>;
 }
 
 function TreasuryAddressRow({ address }: { address: string }) {
