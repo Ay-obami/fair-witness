@@ -192,19 +192,6 @@
   },
   {
     "type": "function",
-    "name": "LIFECYCLE_CONFIGURATOR",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "MAX_ALLOWED_SLIPPAGE_BPS",
     "inputs": [],
     "outputs": [
@@ -366,39 +353,6 @@
   },
   {
     "type": "function",
-    "name": "closeTreasury",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "closed",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "configureLifecycle",
-    "inputs": [
-      {
-        "name": "demoReserve_",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "currentPolicyHash",
     "inputs": [],
     "outputs": [
@@ -406,32 +360,6 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "demoMode",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "demoReserve",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -773,19 +701,6 @@
             "internalType": "bytes32"
           }
         ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "lifecycleConfigured",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -1663,25 +1578,6 @@
   },
   {
     "type": "event",
-    "name": "LifecycleConfigured",
-    "inputs": [
-      {
-        "name": "demoMode",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      },
-      {
-        "name": "demoReserve",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "OwnerExit",
     "inputs": [
       {
@@ -1725,37 +1621,6 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "TreasuryClosure",
-    "inputs": [
-      {
-        "name": "recipient",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "wctcAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "stableAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "demoMode",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "AmountOutOverflow",
     "inputs": []
@@ -1777,27 +1642,12 @@
   },
   {
     "type": "error",
-    "name": "DemoTokenWithdrawalDisabled",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidConfiguration",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidPolicy",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "LifecycleAlreadyConfigured",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotLifecycleConfigurator",
     "inputs": []
   },
   {
@@ -1847,10 +1697,5 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "TreasuryClosed",
-    "inputs": []
   }
 ]
