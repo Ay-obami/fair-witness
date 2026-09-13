@@ -122,6 +122,18 @@ pre,
     box-shadow: 0 24px 80px rgba(0,0,0,.58) !important;
   }
 
+  /* The mobile nav is an overlay below the sticky header. Keep it usable in landscape,
+     short phones and devices with a bottom safe area. */
+  nav > div.absolute {
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  nav > div.absolute > div {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
   input,
   select,
   textarea { font-size: 16px !important; }
