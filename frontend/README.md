@@ -1,36 +1,63 @@
-# Fair Witness — Replay & Audit Viewer
+# Fair Witness Frontend
 
-React + Tailwind frontend for Fair Witness, an attested custody-free arbitrage journal.
-Given an `actionKey`, reconstructs the full attestation -> decision -> action chain and
-independently re-hashes the retrieved off-chain reasoning to confirm it matches the
-on-chain `decisionHash` commitment - the concrete "prove the reasoning wasn't edited
-after the fact" moment described in `docs/DESIGN.md`.
+React + Vite frontend for the current schema-v1 Fair Witness product.
 
-## Quick start
+The application provides:
+
+- embedded-account sign-in;
+- mandate construction and treasury deployment;
+- funding/agent authorization/autonomous-mode lifecycle controls;
+- a mission-control dashboard with real per-treasury agent telemetry;
+- schema-v1 Activity and Decision Detail audit views;
+- Safeguards/policy visualization;
+- independent Verify by treasury address + attempt ID;
+- controlled public-testnet evidence pages.
+
+The frontend is not an authorization layer. Security-critical evidence, policy, replay and execution decisions are enforced by the treasury contracts.
+
+## Local development
 
 ```bash
-npm install
+npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-Runs in **demo mode** by default (`VITE_DEMO_MODE=true`) - no live RPC needed. Three
-sample entries are provided via the quick-pick chips, illustrating:
-1. A normal, hash-verified execution.
-2. A deliberately tampered reasoning payload, to prove the mismatch detector actually
-   catches something rather than always showing a green checkmark.
-3. A decisionHash with no retrievable reasoning, to show the honest "unverifiable, not
-   assumed either way" state.
+Fill only the values appropriate for your environment. Never place private keys or a Supabase service-role key in a `VITE_*` variable; Vite variables are browser-visible.
 
-## Live mode
+## Checks
 
-Set `VITE_DEMO_MODE=false` and fill in `VITE_CREDITCOIN_RPC_URL`,
-`VITE_TREASURY_ADDRESS`, and `VITE_REASONING_API_URL` (see `.env.example`). Note:
-`VITE_REASONING_API_URL` must point at something that actually serves the agent's
-locally-stored reasoning payloads over HTTP - `agent/src/reasoningStore.ts`'s local file
-store isn't reachable from a browser as-is. See `docs/DEPLOYMENT.md`.
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-## Design
+## Routes
 
-Deliberately not a generic indigo/purple SaaS palette - a dark "forensic ledger"
-aesthetic (near-black slate, monospace data, a single teal "verified" accent and amber
-"alert" accent) matching the audit-tool nature of what this actually is.
+The important product routes are:
+
+```text
+/                         landing
+/mandate                  create a new mandate/treasury
+/signup/done              fund and launch a new treasury
+/dashboard                treasury command center
+/activity                 on-chain attempt journal
+/decision/:treasury/:attemptId
+/safeguards               deterministic policy explanation
+/verify                   independent schema-v1 attempt locator
+/evidence                 controlled public-testnet evidence
+/docs                     user-facing help
+```
+
+The `/decision/...` route reads the current `FairWitnessTreasury.getAttempt()` schema. Legacy action-key replay UI has been removed; old `/action/*` links redirect to `/verify`.
+
+## Live telemetry
+
+The dashboard polls the configured agent/sponsor health API for non-sensitive `agent.treasuryPipelines` snapshots. The pipeline is intentionally quiet between cycles and only marks a stage as working when the agent is actually in that stage.
+
+Production browser access therefore requires the agent health service to allow the deployed frontend origin through its CORS allow-list.
+
+## More documentation
+
+See the repository-level [`README.md`](../README.md), [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md), and [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md).

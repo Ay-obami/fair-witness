@@ -2,139 +2,87 @@
 
 ## Purpose
 
-A strategy interprets a verified, deterministic context and produces a bounded candidate. It does not execute, choose a route, perform authoritative accounting, or alter a mandate. The three strategies share one pipeline and one treasury boundary.
+A strategy interprets a verified/deterministic context and produces a bounded candidate. It does not execute, choose a route, perform authoritative accounting, or alter a mandate. All three strategies share one treasury security boundary.
 
 ## Shared pipeline
 
 ```text
-EvidenceCollector
-  -> VerifiedContextAssembler
-  -> deterministic Strategy.evaluate()
-  -> Candidate
-  -> AI decides EXECUTE or WAIT
-  -> deterministic ProposalBuilder
-  -> Treasury policy
-  -> execution or reason-coded rejection
+source observation + proofs
+  → deterministic verified context
+  → deterministic Strategy.evaluate()
+  → Candidate
+  → reasoning layer: EXECUTE or WAIT
+  → deterministic ProposalBuilder
+  → treasury policy
+  → execution or reason-coded rejection
 ```
 
-Suggested off-chain domain interfaces:
+A candidate contains the strategy, commitments, required direction, deterministic input amount, permitted value and typed metrics. The model response contains the decision and rationale; it does not contain authoritative execution terms.
 
-```ts
-type StrategyType = "ARBITRAGE" | "REBALANCE" | "RISK_REDUCTION";
+If the reasoning layer says `EXECUTE`, proposal construction copies execution terms only from the deterministic candidate and active mandate. Free-form model numbers, addresses or routes are never promoted into authority.
 
-interface Strategy<C extends Candidate> {
-  readonly type: StrategyType;
-  evaluate(context: VerifiedContext, mandate: MandateSnapshot): C | null;
-}
+## Context and freshness
 
-interface Candidate {
-  strategy: StrategyType;
-  evidenceHash: Hex32;
-  observationHash: Hex32;
-  policyHash: Hex32;
-  direction: "SELL_WCTC" | "BUY_WCTC";
-  deterministicAmountIn: bigint;
-  permittedValueE6: bigint;
-  metrics: TypedStrategyMetrics;
-}
+One evaluation context is scoped to one treasury and one cycle. It may contain source/confirmation proof positions, decoded source-market values, destination market state, treasury balances, immutable mandate values and canonical commitments.
 
-interface AiDecision {
-  decision: "EXECUTE" | "WAIT";
-  strategy: StrategyType;
-  rationale: string;
-  reasonTags: string[];
-}
-```
-
-The runtime validates the AI response against a strict schema. If it says `EXECUTE`, the ProposalBuilder copies execution terms only from the candidate and on-chain mandate, never from free-form model output.
-
-## Verified context
-
-One context is scoped to one treasury and one evaluation cycle. It contains:
-
-- typed source and confirmation proofs;
-- source/confirmation market values decoded from the Attestcoin-proven observer transaction;
-- destination adapter state;
-- treasury WCTC and stable balances read from Creditcoin;
-- immutable mandate read from the treasury;
-- chain positions and observation time metadata;
-- hashes of the canonical AI-visible snapshot and policy.
-
-Off-chain context is a proposal aid. The contract rereads/reverifies all security-critical values at submission.
+This off-chain context is an optimization and reasoning input, not the final authority. Immediately before submission the runner refreshes mutable state, and the treasury rereads/reverifies the security-critical evidence and state during authorization.
 
 ## Arbitrage
 
-Question: is a verified discrepancy between the permitted source and destination markets sufficiently attractive after conservative costs?
+**Question:** is a verified discrepancy between the permitted source and destination markets sufficiently large after conservative costs?
 
-Deterministic evaluation calculates:
+Deterministic evaluation derives:
 
 - source/confirmation drift;
 - destination spot/TWAP deviation;
-- signed gross edge;
-- pool fee, proposal slippage ceiling, and fixed reserve;
-- net edge;
-- correct direction;
+- signed gross edge and required direction;
+- fee/slippage/execution reserve;
+- net-edge eligibility;
 - liquidity eligibility;
-- maximum edge-scaled action value and exact candidate input amount.
+- bounded action value and exact token input.
 
-The AI may decline a mechanically eligible opportunity because conditions look uncertain. It cannot approve an ineligible one: on-chain policy repeats the calculation.
+The reasoning layer may decline a mechanically eligible candidate. It cannot make an ineligible candidate executable because on-chain policy repeats the relevant calculation and exact-term checks.
 
-No claim is made that the source asset can be acquired/bridged or that the two-leg economic arbitrage closes. The hackathon treasury executes only the bounded Creditcoin-side action. This is a reference demonstration of evidence-conditioned execution.
+The controlled demonstration does not claim a bridge, source-asset acquisition path, closed two-leg arbitrage cycle or natural profitability. It demonstrates evidence-conditioned, policy-bounded destination execution.
 
 ## Rebalancing
 
-Question: has the two-asset portfolio moved outside its target WCTC allocation band?
+**Question:** is the two-asset portfolio outside its immutable target WCTC allocation band?
 
-Mandate example:
+Policy values the stable asset at the configured stable-value unit and WCTC at the verified reference price, then derives total portfolio value, current WCTC basis points, target delta, correct direction and capped adjustment.
 
-```text
-target WCTC: 40%
-tolerance:   +/- 5%
-stable:      remaining allocation
-```
+Boundary equality is inside tolerance. The proposal input must match the deterministic amount; wrong direction or an amount above the recomputed cap is rejected.
 
-Deterministic evaluation values stable at one stable-value unit and WCTC at the confirmed verified reference price. It computes total value, current WCTC bps, target WCTC value, required delta, correct direction, and capped adjustment. Boundary equality is inside tolerance.
-
-The candidate carries the computed exact input. The model sees the calculation and decides only `EXECUTE` or `WAIT`. Policy recomputes it and rejects any different amount or a direction that does not reduce deviation; an amount above the cap gets a specific excessive-amount reason.
-
-Rounding is conservative:
-
-- valuation multiplication/division uses full-precision floor math;
-- a sell converts permitted value to WCTC input by flooring, never exceeding the value cap;
-- a buy uses stable input directly;
-- zero after rounding is not executable;
-- policy accepts no amount above the recomputed cap.
+Rounding is conservative: conversions floor so the action does not exceed the value ceiling, and zero-after-rounding is not executable.
 
 ## Risk Reduction
 
-Question: is WCTC exposure above the configured maximum, requiring bounded reduction?
+**Question:** is WCTC exposure above the mandate's maximum?
 
-The minimum viable model intentionally uses only:
+The branch uses current WCTC exposure, maximum exposure, per-action reduction cap, daily reduction cap, universal action cap and available balance. When breached, the only valid direction is WCTC → stable.
 
-- current WCTC exposure bps from verified-price portfolio accounting;
-- immutable maximum WCTC exposure bps;
-- immutable maximum reduction per action;
-- immutable daily reduction cap;
-- universal maximum action value.
+The permitted reduction is bounded by the excess exposure and every applicable cap. The reasoning layer may return EXECUTE or WAIT but cannot choose a larger amount. Daily usage changes only as part of successful authorized execution.
 
-When breached, the only valid direction is sell WCTC for stable. The permitted value is the minimum of excess exposure and all three caps. The AI may choose `EXECUTE` or `WAIT`; it cannot choose the amount. A deliberately altered oversized proposal is rejected and journaled.
-
-Price prediction, volatility estimation, VaR, liquidation, leverage, and drawdown engines are excluded.
+Price prediction, VaR, leverage, liquidation and user-defined arbitrary strategies are outside this strategy model.
 
 ## Scheduling and conflicts
 
-For each treasury/cycle, all enabled strategies may be evaluated against the same snapshot, but only the highest-priority candidate is presented for execution:
+For each treasury/cycle, enabled strategies are evaluated in fixed priority:
 
 1. Risk Reduction
 2. Rebalancing
 3. Arbitrage
 
-After any execution, all lower-priority candidates are discarded and must be recomputed from new balances and market state. No parallel proposals based on the same portfolio snapshot are submitted.
+Only the highest-priority candidate proceeds to reasoning/submission. After an execution, candidates derived from the prior mutable portfolio/market snapshot are discarded and recomputed.
 
-## AI prompt boundary
+This avoids racing parallel strategies against stale balances.
 
-The prompt must state the active strategy, verified evidence summary, deterministic metrics, permitted action, and mandate. The response schema contains no address, numeric amount, slippage, deadline, nonce, route, or calldata. Model/version, prompt template version, seed/temperature, raw structured response, and rationale are persisted for replay.
+## Reasoning boundary
 
-## Adding a future strategy
+The prompt provides the active strategy, evidence summary, deterministic metrics, permitted action and mandate. The response schema excludes addresses, amount, slippage, deadline, nonce, route, recipient and calldata.
 
-Not part of this migration. A future strategy requires explicit authorization, a new enum value, deterministic candidate math, a treasury policy branch, typed journal metrics, adversarial tests, ABI/schema version review, and documentation-lock amendment. A user-authored off-chain module alone can never become executable.
+Model/provider metadata and rationale may be retained by the optional audit projection and committed by `decisionHash`, but the on-chain attempt does not pretend to store prose that is not actually present in contract state.
+
+## Adding another strategy
+
+A new executable strategy requires an explicit schema/enum change, deterministic candidate math, a treasury policy branch, typed journal semantics, adversarial tests, ABI/commitment review and updated public documentation. Adding an off-chain prompt or module alone can never grant executable authority.

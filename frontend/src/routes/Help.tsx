@@ -11,8 +11,8 @@ export default function Help() {
       <div className="mx-auto max-w-3xl px-6 py-16 pb-32">
         <h1 className="text-3xl font-bold text-ledger-100">Help &amp; docs</h1>
         <p className="mt-3 text-sm leading-relaxed text-ledger-400">
-          Plain-language answers to common Fair Witness questions. The locked technical
-          architecture is documented separately in docs/architecture/ARCHITECTURE_LOCK.md.
+          Plain-language answers to common Fair Witness questions. The current technical
+          architecture is documented in the repository at docs/ARCHITECTURE.md.
         </p>
         <div className="mt-5"><ControlledDemoNotice /></div>
 

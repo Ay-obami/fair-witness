@@ -90,16 +90,15 @@ jobs:
           node-version: 22
       - name: Verify current release references agree
         run: node scripts/check-release-consistency.mjs
-      - name: Require release source-of-truth files and complete handoff chain
+      - name: Require public documentation and release source of truth
         run: |
-          test -f master_instruction.md
-          test -f docs/RELEASE_AUDIT.md
-          test -f docs/architecture/ARCHITECTURE_LOCK.md
+          test -f README.md
+          test -f docs/README.md
+          test -f docs/ARCHITECTURE.md
+          test -f docs/DEPLOYMENT.md
+          test -f docs/CONTROLLED_DEMO_RUNBOOK.md
+          test -f docs/architecture/SECURITY_MODEL.md
           test -f contracts/deployments/controlled-demo-schema-v1-lifecycle.json
-          test -f docs/PRE_SUBMISSION_CHECKLIST.md
-          for phase in $(seq 1 13); do
-            test -f "docs/handoffs/PHASE_${phase}_HANDOFF.md"
-          done
       - name: Reject tracked private environment files
         run: |
           if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '\.env\.example$'; then

@@ -33,8 +33,8 @@
    output returns to treasury; journal finalized
 
 8. PROJECTION AND REPLAY
-   Indexer ingests events/receipts into Supabase, attaches full off-chain artifacts,
-   reconciles hashes, and serves the strategy-aware UI
+   Chain receipts remain authoritative; optional indexers/databases attach off-chain
+   artifacts and make the strategy-aware UI easier to query
 ```
 
 ## Identity chain
@@ -53,61 +53,54 @@ No link is inferred from timestamps alone. Source/confirmation moments are chain
 
 ## Authoritative versus advisory data
 
-| Data | Authority | Supabase treatment |
+| Data | Authority | Projection treatment |
 |---|---|---|
-| Treasury balances | Creditcoin token contracts at evaluated block | Cached snapshot with block number/hash. |
+| Treasury balances | Creditcoin token contracts at evaluated block | Cache only with block reference. |
 | Mandate/allowlists/mode | Treasury contract | Read-only projection; never used to authorize. |
 | Source market fact | Successful validator/Attestcoin verification plus decoder | Store proof/result and anchor references; never set verified from API alone. |
 | Destination market state | Immutable adapter/pool read during policy | Cache evaluated metrics and block reference. |
-| AI reasoning | Off-chain model response | Full canonical envelope; integrity checked by decision hash. |
-| Policy result | Treasury event/state | Indexed projection reconciled to receipt. |
+| AI reasoning | Off-chain model response | Store canonical envelope if available; integrity checked by commitment. |
+| Policy result | Treasury attempt/state | Indexed projection reconciled to receipt. |
 | Execution | Treasury/adapter event and token state | Indexed receipt and decoded amounts. |
-| User UI settings | Supabase | Application authority only; no contract effect. |
+| UI preferences | Application storage | Application authority only; no contract effect. |
 
-## Supabase logical schema
+## Optional Supabase audit schema
 
-Names may be adjusted to project conventions, but relationships and authority labels are locked.
+The current public `user_instances` table is only a wallet ↔ treasury convenience projection and contains no email. Richer audit tables can be enabled by applying the audit migration and running the indexer.
 
-### Identity and UX
+Logical records include:
 
-- `user_instances`: authenticated user/wallet to public treasury association; retain on-chain owner verification.
-- `ui_preferences`: selected treasury, display preferences, notification settings.
-- `mandate_projections`: treasury address, policy hash, decoded immutable fields, mode, source block, sync status.
+- `observations`: observation hash, source/destination block references, balances, prices, liquidity and canonical payload;
+- `evidence_bundles`: evidence hash, source/confirm positions, proof locator/digest and on-chain validation state;
+- `ai_decisions`: decision hash, linked commitments, strategy, candidate, model metadata and EXECUTE/WAIT result;
+- `proposals`: proposal ID and exact typed schema-v1 fields;
+- `policy_attempts`: on-chain attempt ID, result/reason, evaluated-state hash and transaction identity;
+- `executions`: successful movement linked one-to-one to an executed attempt;
+- `portfolio_snapshots`: block-bound accounting snapshots;
+- `mandate_projections`: chain-derived mandate/mode cache.
 
-### Evidence and reasoning
-
-- `observations`: observation hash, treasury, source/destination block references, balances, prices, liquidity, canonical payload.
-- `evidence_bundles`: evidence hash, source/confirm chain positions, observer/pool, proof object locator, proof builder response digest, on-chain validation status/transaction. A status is `UNVERIFIED`, `VERIFIED_ONCHAIN`, or `INVALID`; only receipt reconciliation may set `VERIFIED_ONCHAIN`.
-- `ai_decisions`: decision hash, observation/evidence/policy hashes, strategy, candidate envelope, prompt-template version, provider/model, temperature/seed, output, outcome, rationale, created time.
-
-### Proposal, policy, and execution
-
-- `proposals`: proposal ID, exact typed fields, canonical encoded bytes/hash, submitting agent, lifecycle status.
-- `policy_attempts`: on-chain attempt ID, proposal ID, strategy/action, result/reason enum, evaluated-state hash, permitted and observed metrics, transaction/block/log, reconciliation status.
-- `executions`: attempt ID, execution key, asset amounts, adapter/pool, receipt, success and post-state.
-- `portfolio_snapshots`: treasury, evaluated block, balances, values, allocation/exposure bps, evidence and observation hashes.
-
-Use foreign keys where identifiers are database rows, and unique constraints for hashes plus chain positions. Chain reorg handling must key projections by block hash and mark/reconcile orphaned rows.
+Database labels such as `VERIFIED_ONCHAIN` or `EXECUTED` are projections of chain truth, never authorization inputs.
 
 ## AI WAIT path
 
-A WAIT decision has evidence, observation, policy, candidate, and decision records but no on-chain proposal/attempt/execution. It remains visible in the unified UI as `WAIT — NOT SUBMITTED`. It must never be labeled policy-rejected. Periodic hash-root anchoring is a future option, not Phase 0/initial migration scope.
+A WAIT decision is not submitted and therefore has no on-chain proposal/attempt/execution. If richer off-chain audit indexing is enabled it may retain the observation/candidate/decision artifacts, but the product must never label a WAIT as a policy rejection.
 
 ## Rejection path
 
-A registered agent submits a structurally decodable proposal. The treasury creates an attempt, evaluates it, and writes a stable reason code from the locked enum in `ARCHITECTURE_LOCK.md`. The indexer attaches the failed policy stage and all available verified/evaluated context. `amountInActual` and `amountOutActual` remain zero. Evidence locations on an invalid attempt are labeled caller-claimed, never verified. Token balances and approvals are asserted unchanged in tests.
+A registered agent submits a structurally decodable proposal. The treasury creates an attempt, evaluates it, and writes a stable reason code defined by the schema-v1 policy/attempt model summarized in [`../ARCHITECTURE.md`](../ARCHITECTURE.md). `amountInActual` and `amountOutActual` remain zero for a rejected attempt. Evidence locations on invalid evidence are caller-claimed until verification succeeds.
 
-If an unauthorized caller is rejected before journal admission or attempt capacity is exhausted, only the failed transaction receipt exists. The UI may index it as an external transaction anomaly, but must not invent a treasury journal entry.
+If an unauthorized caller is rejected before journal admission or attempt capacity is exhausted, only the failed transaction receipt exists. The UI must not invent a treasury journal entry.
 
 ## Execution ordering and crash recovery
 
 - Build proof once per source fact; evaluate per treasury with fresh balances/destination state.
-- Persist observation and AI decision before submission.
 - Submission is idempotent by proposal ID/nonce/execution key.
+- Immediately before submission, refresh destination/treasury state and re-run deterministic preflight.
+- On state drift, rebuild within the bounded retry policy rather than broadcasting stale terms.
 - On process crash, query chain by proposal ID/nonce and transaction receipt before resubmitting.
-- After any execution, invalidate all candidates from the prior snapshot.
-- Indexer uses event `(chainId, txHash, logIndex)` uniqueness and can replay from deployment block.
+- After any execution, invalidate candidates derived from the prior mutable destination snapshot.
+- Indexers use event `(chainId, txHash, logIndex)` uniqueness and can replay from deployment block.
 
 ## Data retention
 
-Retain canonical proposal/decision envelopes, proof artifacts or durable locators, receipts, and journal projections for the life of the corresponding treasury. Analytics can be rebuilt. Secrets, raw private keys, OTPs, and service credentials never enter records.
+Retain canonical proposal/decision envelopes where available, proof artifacts or durable locators, receipts, and journal projections for the life of the corresponding treasury. Analytics can be rebuilt. Secrets, raw private keys, OTPs and service credentials never belong in audit records.
