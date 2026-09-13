@@ -16,7 +16,7 @@ export function LiveExecutionEngine({ compact = false }: { compact?: boolean }) 
         <p className="text-[9px] uppercase tracking-[0.18em] text-ledger-500 sm:text-[10px] sm:tracking-[0.22em]">Execution control plane</p>
         <p className="mt-1 text-sm font-medium text-ledger-200">Verified evidence → bounded action</p>
       </div>
-      <span className="fw-status-chip shrink-0 text-[9px] font-data sm:text-[10px]"><span className="fw-status-dot" /> LIVE</span>
+      <span className="fw-status-chip shrink-0 text-[9px] font-data sm:text-[10px]"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-external-400" /> SYSTEM FLOW</span>
     </div>
 
     <div className="space-y-0">
