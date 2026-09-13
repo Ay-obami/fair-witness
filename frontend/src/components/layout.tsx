@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/activity", label: "Activity" },
   { to: "/safeguards", label: "Safeguards" },
   { to: "/evidence", label: "Evidence" },
+  { to: "/verify", label: "Verify" },
 ];
 
 const PRODUCT_LINKS = [
@@ -15,6 +16,7 @@ const PRODUCT_LINKS = [
   { to: "/activity", label: "Agent activity" },
   { to: "/safeguards", label: "Safeguards" },
   { to: "/evidence", label: "Verified evidence" },
+  { to: "/verify", label: "Independent verify" },
 ];
 
 const TECH_LINKS = [
@@ -61,10 +63,10 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="hidden items-center gap-2 rounded-full border border-ledger-800 bg-ledger-950/60 px-2.5 py-1 text-[9px] uppercase tracking-widest text-ledger-500 xl:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-verified-400 shadow-[0_0_10px_rgba(36,217,165,.55)]" /> CC3 live</span>
         </Link>
 
-        <div className="hidden items-center gap-x-2 text-sm md:flex lg:gap-x-3">
+        <div className="hidden items-center gap-x-2 text-sm lg:flex xl:gap-x-3">
           {NAV_ITEMS.map(({to,label}) => navLink(to, label))}
           {!resolving && account ? <>
-            <span className="hidden rounded-lg border border-ledger-800 bg-ledger-950/50 px-3 py-2 font-data text-[10px] text-ledger-500 lg:inline">{short(account.address)}</span>
+            <span className="hidden rounded-lg border border-ledger-800 bg-ledger-950/50 px-3 py-2 font-data text-[10px] text-ledger-500 xl:inline">{short(account.address)}</span>
             <button type="button" disabled={loggingOut} onClick={()=>void handleLogout()} className="cursor-pointer rounded-lg border border-ledger-800 px-3 py-2 text-[11px] text-ledger-400 transition hover:border-alert-500/40 hover:bg-alert-500/5 hover:text-alert-400 disabled:cursor-not-allowed disabled:opacity-50">{loggingOut ? "Signing out…" : "Log out"}</button>
           </> : !resolving ? <Link to="/signup" className="fw-secondary-button rounded-lg px-3 py-2 text-[11px] text-ledger-300">Sign in</Link> : null}
           <Link to={newTreasuryPath} className="fw-primary-button rounded-lg px-4 py-2 text-[11px] font-semibold">New treasury →</Link>
@@ -75,7 +77,7 @@ export function Layout({ children }: { children: ReactNode }) {
           aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((open) => !open)}
-          className="fw-secondary-button cursor-pointer rounded-lg p-2.5 text-ledger-200 md:hidden"
+          className="fw-secondary-button cursor-pointer rounded-lg p-2.5 text-ledger-200 lg:hidden"
         >
           <span className={`block h-0.5 w-5 bg-current transition ${mobileOpen ? "translate-y-2 rotate-45" : ""}`} />
           <span className={`mt-1.5 block h-0.5 w-5 bg-current transition ${mobileOpen ? "opacity-0" : ""}`} />
@@ -83,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-      {mobileOpen && <div className="absolute inset-x-0 top-full border-b border-ledger-800 bg-ledger-950/95 shadow-2xl backdrop-blur-xl md:hidden">
+      {mobileOpen && <div className="absolute inset-x-0 top-full max-h-[calc(100vh-4.5rem)] overflow-y-auto border-b border-ledger-800 bg-ledger-950/95 shadow-2xl backdrop-blur-xl lg:hidden">
         <div className="mx-auto max-w-7xl px-4 py-4">
           <div className="overflow-hidden rounded-2xl border border-ledger-800 bg-ledger-900/60">{NAV_ITEMS.map(({to,label}) => navLink(to, label, true))}</div>
           <div className="mt-4 grid gap-3">
