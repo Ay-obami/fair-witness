@@ -54,7 +54,7 @@ struct PolicyEvaluation {
     uint128 permittedValueE6;
     uint128 amountOutMinimum;
     uint16 currentWctcBps;
-    uint16 referenceBps; // edge, target, or risk threshold by strategy
+    uint16 referenceBps;
 }
 ```
 
@@ -68,18 +68,18 @@ struct PolicyEvaluation {
 4. Validate schema, commitments, mode, strategy, action, assets, venue, deadline, slippage, and policy hash.
 5. Detect exact proposal, nonce, and executed strategy/evidence replay.
 6. Consume a valid first-use nonce and mark proposal processed.
-7. Call the immutable validator inside `try/catch`; reject and journal any proof/semantic failure.
+7. Call the immutable validator inside `try/catch`; reject and journal proof/semantic failure where safely recoverable.
 8. Derive and compare evidence hash.
 9. Enforce source drift/liquidity.
-10. Read destination adapter state inside `try/catch`; enforce liquidity and spot/TWAP deviation.
+10. Read destination adapter state; enforce liquidity and spot/TWAP deviation.
 11. Read treasury balances and derive current portfolio state.
 12. Run exactly one strategy branch.
-13. Enforce universal/strategy amount cap, input balance, and execution rate.
+13. Enforce universal/strategy amount cap, input balance, daily usage where applicable, and execution rate.
 14. Derive minimum output using the stricter proposal/mandate slippage.
-15. Invoke an `onlySelf` external execution subcall while the outer submission holds the reentrancy guard. The subcall sets execution replay/rate/risk usage, approves exact input, calls the adapter, verifies output, and clears approval atomically.
-16. On subcall success, finalize the attempt as executed. On caught revert, all subcall state and approvals have rolled back; finalize it as `EXECUTION_FAILED` with no residue.
+15. Invoke the constrained execution path, approve exact input and call the immutable adapter.
+16. Finalize the attempt as executed or as a typed failure while preserving atomic asset/replay invariants.
 
-If adapter execution reverts, the external `onlySelf` execution subcall must leave balances, approvals, replay execution key, execution counters, and risk usage unchanged, while the outer call journals `EXECUTION_FAILED`. The execution helper is callable only by the treasury itself and remains protected by the outer `nonReentrant` call. This exact pattern requires adversarial rollback and direct-call tests; do not replace it with a partially committed sequence.
+A rejected proposal from a registered agent must leave token approvals and strategy balances unchanged. Execution failures must not leave partially committed execution keys, rate counters, risk usage or allowances.
 
 ## Universal checks
 
@@ -89,7 +89,7 @@ If adapter execution reverts, the external `onlySelf` execution subcall must lea
 - schema/action/pair/venue exact;
 - bounded amount and slippage;
 - deadline valid with maximum horizon;
-- nonzero and matching hashes;
+- nonzero and matching commitments;
 - Attestcoin verification, semantic evidence validation, absolute freshness and confirmation relationship;
 - source and destination market validity/liquidity;
 - replay and nonce;
@@ -98,36 +98,29 @@ If adapter execution reverts, the external `onlySelf` execution subcall must lea
 
 ## Arbitrage branch
 
-Compare confirmed verified source price with destination TWAP. Require correct signed direction. Compute gross edge with the economically correct denominator. Require:
+Compare confirmed verified source price with destination TWAP. Require correct signed direction. Compute gross edge with the economically correct denominator and require it to cover pool fee, effective slippage, fixed execution reserve and the mandate's minimum net edge.
 
-```text
-grossEdgeBps >= poolFeeBps
-             + effectiveSlippageBps
-             + fixedExecutionReserveBps
-             + minNetEdgeBps
-```
-
-The maximum value is an auditable monotonic edge-scaling function capped by the arbitrage cap, universal cap and available balance. Preserve the current simple linear curve unless tests reveal a unit error; do not add optimization. Proposal input must equal the recomputed amount.
+The permitted value is a deterministic, auditable monotonic function capped by the arbitrage cap, universal cap and available balance. Proposal input must equal the recomputed amount.
 
 ## Rebalancing branch
 
-Compute two-asset value/allocation exactly as locked in `ARCHITECTURE_LOCK.md`. Require deviation strictly outside tolerance and a direction toward target. `permittedValueE6` is the target delta capped by rebalance and universal maxima. Proposal input must exactly match the deterministic token amount after conservative rounding.
+Compute the two-asset value/allocation described in [`../ARCHITECTURE.md`](../ARCHITECTURE.md). Require deviation strictly outside tolerance and a direction toward target. `permittedValueE6` is the target delta capped by rebalance and universal maxima. Proposal input must exactly match the deterministic token amount after conservative rounding.
 
 ## Risk branch
 
-Compute WCTC exposure using the same valuation routine. Require exposure strictly above the maximum. Only sell WCTC. Cap value by excess, per-action risk cap, remaining fixed-day cap, universal cap and balance; require exact deterministic input. Increment daily usage only inside the successful execution subcall.
+Compute WCTC exposure using the same valuation routine. Require exposure strictly above the maximum. Only sell WCTC. Cap value by excess, per-action risk cap, remaining fixed-day cap, universal cap and balance; require exact deterministic input. Daily usage advances only with successful authorized execution.
 
 ## Rejection journal semantics
 
-A rejected proposal from a registered agent writes no token approval and makes no external DEX call. It records the submitted hashes/terms, policy hash, evaluated-state hash when available, result, reason, and permitted/observed metrics. Invalid evidence is marked `REJECTED_INVALID_EVIDENCE`, never `verified`.
+A rejected proposal from a registered agent writes no token approval and makes no DEX call. It records the submitted commitments/terms, policy hash, evaluated-state hash when available, result, reason and permitted/observed metrics.
 
-Exact replays are journaled as new attempts keyed by attempt ID, while their proposal ID points back to the original. Attempt rate limiting bounds malicious storage growth. Unauthorized EOAs and attempts beyond the journal-rate cap revert and are visible only in transaction receipts; this exception is explicit.
+Exact replays may be journaled as new attempts keyed by attempt ID while their proposal ID links to the original identity. Attempt rate limiting bounds malicious storage growth. Unauthorized EOAs and attempts beyond the journal-rate cap revert and are visible only in transaction receipts.
 
 ## Owner actions
 
-- `registerAgent`/`deregisterAgent`: owner-only, emitted.
-- `pause`/`resume`: owner-only, emitted with policy hash transition.
-- `ownerExit(asset, amount)`: owner-only, allowed WCTC/stable only, recipient fixed to owner, no arbitrary calls, journaled separately from AI strategies.
-- ownership renunciation remains disabled unless decommission semantics safely clear agents and preserve exit; default is disabled.
+- `registerAgent` / `deregisterAgent`: owner-only.
+- `pause` / `resume`: owner-only, with policy-epoch invalidation semantics.
+- supported-asset exit/close paths are constrained by lifecycle mode; no AI proposal can select an arbitrary recipient.
+- ownership renunciation remains disabled.
 
-Owner actions are not AI proposals and do not masquerade as a strategy result.
+Owner actions are not AI proposals and do not masquerade as strategy results.

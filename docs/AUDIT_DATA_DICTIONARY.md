@@ -1,44 +1,67 @@
 # Audit Data Dictionary and Operations
 
-Phase 7 projects Fair Witness records into Supabase for query and replay. Creditcoin receipts and `FairWitnessTreasury.getAttempt` remain authoritative; database rows never authorize execution.
+Creditcoin receipts and `FairWitnessTreasury.getAttempt()` are authoritative. Database rows are optional projections for querying, observability and richer artifact retention; they never authorize execution.
 
-## Record chain
+## On-chain record chain
 
-`observations` → `evidence_bundles` → `ai_decisions` → `proposals` → `policy_attempts` → `executions`
+A submitted schema-v1 attempt links the proposal identity, agent, strategy/action, evidence status, policy result/reason, evaluated-state commitment and actual execution amounts. Successful executions add the execution identity and token movement. Activity, Decision Detail and Verify read this chain-facing model directly.
 
-- `observations`: canonical AI-visible source, destination, portfolio, and block-referenced snapshot.
-- `evidence_bundles`: proof locations/artifacts and reconciliation state. Only a reconciled chain result may set `VERIFIED_ONCHAIN`.
-- `ai_decisions`: canonical prompt/result envelope. `WAIT` ends here and is displayed as `WAIT — NOT SUBMITTED`.
-- `proposals`: deterministic schema-v1 proposal artifact. Its absence must not prevent chain attempt ingestion.
-- `policy_attempts`: complete projection of the typed on-chain attempt plus chain/log identity. Rejections, executions, and caught execution failures are distinct.
-- `executions`: successful asset movement associated one-to-one with an executed attempt.
-- `portfolio_snapshots`: block-hash-bound accounting snapshots.
-- `mandate_projections`: chain-derived immutable mandate/mode projection.
-- `ui_preferences`: the only user-private application-authority table.
+An off-chain reasoning decision to `WAIT` is not submitted and therefore does not become an on-chain attempt.
+
+## Optional richer audit projection
+
+Where the audit migration/indexer is enabled, the logical record chain is:
+
+```text
+observations → evidence_bundles → ai_decisions → proposals → policy_attempts → executions
+```
+
+- `observations` — canonical reasoning-visible source/destination/portfolio snapshot.
+- `evidence_bundles` — proof locations/artifacts and reconciliation state; only reconciled chain results may be labeled verified on-chain.
+- `ai_decisions` — canonical model decision envelope; WAIT terminates here.
+- `proposals` — deterministic schema-v1 proposal artifact.
+- `policy_attempts` — projection of the typed on-chain attempt plus chain/log identity.
+- `executions` — successful asset movement linked to an executed attempt.
+- `portfolio_snapshots` — block-bound accounting snapshots.
+- `mandate_projections` — chain-derived mandate/mode cache.
+
+Missing off-chain reasoning/proof/proposal artifacts must be displayed as missing, never synthesized from the on-chain hashes.
+
+## Public identity cache
+
+`user_instances` is a convenience copy of a relationship that is already observable on-chain. Its current public schema is intentionally limited to:
+
+```text
+id
+wallet_address
+instance_address
+created_at
+```
+
+It must not store login email or social identity. The dashboard independently validates discovered treasury ownership/factory provenance against chain state.
 
 ## Authority rules
 
-- Browser clients have read-only access to public audit projections and owner-only access to their UI preferences.
-- `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never prefix it with `VITE_`, commit it, log it, or bundle it in the frontend.
-- A database `VERIFIED_ONCHAIN`, `EXECUTED`, or `CANONICAL` label is only a cache of reconciled chain truth.
-- Missing reasoning/proof/proposal rows are shown as missing artifacts, never synthesized.
-- Legacy `ASCTreasuryJournal` entries use their legacy decoder and label.
+- Chain state is authoritative for ownership, mandate, evidence result, policy result and execution.
+- Supabase `VERIFIED_ONCHAIN`, `EXECUTED` or `CANONICAL` labels are cached conclusions that must be reconciled to chain data.
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never prefix it with `VITE_`, commit it, log it or bundle it in the browser.
+- Frontend validation and database RLS improve application safety/privacy but do not replace treasury authorization.
 
-## Apply and run
+## Apply and operate the richer audit index
 
-1. Back up the database and apply `0001_user_instances.sql`, then `0002_audit_journal.sql` using the database owner/migration role.
-2. Configure the server process with `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CREDITCOIN_RPC_URL`, `AUDIT_TREASURIES`, and `AUDIT_FROM_BLOCK`.
-3. Run `cd agent && npm run index:audit`.
-4. Re-running the same range is idempotent by treasury attempt identity and `(chain_id, transaction_hash, log_index)`.
-5. Replay schema-v1 data with `npm run replay:audit -- <chainId> <treasuryAddress> <attemptId>`. The existing `npm run replay -- <actionKey>` remains the explicit legacy decoder.
+1. Back up the database.
+2. Apply the migrations in `frontend/supabase/migrations/` in order using the database owner/migration role.
+3. Configure only the server process with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` plus the required Creditcoin/indexer settings.
+4. Run the audit indexer scripts from `agent/package.json` when that projection is desired.
+5. Re-running an indexed range should remain idempotent by treasury attempt identity and `(chain_id, transaction_hash, log_index)`.
 
 ## Reconciliation and reorgs
 
-Before presenting a row as canonical, compare its stored block hash with `eth_getBlockByNumber`. A mismatch marks every projection from the old hash `ORPHANED`; re-ingest from the last finalized checkpoint. Do not delete orphaned rows immediately—they are audit evidence. Production scheduling should index only to a configured confirmation depth and periodically reconcile the recent window.
+A projection that claims a canonical chain block should retain the block number/hash needed for reconciliation. If a stored block hash no longer matches `eth_getBlockByNumber`, mark data derived from the old block as orphaned and re-ingest from the last finalized checkpoint. Do not silently rewrite audit history.
 
-## Backup and retention
+## Retention
 
-- Use managed point-in-time recovery where available and export audit tables before migrations.
-- Retain canonical and orphaned policy attempts for the project lifetime.
-- Proof bodies may move to object storage, but retain their content digest and locator.
-- Never back up private keys because none belong in Supabase.
+- retain canonical and orphaned policy attempts for the project lifetime;
+- proof bodies may move to object storage, but retain their digest and durable locator;
+- preserve proposal/decision artifacts when they exist so commitments can be checked;
+- never store raw private keys, OTPs or service credentials in audit tables or backups.
