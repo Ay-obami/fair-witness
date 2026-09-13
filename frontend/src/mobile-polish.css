@@ -2,14 +2,22 @@
    Keep the desktop command-center aesthetic while making narrow screens read
    as a deliberate product experience rather than a compressed desktop view. */
 
-@media (max-width: 1023px) {
-  .fw-float {
-    animation: none;
-  }
+html,
+body { overflow-x: clip; }
 
-  .fw-ambient-orb {
-    opacity: .18;
-  }
+main,
+section,
+article,
+.fw-glass,
+.fw-command-surface { min-width: 0; }
+
+code,
+pre,
+.font-data { overflow-wrap: anywhere; }
+
+@media (max-width: 1023px) {
+  .fw-float { animation: none; }
+  .fw-ambient-orb { opacity: .18; }
 }
 
 @media (max-width: 640px) {
@@ -20,10 +28,7 @@
       linear-gradient(180deg, #070b0d 0%, #090f12 48%, #070b0d 100%);
   }
 
-  body::before {
-    background-size: 36px 36px;
-    opacity: .72;
-  }
+  body::before { background-size: 36px 36px; opacity: .72; }
 
   .fw-kicker {
     gap: .42rem;
@@ -33,10 +38,7 @@
     letter-spacing: .17em;
   }
 
-  .fw-kicker::before {
-    width: 1rem;
-    flex: 0 0 auto;
-  }
+  .fw-kicker::before { width: 1rem; flex: 0 0 auto; }
 
   .fw-hero-title {
     text-wrap: pretty;
@@ -44,18 +46,12 @@
     overflow-wrap: normal;
   }
 
-  .fw-hero-copy {
-    transition-duration: .58s;
-  }
+  .fw-hero-copy { transition-duration: .58s; }
 
   .fw-primary-button,
-  .fw-secondary-button {
-    min-height: 2.9rem;
-  }
+  .fw-secondary-button { min-height: 2.9rem; }
 
-  .fw-glass {
-    backdrop-filter: blur(12px);
-  }
+  .fw-glass { backdrop-filter: blur(12px); }
 
   .fw-engine-node {
     min-height: 4.45rem;
@@ -71,25 +67,11 @@
     font-size: .62rem;
   }
 
-  .fw-engine-connector {
-    height: 1.55rem;
-  }
+  .fw-engine-connector { height: 1.55rem; }
+  .fw-engine-connector::after { animation-duration: 2.5s; }
+  .fw-policy-gate::after { display: none; }
 
-  .fw-engine-connector::after {
-    animation-duration: 2.5s;
-  }
-
-  .fw-policy-gate::after {
-    display: none;
-  }
-
-  /* Five horizontal stages are too dense at phone width. Convert the execution
-     rail to a readable vertical path while keeping the same semantic order. */
-  .fw-live-rail {
-    grid-template-columns: 1fr;
-    gap: .42rem;
-  }
-
+  .fw-live-rail { grid-template-columns: 1fr; gap: .42rem; }
   .fw-live-rail::before {
     left: .98rem;
     right: auto;
@@ -121,54 +103,58 @@
     text-align: left;
   }
 
-  .fw-decision-card {
-    padding: .85rem;
-  }
+  .fw-decision-card { padding: .85rem; }
 
   .fw-status-chip {
+    max-width: 100%;
     padding: .38rem .58rem;
+    white-space: normal;
   }
 
-  /* Prevent iOS from zooming the viewport when users edit a mandate. */
+  .fw-market-popover {
+    position: fixed !important;
+    inset: auto 1rem calc(1rem + env(safe-area-inset-bottom)) 1rem !important;
+    z-index: 80 !important;
+    width: auto !important;
+    max-height: min(15rem, 45dvh);
+    margin: 0 !important;
+    overflow-y: auto;
+    box-shadow: 0 24px 80px rgba(0,0,0,.58) !important;
+  }
+
   input,
   select,
-  textarea {
-    font-size: 16px !important;
-  }
+  textarea { font-size: 16px !important; }
 
   button,
   a,
-  summary {
-    touch-action: manipulation;
-  }
+  summary { touch-action: manipulation; }
+
+  code,
+  pre,
+  .font-data { word-break: break-word; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .fw-primary-button:hover,
+  .fw-secondary-button:hover,
+  .fw-engine-node:hover,
+  article.rounded-xl:hover,
+  article.rounded-2xl:hover { transform: none; }
+
+  .fw-primary-button:hover::after { transform: translateX(-115%); }
 }
 
 @media (max-width: 380px) {
-  .fw-hero-title {
-    letter-spacing: -.04em;
-  }
-
-  .fw-engine-node {
-    gap: .58rem;
-    padding-inline: .65rem;
-  }
-
-  .fw-node-icon {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .fw-status-chip {
-    font-size: .52rem;
-    letter-spacing: .04em;
-  }
+  .fw-hero-title { letter-spacing: -.04em; }
+  .fw-engine-node { gap: .58rem; padding-inline: .65rem; }
+  .fw-node-icon { width: 2rem; height: 2rem; }
+  .fw-status-chip { font-size: .52rem; letter-spacing: .04em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fw-float,
   .fw-engine-connector::after,
   .fw-verified-ring,
-  .fw-scanline {
-    animation: none !important;
-  }
+  .fw-scanline { animation: none !important; }
 }
