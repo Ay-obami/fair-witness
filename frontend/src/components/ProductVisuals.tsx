@@ -91,7 +91,7 @@ export function ControlledMarketBadge() {
     <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-alert-500/25 bg-alert-500/5 px-3 py-1.5 text-[9px] font-medium uppercase tracking-widest text-alert-400 marker:hidden sm:text-[10px]">
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-alert-400" /> Controlled test market
     </summary>
-    <div className="absolute left-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-ledger-700 bg-ledger-950 p-3 text-left text-[11px] normal-case leading-relaxed tracking-normal text-ledger-300 shadow-2xl">
+    <div className="fw-market-popover absolute left-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-ledger-700 bg-ledger-950 p-3 text-left text-[11px] normal-case leading-relaxed tracking-normal text-ledger-300 shadow-2xl">
       Market conditions are synthetic for demonstration. Cross-chain transactions, Attestcoin verification, policy authorization and Creditcoin execution remain real public-testnet paths.
     </div>
   </details>;
