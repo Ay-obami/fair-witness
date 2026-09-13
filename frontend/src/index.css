@@ -4,89 +4,504 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Forensic-ledger palette: near-black slate, one verification accent (teal),
-     one alert accent (amber) for rejections — deliberately not a generic
-     indigo/purple SaaS palette. See DEVLOG.md for the design rationale. */
-  --color-ledger-950: #0a0e0f;
-  --color-ledger-900: #0f1517;
-  --color-ledger-800: #161e21;
-  --color-ledger-700: #212b2f;
-  --color-ledger-600: #34434a;
-  --color-ledger-400: #6b7f87;
-  --color-ledger-200: #b9c6ca;
-  --color-ledger-100: #dde5e7;
-  --color-verified-500: #2dd4a7;
-  --color-verified-400: #5ee6c2;
-  --color-alert-500: #e8a33d;
-  --color-alert-400: #f0bb66;
+  --color-ledger-950: #070b0d;
+  --color-ledger-900: #0d1417;
+  --color-ledger-800: #152025;
+  --color-ledger-700: #223039;
+  --color-ledger-600: #344a56;
+  --color-ledger-400: #7b9099;
+  --color-ledger-200: #c3d0d5;
+  --color-ledger-100: #edf3f4;
+  --color-verified-500: #24d9a5;
+  --color-verified-400: #6af0ca;
+  --color-alert-500: #f0a34a;
+  --color-alert-400: #ffc16f;
 
-  /* Planning Part 1, Phase 0 design tokens. The existing ledger/verified/alert tokens
-     above are untouched — these EXTEND the persisted forensic-ledger palette.
-     Copper is for actions + agent-decision UI, blue for independently-verifiable
-     external-evidence contexts (Sepolia), teal/amber stay strictly status colors. */
-  --color-background: #0B0D0F;
-  --color-surface: #15181B;
-  --color-elevated: #1D2125;
-  --color-hairline: #262B30;
-  --color-text-primary: #E8E6E1;
-  --color-text-secondary: #9BA1A8;
-  --color-copper-500: #C98A3E;
-  --color-copper-400: #E1A95F;
-  --color-external-500: #5B9BD5;
-  --color-external-400: #7FB4E3;
+  --color-background: #070b0d;
+  --color-surface: #0d1417;
+  --color-elevated: #121c21;
+  --color-hairline: #1d2a31;
+  --color-text-primary: #f4f7f8;
+  --color-text-secondary: #9fb0b7;
+  --color-copper-500: #d58f3f;
+  --color-copper-400: #f0b461;
+  --color-external-500: #4f9ee8;
+  --color-external-400: #7ab8f0;
+}
+
+:root {
+  color-scheme: dark;
+  --fw-glow-copper: 213 143 63;
+  --fw-glow-green: 36 217 165;
+  --fw-glow-blue: 79 158 232;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--color-background);
 }
 
 body {
-  background-color: var(--color-ledger-950);
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 20% -10%, rgba(var(--fw-glow-copper) / 0.08), transparent 32rem),
+    radial-gradient(circle at 85% 10%, rgba(var(--fw-glow-green) / 0.06), transparent 28rem),
+    linear-gradient(180deg, #070b0d 0%, #090f12 48%, #070b0d 100%);
   color: var(--color-ledger-100);
   font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .14;
+  background-image: radial-gradient(rgba(255,255,255,.38) .55px, transparent .55px);
+  background-size: 6px 6px;
+  mix-blend-mode: soft-light;
+}
+
+::selection {
+  background: rgba(var(--fw-glow-copper) / .28);
+  color: white;
 }
 
 .font-data {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
 }
 
-/* Hero copy rotation
-   Keep only the active message in document flow so long wrapped headlines can never
-   collide with the supporting copy. The active copy eases in very gradually with
-   only a tiny amount of motion, avoiding the sharp "swap" feeling while preserving
-   the overlap fix. */
-h1[aria-hidden="true"],
-p[aria-hidden="true"] {
-  display: none;
+/* Premium shared surfaces. Existing Tailwind utility classes inherit these overrides,
+   so Dashboard, Activity, Safeguards and Mandate all gain depth without changing behavior. */
+.bg-ledger-900,
+.bg-surface {
+  background-color: rgba(13, 20, 23, .86) !important;
 }
 
-h1[aria-hidden="false"],
-p[aria-hidden="false"] {
-  position: relative !important;
-  inset: auto !important;
-  animation: fair-witness-hero-copy-in 1350ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-  will-change: opacity, transform;
+.bg-ledger-950 {
+  background-color: rgba(7, 11, 13, .88) !important;
 }
 
-@keyframes fair-witness-hero-copy-in {
-  0% {
-    opacity: 0.18;
-    transform: translateY(3px);
-  }
-  22% {
-    opacity: 0.42;
-  }
-  55% {
-    opacity: 0.78;
-    transform: translateY(1px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.border-ledger-700,
+.border-ledger-800,
+.border-hairline {
+  border-color: rgba(93, 123, 136, .22) !important;
+}
+
+article.rounded-xl,
+article.rounded-2xl,
+.rounded-2xl.border,
+.rounded-xl.border {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 18px 50px rgba(0,0,0,.12);
+}
+
+article.rounded-xl:hover,
+article.rounded-2xl:hover {
+  border-color: rgba(var(--fw-glow-copper) / .24) !important;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(var(--fw-glow-copper) / .76);
+  outline-offset: 3px;
+}
+
+/* Brand interaction primitives */
+.fw-primary-button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 202, 127, .2);
+  background: linear-gradient(135deg, #efb15d 0%, #d58936 52%, #b96c28 100%);
+  color: #090c0d;
+  box-shadow: 0 12px 35px rgba(var(--fw-glow-copper) / .16), inset 0 1px 0 rgba(255,255,255,.45);
+  transition: transform .22s ease, box-shadow .22s ease, filter .22s ease;
+}
+
+.fw-primary-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-115%);
+  background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.32) 48%, transparent 72%);
+  transition: transform .55s ease;
+}
+
+.fw-primary-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 18px 44px rgba(var(--fw-glow-copper) / .24), inset 0 1px 0 rgba(255,255,255,.5);
+}
+
+.fw-primary-button:hover::after { transform: translateX(115%); }
+
+.fw-secondary-button {
+  border: 1px solid rgba(112, 145, 157, .3);
+  background: rgba(10, 17, 20, .58);
+  backdrop-filter: blur(14px);
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+
+.fw-secondary-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--fw-glow-green) / .42);
+  background: rgba(17, 29, 34, .78);
+}
+
+.fw-glass {
+  background: linear-gradient(145deg, rgba(20, 31, 36, .82), rgba(8, 14, 17, .72));
+  border: 1px solid rgba(111, 145, 158, .2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 35px 90px rgba(0,0,0,.26);
+  backdrop-filter: blur(18px);
+}
+
+.fw-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  font-size: .69rem;
+  line-height: 1;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--color-copper-400);
+}
+
+.fw-kicker::before {
+  content: "";
+  width: 1.55rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-copper-400));
+}
+
+.fw-hero-title {
+  text-wrap: balance;
+  letter-spacing: -.055em;
+  text-shadow: 0 12px 55px rgba(0,0,0,.28);
+}
+
+.fw-gradient-text {
+  background: linear-gradient(95deg, #f6c276 0%, #65edc7 54%, #86bff2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fw-ambient-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(78px);
+  opacity: .28;
+  pointer-events: none;
+}
+
+.fw-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  border: 1px solid rgba(93, 123, 136, .24);
+  background: rgba(8, 14, 17, .74);
+  padding: .45rem .72rem;
+  border-radius: 999px;
+  color: #b9c8ce;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.fw-status-dot {
+  width: .42rem;
+  height: .42rem;
+  border-radius: 999px;
+  background: var(--color-verified-400);
+  box-shadow: 0 0 0 4px rgba(var(--fw-glow-green) / .08), 0 0 16px rgba(var(--fw-glow-green) / .55);
+}
+
+.fw-section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(213,143,63,.2), rgba(36,217,165,.14), transparent);
+}
+
+/* Animated product architecture */
+.fw-engine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.fw-engine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 18% 25%, rgba(var(--fw-glow-blue) / .11), transparent 26%),
+    radial-gradient(circle at 78% 72%, rgba(var(--fw-glow-green) / .11), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,.018), transparent 35%);
+}
+
+.fw-engine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: .36;
+  background-image:
+    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at center, black, transparent 76%);
+}
+
+.fw-engine-node {
+  position: relative;
+  display: flex;
+  min-height: 5.1rem;
+  align-items: center;
+  gap: .8rem;
+  border: 1px solid rgba(99, 132, 145, .22);
+  background: linear-gradient(145deg, rgba(18, 29, 34, .88), rgba(8, 14, 17, .9));
+  border-radius: .9rem;
+  padding: .85rem .9rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+
+.fw-engine-node:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--fw-glow-copper) / .36);
+  box-shadow: 0 16px 35px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.fw-node-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  border-radius: .72rem;
+  border: 1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.025);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  color: #dbe6e9;
+}
+
+.fw-engine-connector {
+  position: relative;
+  height: 2.1rem;
+  width: 2px;
+  margin: 0 auto;
+  background: linear-gradient(to bottom, rgba(var(--fw-glow-blue)/.18), rgba(var(--fw-glow-green)/.48));
+}
+
+.fw-engine-connector::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: .42rem;
+  height: .42rem;
+  margin-left: -.21rem;
+  border-radius: 999px;
+  background: #79efd0;
+  box-shadow: 0 0 14px rgba(var(--fw-glow-green)/.72);
+  animation: fw-packet-down 2.25s linear infinite;
+}
+
+.fw-policy-gate {
+  border-color: rgba(var(--fw-glow-copper) / .42);
+  box-shadow: inset 0 0 32px rgba(var(--fw-glow-copper) / .055), 0 0 0 1px rgba(var(--fw-glow-copper) / .06);
+}
+
+.fw-policy-gate::after {
+  content: "POLICY LOCK";
+  position: absolute;
+  right: .65rem;
+  top: .55rem;
+  font-family: var(--font-mono);
+  font-size: .52rem;
+  letter-spacing: .12em;
+  color: var(--color-copper-400);
+}
+
+.fw-verified-ring {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(var(--fw-glow-green) / .2);
+  border-radius: inherit;
+  animation: fw-ring 2.8s ease-out infinite;
+}
+
+.fw-live-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.fw-live-rail::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 1.22rem;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(var(--fw-glow-blue)/.3), rgba(var(--fw-glow-green)/.56), rgba(var(--fw-glow-copper)/.55));
+}
+
+.fw-live-rail-step {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.fw-live-rail-dot {
+  margin: 0 auto;
+  display: grid;
+  height: 2.45rem;
+  width: 2.45rem;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(92,125,138,.3);
+  background: #0b1215;
+  box-shadow: 0 0 0 4px #0b1215;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  color: #a9bac0;
+}
+
+.fw-live-rail-step[data-active="true"] .fw-live-rail-dot {
+  border-color: rgba(var(--fw-glow-green)/.62);
+  color: #75f2cf;
+  box-shadow: 0 0 0 4px #0b1215, 0 0 20px rgba(var(--fw-glow-green)/.22);
+}
+
+.fw-decision-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(16, 28, 32, .94), rgba(7, 12, 14, .95));
+}
+
+.fw-decision-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, var(--color-verified-400), transparent);
+  opacity: .65;
+}
+
+.fw-command-surface {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(var(--fw-glow-green)/.05), transparent 24rem),
+    linear-gradient(145deg, rgba(13,20,23,.94), rgba(8,13,15,.94));
+  border-color: rgba(105,140,153,.22) !important;
+}
+
+/* Inputs and forms feel like instrument controls rather than plain SaaS fields. */
+input,
+select,
+textarea {
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(var(--fw-glow-copper)/.48) !important;
+  box-shadow: 0 0 0 3px rgba(var(--fw-glow-copper)/.08);
+  background-color: rgba(12, 20, 23, .96) !important;
+}
+
+/* Hero copy rotation: true crossfade without overlap. */
+.fw-hero-copy {
+  transition: opacity .8s cubic-bezier(.22,.61,.36,1), transform .8s cubic-bezier(.22,.61,.36,1), filter .8s ease;
+}
+
+.fw-hero-copy[data-active="true"] {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+  pointer-events: auto;
+}
+
+.fw-hero-copy[data-active="false"] {
+  opacity: 0;
+  transform: translateY(7px);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+@keyframes fw-packet-down {
+  from { top: -.15rem; opacity: 0; }
+  12% { opacity: 1; }
+  86% { opacity: 1; }
+  to { top: 1.85rem; opacity: 0; }
+}
+
+@keyframes fw-ring {
+  0% { opacity: .55; transform: scale(.98); }
+  70%,100% { opacity: 0; transform: scale(1.08); }
+}
+
+@keyframes fw-float {
+  0%,100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-8px,0); }
+}
+
+@keyframes fw-scan {
+  0% { transform: translateY(-120%); opacity: 0; }
+  18% { opacity: .4; }
+  82% { opacity: .22; }
+  100% { transform: translateY(520%); opacity: 0; }
+}
+
+.fw-float { animation: fw-float 6s ease-in-out infinite; }
+
+.fw-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--fw-glow-green)/.75), transparent);
+  box-shadow: 0 0 24px rgba(var(--fw-glow-green)/.2);
+  animation: fw-scan 7s linear infinite;
+}
+
+@media (max-width: 640px) {
+  .fw-live-rail { gap: .22rem; }
+  .fw-live-rail-dot { width: 2rem; height: 2rem; font-size: .55rem; }
+  .fw-live-rail::before { top: .98rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  h1[aria-hidden="false"],
-  p[aria-hidden="false"] {
-    animation: none;
-    will-change: auto;
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
   }
 }

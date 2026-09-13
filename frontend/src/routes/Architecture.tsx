@@ -1,183 +1,51 @@
-// Phase 1, Page 12 — Architecture page (`/architecture`).
-// Interactive diagram: LLM Agent → ASC Treasury → Attestcoin → Execution → Journal,
-// with a clear trust-boundary line around the treasury. Funds/policy/execution
-// inside; agent decision outside (no custody).
 import { NetworkIndicator } from "../components/networkIndicator";
 import { Layout } from "../components/layout";
+import { ControlledMarketBadge, ExecutionRail, LiveExecutionEngine } from "../components/ProductVisuals";
+
+const LAYERS = [
+  { code: "SRC", title: "Source-chain market", tone: "external", text: "A controlled Sepolia V3 market produces observable cross-chain state. Market conditions are synthetic for the demo; the observation itself is a real public-testnet transaction." },
+  { code: "PRF", title: "Attestcoin evidence", tone: "verified", text: "Attestcoin proves the source observation so Creditcoin does not need to trust a private API, application database or the AI reasoning layer." },
+  { code: "AI", title: "AI reasoning", tone: "copper", text: "The reasoning layer receives verified context and a deterministic candidate, then recommends EXECUTE or WAIT with rationale. It has no custody authority." },
+  { code: "POL", title: "Deterministic policy gate", tone: "copper", text: "The treasury independently checks evidence freshness, source drift, destination conditions, strategy access, direction, sizing, slippage, rate limits, policy epoch, nonces and replay protection." },
+  { code: "DEX", title: "Fixed execution adapter", tone: "verified", text: "Only a proposal that clears policy reaches the configured destination adapter. The AI cannot swap venues, change assets or invent unrestricted execution calldata." },
+  { code: "JRN", title: "On-chain journal", tone: "verified", text: "Accepted, rejected and failed attempts remain security records. Historical journal data remains readable even after a treasury is permanently closed." },
+];
 
 export default function Architecture() {
-  return (
-    <Layout>
-      <div className="mx-auto max-w-3xl px-6 py-12">
-        <header className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <p className="text-xs uppercase tracking-widest text-verified-400">
-              Fair Witness
-            </p>
-            <NetworkIndicator />
-          </div>
-          <h1 className="text-2xl font-semibold text-ledger-100">Architecture</h1>
-          <p className="mt-2 text-sm leading-relaxed text-ledger-400">
-            A plain-language map of what does what — and, crucially, what trust
-            each piece requires. The teal line marks the trust boundary: anything
-            inside it is on-chain and independently verifiable; anything outside
-            is off-chain reasoning that the contract re-checks before acting.
-          </p>
-        </header>
-
-        <section className="mb-8 rounded-lg border border-ledger-700 bg-ledger-900 p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-ledger-200">
-            Trust boundary
-          </h2>
-          <p className="text-sm leading-relaxed text-ledger-400">
-            <strong className="text-verified-400">Inside the boundary</strong>{" "}
-            (on-chain, verifiable): the treasury contract enforces all guardrails,
-            verifies the attestation proofs, executes against the DEX, and journals
-            the result. The agent cannot bypass what the contract checks.
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-ledger-400">
-            <strong className="text-copper-400">Outside the boundary</strong>{" "}
-            (off-chain, human-readable): the LLM agent reasons about opportunities
-            and proposes actions. It <em>decides</em>, but never <em>executes</em>{" "}
-            directly — the contract re-validates every bound before touching funds.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          {/* Step 1: LLM Agent (outside) */}
-          <div className="rounded-lg border border-copper-500/30 bg-copper-500/5 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-copper-500/30 bg-copper-500 text-xs font-bold text-background">
-                1
-              </span>
-              <h3 className="text-lg font-semibold text-copper-400">LLM Agent (off-chain)</h3>
-              <span className="ml-auto rounded-full border border-copper-500/30 bg-copper-500/10 px-2.5 py-1 text-xs font-data uppercase tracking-wide text-copper-400">
-                outside trust boundary
-              </span>
-            </div>
-            <p className="text-sm text-ledger-400">
-              Watches the source chain, waits for two Attestcoin proofs confirming
-              a price gap, then asks the LLM (Gemini, temperature 0 + seed for
-              determinism) whether the gap clears the instance's guardrails.
-              The agent only <em>proposes</em> — it never touches funds directly.
-            </p>
-            <ul className="mt-2 list-disc list-inside space-y-1 text-xs text-ledger-400">
-              <li>Never holds user funds — only submits proposals to the contract</li>
-              <li>Decisions are hash-committed and independently verifiable</li>
-              <li>Uses one platform LLM key (Gemini), not per-user keys</li>
-            </ul>
-          </div>
-
-          {/* Step 2: ASC Treasury (inside) */}
-          <div className="rounded-lg border border-verified-500/30 bg-verified-500/5 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-verified-500/30 bg-verified-500 text-xs font-bold text-background">
-                2
-              </span>
-              <h3 className="text-lg font-semibold text-verified-400">ASC Treasury (on-chain, per-user)</h3>
-              <span className="ml-auto rounded-full border border-verified-500/30 bg-verified-500/10 px-2.5 py-1 text-xs font-data uppercase tracking-wide text-verified-400">
-                inside trust boundary
-              </span>
-            </div>
-            <p className="text-sm text-ledger-400">
-              Each user gets their own factory-deployed instance. The guardrails
-              (max trade, slippage, drift, rate limit — all seven) are
-              <strong> constructor-set immutables</strong> — baked in once at
-              deployment, unchangeable forever, even by the owner.
-            </p>
-            <ul className="mt-2 list-disc list-inside space-y-1 text-xs text-ledger-400">
-              <li>Independent per-user contract — no shared mutable settings</li>
-              <li>Enforces guardrails independently before any trade</li>
-              <li>Never holds custody — it only mediates trades within the limits you set</li>
-            </ul>
-          </div>
-
-          {/* Step 3: Attestation */}
-          <div className="rounded-lg border border-ledger-700 bg-ledger-900 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ledger-700 bg-ledger-800 text-xs font-bold text-verified-400">
-                3
-              </span>
-              <h3 className="text-lg font-semibold text-ledger-200">Attestation (Sepolia → Creditcoin)</h3>
-              <span className="ml-auto rounded-full border border-external-500/30 bg-external-500/10 px-2.5 py-1 text-xs font-data uppercase tracking-wide text-external-400">
-                external evidence
-              </span>
-            </div>
-            <p className="text-sm text-ledger-400">
-              The agent builds two Attestcoin zero-knowledge proofs on Sepolia facts:
-              a source-chain price observation, and a confirmation of the same fact at
-              a later block. The treasury contract verifies both proofs on-chain before
-              accepting any action — so the gap the AI saw is cryptographically bound
-              to the execution.
-            </p>
-          </div>
-
-          {/* Step 4: Execution */}
-          <div className="rounded-lg border border-ledger-700 bg-ledger-900 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ledger-700 bg-ledger-800 text-xs font-bold text-verified-400">
-                4
-              </span>
-              <h3 className="text-lg font-semibold text-ledger-200">DEX Execution (on-chain)</h3>
-            </div>
-            <p className="text-sm text-ledger-400">
-              If both proofs verify and the guardrails clear, the treasury executes
-              a bounded swap against the destination DEX. The slippage and trade-size
-              limits are enforced by the contract's own revert paths — the agent cannot
-              override them.
-            </p>
-          </div>
-
-          {/* Step 5: Journal */}
-          <div className="rounded-lg border border-ledger-700 bg-ledger-900 p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ledger-700 bg-ledger-800 text-xs font-bold text-verified-400">
-                5
-              </span>
-              <h3 className="text-lg font-semibold text-ledger-200">Journal (on-chain)</h3>
-            </div>
-            <p className="text-sm text-ledger-400">
-              Every schema-v1 attempt is written to the journal as a structured entry with
-              a <code className="font-data text-xs text-ledger-200">decisionHash</code>
-              that commits to the agent's off-chain reasoning. You can reconstruct the
-              entire chain — fact, proof, decision, action — and verify the hash matches
-              independently.
-            </p>
-            <p className="mt-2 text-xs text-ledger-400">
-              Rejected and execution-failed proposals are first-class security records.
-              A rejection records the reason while leaving treasury balances untouched.
-            </p>
-          </div>
-        </section>
-
-        <section className="mt-8 rounded-lg border border-ledger-700 bg-ledger-900 p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ledger-200">
-            Data flow summary
-          </h2>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-ledger-400">
-            <li>
-              Something happens on <span className="text-external-400">Sepolia</span> →
-              Attestcoin observes it
-            </li>
-            <li>
-              Two ZK proofs are built (observation + confirmation at a later block)
-            </li>
-            <li>
-              Agent submits: proofs + fact + reasoning →{" "}
-              <span className="text-verified-400">treasury contract</span>
-            </li>
-            <li>
-              Treasury verifies proofs on-chain, checks guardrails (all immutable)
-            </li>
-            <li>
-              If all clear → executes bounded DEX swap → journals the result
-            </li>
-            <li>
-              You verify any step independently via block explorer or the Verify page
-            </li>
-          </ol>
-        </section>
+  return <Layout><main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+    <header className="relative overflow-hidden rounded-3xl border border-ledger-800 bg-ledger-900/60 p-5 sm:p-7 lg:p-8">
+      <div className="fw-ambient-orb -left-20 -top-24 h-72 w-72 bg-external-500/12" />
+      <div className="fw-ambient-orb -right-20 -top-24 h-72 w-72 bg-verified-500/12" />
+      <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_.72fr] lg:items-end">
+        <div><div className="flex flex-wrap items-center gap-3"><p className="fw-kicker">Trust architecture</p><NetworkIndicator /><ControlledMarketBadge /></div><h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-tight text-ledger-100 sm:text-5xl lg:text-6xl">Intelligence stays outside. Authority stays on-chain.</h1><p className="mt-4 max-w-3xl text-sm leading-relaxed text-ledger-400">Fair Witness is designed around one separation: the AI may reason about what should happen, but only deterministic treasury policy may decide whether capital is allowed to move.</p></div>
+        <div className="rounded-2xl border border-ledger-800 bg-ledger-950/55 p-4"><ExecutionRail /><p className="mt-4 text-center text-[10px] uppercase tracking-[.18em] text-ledger-600">Observe → prove → reason → authorize → execute</p></div>
       </div>
-    </Layout>
-  );
+    </header>
+
+    <section className="mt-8 grid gap-8 lg:grid-cols-[.92fr_1.08fr] lg:items-start">
+      <div className="lg:sticky lg:top-24"><LiveExecutionEngine /></div>
+      <div className="space-y-4">
+        {LAYERS.map((layer, index) => <article key={layer.code} className={`group relative overflow-hidden rounded-2xl border p-5 transition hover:-translate-y-0.5 ${layer.tone === "external" ? "border-external-500/25 bg-external-500/5" : layer.tone === "copper" ? "border-copper-500/25 bg-copper-500/5" : "border-verified-500/20 bg-verified-500/5"}`}>
+          <div className="flex items-start gap-4"><div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border font-data text-[10px] ${layer.tone === "external" ? "border-external-500/25 text-external-400" : layer.tone === "copper" ? "border-copper-500/25 text-copper-400" : "border-verified-500/25 text-verified-400"}`}>{layer.code}</div><div><div className="flex flex-wrap items-center gap-2"><span className="font-data text-[9px] text-ledger-600">0{index + 1}</span><h2 className="text-xl font-semibold text-ledger-100">{layer.title}</h2></div><p className="mt-2 text-sm leading-relaxed text-ledger-400">{layer.text}</p></div></div>
+          {layer.code === "POL" && <div className="absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b from-copper-400 via-verified-400 to-transparent" />}
+        </article>)}
+      </div>
+    </section>
+
+    <section className="mt-10 grid gap-5 lg:grid-cols-2">
+      <div className="rounded-3xl border border-copper-500/20 bg-copper-500/5 p-6"><div className="flex items-center justify-between gap-3"><p className="text-xl font-semibold text-ledger-100">Outside the authority boundary</p><span className="fw-status-chip text-[9px] text-copper-400">OFF-CHAIN</span></div><div className="mt-5 grid gap-3 text-sm text-ledger-300 sm:grid-cols-2"><p>• AI reasoning</p><p>• Human-readable rationale</p><p>• Opportunity ranking</p><p>• Candidate recommendation</p></div><p className="mt-5 text-xs leading-relaxed text-ledger-500">This layer can be wrong, manipulated or unavailable without gaining the ability to rewrite the mandate or withdraw funds.</p></div>
+      <div className="rounded-3xl border border-verified-500/20 bg-verified-500/5 p-6"><div className="flex items-center justify-between gap-3"><p className="text-xl font-semibold text-ledger-100">Inside the authority boundary</p><span className="fw-status-chip text-[9px] text-verified-400"><span className="fw-status-dot" /> ON-CHAIN</span></div><div className="mt-5 grid gap-3 text-sm text-ledger-300 sm:grid-cols-2"><p>✓ Verified evidence</p><p>✓ Policy limits</p><p>✓ Treasury balances</p><p>✓ Execution + replay state</p></div><p className="mt-5 text-xs leading-relaxed text-ledger-500">This layer is the security boundary. Every proposal is re-derived and re-checked before capital may move.</p></div>
+    </section>
+
+    <section className="fw-glass mt-10 rounded-3xl p-6 sm:p-7">
+      <div className="grid gap-8 lg:grid-cols-[.72fr_1.28fr] lg:items-start"><div><p className="fw-kicker">Data flow summary</p><h2 className="mt-4 text-3xl font-semibold tracking-tight text-ledger-100">No hidden leap from AI output to transaction.</h2><p className="mt-3 text-sm leading-relaxed text-ledger-400">Each transition adds another independently checkable constraint.</p></div><ol className="space-y-3">{[
+        "A source observation is created on Sepolia.",
+        "Attestcoin makes that observation verifiable on Creditcoin.",
+        "Deterministic strategy code derives a bounded candidate from current state.",
+        "AI returns EXECUTE or WAIT plus rationale; it does not invent unrestricted transaction authority.",
+        "The treasury performs a fresh on-chain policy preflight against current balances and policy state.",
+        "Only an authorized action reaches the fixed adapter, and the result is journaled on-chain.",
+      ].map((text,index)=><li key={text} className="flex gap-4 rounded-xl border border-ledger-800 bg-ledger-950/45 p-4"><span className="font-data text-xs text-copper-400">{String(index+1).padStart(2,"0")}</span><span className="text-sm leading-relaxed text-ledger-300">{text}</span></li>)}</ol></div>
+    </section>
+  </main></Layout>;
 }

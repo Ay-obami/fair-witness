@@ -2,9 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
+import './mobile-polish.css'
 import Home from './routes/Home'
 import Verify from './routes/Verify'
-import ActionDetail from './routes/ActionDetail'
+import DecisionDetail from './routes/DecisionDetail'
 import Treasury from './routes/Treasury'
 import Architecture from './routes/Architecture'
 import SignUp from './routes/SignUp'
@@ -34,12 +35,12 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/" element={<Home />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/activity" element={<Activity />} />
+            <Route path="/decision/:treasury/:attemptId" element={<DecisionDetail />} />
             <Route path="/safeguards" element={<Safeguards />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/treasury" element={<Treasury />} />
             <Route path="/architecture" element={<Architecture />} />
-            <Route path="/action/:actionKey" element={<ActionDetail />} />
-            <Route path="/action/:actionKey/:instance" element={<ActionDetail />} />
+            <Route path="/action/*" element={<Navigate to="/verify" replace />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/mandate" element={<Mandate />} />
             <Route path="/evidence" element={<Demo />} />
