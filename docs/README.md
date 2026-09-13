@@ -6,12 +6,14 @@ This directory contains the documentation that is useful for understanding, audi
 
 | Document | Purpose |
 |---|---|
+| [`WHITEPAPER.md`](WHITEPAPER.md) | Product thesis, architecture, Attestcoin integration, security model, controlled-demo evidence and roadmap. |
+| [`ATTESTCOIN_INTEGRATION.md`](ATTESTCOIN_INTEGRATION.md) | Dedicated walkthrough of the Attestcoin SDK, proof flow, Creditcoin verification and semantic validation. |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Current architecture, trust boundary, lifecycle and component responsibilities. |
 | [`architecture/SECURITY_MODEL.md`](architecture/SECURITY_MODEL.md) | Threat model, mandatory invariants, attack controls and residual risks. |
 | [`architecture/POLICY_MODEL.md`](architecture/POLICY_MODEL.md) | Deterministic policy schema and authorization stages. |
 | [`architecture/PROPOSAL_SCHEMA.md`](architecture/PROPOSAL_SCHEMA.md) | Schema-v1 proposal fields, hashes and replay identities. |
 | [`architecture/STRATEGY_MODEL.md`](architecture/STRATEGY_MODEL.md) | Arbitrage, rebalancing and risk-reduction strategy semantics. |
-| [`architecture/DATA_FLOW.md`](architecture/DATA_FLOW.md) | Evidence → decision → proposal → attempt → execution record linkage. |
+| [`architecture/DATA_FLOW.md`](architecture/DATA_FLOW.md) | Evidence -> decision -> proposal -> attempt -> execution record linkage. |
 | [`architecture/TEST_STRATEGY.md`](architecture/TEST_STRATEGY.md) | Test layers and security assertions. |
 | [`ADVERSARIAL_TEST_MATRIX.md`](ADVERSARIAL_TEST_MATRIX.md) | Concrete adversarial cases and the tests that protect capital. |
 | [`AUDIT_DATA_DICTIONARY.md`](AUDIT_DATA_DICTIONARY.md) | Optional Supabase audit projection and authority rules. |
