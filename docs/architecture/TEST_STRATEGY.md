@@ -4,126 +4,101 @@
 
 The highest-priority test obligation is:
 
-> Even if the AI produces malicious, incorrect, oversized, stale, replayed, or unauthorized instructions, it cannot cause capital movement outside deterministic policy constraints.
+> Even if the reasoning layer produces malicious, incorrect, oversized, stale, replayed, or unauthorized instructions, it cannot cause capital movement outside deterministic policy constraints.
 
-Every adversarial test asserts not only a reason code but also balance, allowance, execution counter, execution key, and strategy-usage state.
+A policy test is incomplete if it checks only a reason code. Adversarial cases should also assert the protected state that must remain unchanged: balances, approvals, execution identity/counters, replay state and strategy-specific usage.
 
 ## Test layers
 
-### Contract unit tests
+### Contracts
 
-- Proposal schema/version, policy constructor ceilings, policy hash/policy-epoch invalidation.
-- Universal gates and stable reason-code mapping.
-- Arbitrage arithmetic/direction/net costs/sizing.
-- Rebalance valuation/allocation/tolerance/direction/sizing/rounding.
-- Risk exposure/excess/per-action/daily cap and reset boundary.
-- Attempt/proposal/nonce/execution replay identity.
-- Attempt journal versus execution journal state transitions and exact enum/ABI parity.
-- Pause/resume, agent management, constrained owner exit.
+The Foundry suite covers:
 
-Use table tests at exact boundaries and fuzz amounts/prices/bps/decimals within supported domains. Prefer full-precision math and invariant assertions over example-only tests.
+- constructor/mandate validation and protocol ceilings;
+- policy hash and policy-epoch invalidation;
+- universal gates and stable reason-code mapping;
+- Arbitrage direction, edge, costs and deterministic sizing;
+- Rebalancing valuation, allocation, tolerance, direction and rounding;
+- Risk Reduction exposure, per-action cap, daily cap and rollover;
+- proposal/nonce/evidence replay identities;
+- attempt versus execution journal transitions;
+- pause/resume, agent management and lifecycle/owner controls;
+- validator receipt/proof semantics;
+- adapter route/output behavior and atomic rollback;
+- tenant isolation and factory-created configuration.
 
-### Contract integration tests
+Boundary-value and fuzz tests are preferred over example-only tests for amounts, prices, basis points and token units.
 
-- Treasury + mock validator + mock adapter for precise policy branches.
-- Treasury + real `VerifiedMarketFactValidator` + semantic encoded receipt fixtures.
-- Treasury + `PenguinV3Adapter` + V3 pool/router mocks for end-to-end atomic execution.
-- Factory creates isolated tenants with distinct immutable mandates and canonical dependencies.
-- Adapter failure rolls back approvals, balances, replay execution key, rate and daily usage.
+### Agent
 
-### Agent unit tests
+The TypeScript tests cover:
 
-- Closed strategy dispatch and risk-first priority.
-- Deterministic context/candidate math mirrors Solidity.
-- AI response schema excludes execution terms and rejects malformed output.
-- ProposalBuilder uses candidate/mandate values, not rationale/model numbers.
-- Solidity/TypeScript golden hashes and enum parity.
-- Per-tenant fresh balance/market reads and candidate invalidation after execution.
-- Crash recovery queries proposal/receipt before resubmission.
+- fixed strategy priority (`Risk Reduction → Rebalancing → Arbitrage`);
+- deterministic candidate math and Solidity-parity commitment construction;
+- strict EXECUTE/WAIT model output with execution-shaped fields rejected;
+- proposal terms copied only from deterministic candidate/mandate state;
+- proof acquisition/validation handling;
+- fail-closed preflight and just-in-time state refresh;
+- no stale broadcast when state drifts;
+- per-treasury runtime telemetry;
+- idempotency/replay-safe submission behavior.
 
-### Supabase/indexer tests
+### Frontend
 
-- Migrations apply from empty database and constraints reject duplicate identities.
-- RLS prevents cross-user private preference writes; service role is never bundled in frontend.
-- Event ingestion is idempotent by chain/tx/log.
-- Reorg/orphan reconciliation and replay from deployment block.
-- Evidence becomes `VERIFIED_ONCHAIN` only from a reconciled validator/treasury receipt.
-- Hash mismatch, missing reasoning/proof, invalid evidence and legacy entries render honest states.
+Frontend tests and build checks cover:
 
-### Frontend tests
+- mandate unit/bounds/address validation;
+- strategy/result/reason rendering;
+- current treasury lifecycle states;
+- live pipeline status mapping without decorative fake progress;
+- schema-v1 Activity and Decision Detail data handling;
+- `/verify` treasury + attempt locator behavior;
+- production build and lint safety.
 
-- Mandate fields and protocol ceilings map to constructor units correctly.
-- Strategy, result, and reason enums render correctly.
-- WAIT, policy rejection, execution, missing artifacts, tampering, legacy, demo and controlled-liquidity badges are distinct.
-- Timeline links observation/evidence/decision/proposal/policy/execution.
-- Owner and agent role language is accurate.
-- Live mode never silently falls back to mock data.
+UI tests do not substitute for chain authorization tests.
 
-### End-to-end tests
+### Database/audit projection
 
-- Deterministic local stack: observer event fixture -> proof fixture -> candidate -> stubbed AI EXECUTE -> proposal -> policy -> adapter -> on-chain journal -> indexer -> UI replay.
-- WAIT path persists off-chain without claiming policy evaluation.
-- Rejection path persists on-chain/off-chain with unchanged assets.
-- Multi-tenant isolation: same evidence may independently execute once per tenant.
-- Cross-strategy use: evidence may be evaluated per strategy; same strategy/evidence cannot execute twice.
+Where the richer audit projection is enabled, tests should cover migration safety, identity uniqueness, idempotent event ingestion, block-hash reconciliation, honest missing-artifact states and service-role isolation.
 
-### Deployment smoke tests
-
-- Correct chain IDs and contract bytecode.
-- Every immutable equals reviewed manifest.
-- Policy hash recomputes off-chain.
-- Owner/registered agent separation; agent has no strategy-token balance.
-- Invalid evidence and oversized proposal reject without movement and journal correct reason.
-- One minimal valid action executes through exact adapter/pool and appears in replay.
-- Attestcoin source proof verifies on Creditcoin; no API flag is substituted.
+The public `user_instances` cache is intentionally smaller: wallet address, treasury address and timestamp only. Login email must not be persisted in that public projection.
 
 ## Mandatory adversarial matrix
 
 | Case | Expected result | Required state assertion |
 |---|---|---|
-| Oversized action | `AMOUNT_EXCEEDS_POLICY` | No balance/allowance/counter/usage change; rejection journaled. |
-| Unauthorized asset | `ASSET_NOT_ALLOWED` | No adapter call or approval; rejection journaled. |
-| Unauthorized venue | `VENUE_NOT_ALLOWED` | No external venue call; rejection journaled. |
-| Stale evidence | `EVIDENCE_STALE` | No movement; proof locations/reason linked. |
-| Exact replay | `REPLAY_PROPOSAL` | Original executes at most once; replay attempt journaled. |
-| Changed nonce/amount/agent replay | `EVIDENCE_ALREADY_EXECUTED_FOR_STRATEGY` | No second execution. |
-| Expired proposal | `PROPOSAL_EXPIRED` | Evidence verifier/adapter not called if ordered earlier; no movement. |
-| Invalid evidence | `INVALID_EVIDENCE` | Never labeled verified; no movement; rejection journaled. |
-| Rebalance inside tolerance | `REBALANCE_WITHIN_TOLERANCE` | No movement; deterministic current allocation recorded. |
-| Rebalance wrong direction | `WRONG_DIRECTION` | Deviation cannot be increased. |
-| Risk below/equal threshold | `RISK_THRESHOLD_NOT_BREACHED` | No movement. |
-| Risk reduction above limit | `AMOUNT_EXCEEDS_POLICY` | Treasury untouched; permitted maximum recorded. |
-| Daily risk cap exceeded | `DAILY_RISK_LIMIT` | No movement/usage increment. |
-| Valid arbitrage | `EXECUTED` | Exact venue/pair, bounded value/slippage, one journal entry. |
-| Valid rebalance | `EXECUTED` | Direction toward target; resulting deviation reduced within rounding/cost bounds. |
-| Valid risk reduction | `EXECUTED` | WCTC exposure reduced; daily usage equals executed value. |
+| Oversized action | amount/policy rejection | No balance/approval/execution/usage change. |
+| Unauthorized asset | asset rejection | No adapter call or approval. |
+| Unauthorized venue | venue rejection | No external venue call. |
+| Stale/invalid evidence | evidence rejection | No movement; never marked verified. |
+| Exact proposal replay | replay rejection | Original can execute at most once. |
+| Changed nonce/amount/agent over executed evidence | evidence-executed rejection | No second execution. |
+| Expired proposal | expiry rejection | No movement. |
+| Rebalance inside tolerance | tolerance rejection | No movement. |
+| Rebalance wrong direction | direction rejection | Deviation cannot be increased. |
+| Risk below/equal threshold | threshold rejection | No movement or daily usage. |
+| Risk amount/daily cap exceeded | cap rejection | Treasury state remains bounded. |
+| Valid Arbitrage | executed | Exact allowed pair/venue/direction/input. |
+| Valid Rebalance | executed | Movement is toward target. |
+| Valid Risk Reduction | executed | WCTC exposure is reduced within caps. |
 
-Also test zero commitments/amount, unsupported schema/action/strategy, disabled/paused policy, stale policy hash, excessive deadline horizon/slippage, insufficient balance/liquidity, source drift, spot/TWAP manipulation, fee-on-transfer behavior, adapter output mismatch, reentrancy, attempt/execution epoch boundaries, and construction-time invalid mandate relationships.
+The concrete test names are tracked in [`../ADVERSARIAL_TEST_MATRIX.md`](../ADVERSARIAL_TEST_MATRIX.md).
 
-## Existing regression suite to preserve
+## CI gates
 
-Current baseline on 2026-09-08:
+Every pull request runs four independent jobs:
 
-- Foundry: 103/103 passing.
-- Agent Vitest: 42/42 passing.
-- Frontend production build: passing with bundle-size warning.
+1. **Contracts** — Foundry tests/build, runtime-size checks, current deployed creation-code commitment and committed ABI drift.
+2. **Agent** — clean install, Vitest and TypeScript build.
+3. **Frontend** — clean install, tests, lint and production build.
+4. **Release/security** — lifecycle-reference consistency, required public docs, tracked-secret checks and public-email persistence guard.
 
-Do not delete legacy invariant tests merely because new contracts supersede deployments. Port relevant invariants and keep legacy decode/read compatibility tests until explicitly retired.
+The exact workflow is `.github/workflows/ci.yml`; this document intentionally does not freeze test-count numbers that become stale as coverage grows.
 
-## CI target
+## Public-testnet validation
 
-Required jobs:
+Deterministic tests are the repeatable acceptance layer. Public-testnet controlled rehearsals complement them by checking the real source observation → Attestcoin proof → Creditcoin authorization/execution path.
 
-- `forge fmt --check`, build, unit/integration/fuzz/invariant tests;
-- agent clean install, TypeScript build, unit/integration tests;
-- frontend clean install, lint, tests, production build;
-- proposal ABI/hash golden-vector check;
-- Supabase migration/schema test;
-- local E2E stack;
-- opt-in read-only testnet readiness and post-deploy smoke jobs, never using secrets on untrusted PRs.
+Before showing a public receipt, preserve the relevant source/confirmation transactions, Creditcoin attempt transaction, treasury/attempt identity and explicit controlled-market disclosure. See [`../CONTROLLED_DEMO_RUNBOOK.md`](../CONTROLLED_DEMO_RUNBOOK.md).
 
-Live testnet tests complement but do not replace deterministic local tests. Market unavailability is a deployment/demo blocker, not a reason to weaken unit acceptance.
-
-## Completion evidence
-
-Each handoff reports exact commands, totals, failures/skips, and environment classification (local mock, fork, controlled testnet, or independent live market). “Tests pass” without command/output scope is insufficient.
+Live-market availability is never a reason to weaken deterministic acceptance criteria.
