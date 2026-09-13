@@ -158,7 +158,12 @@ pre,
 }
 
 @media (max-width: 380px) {
-  .fw-hero-title { letter-spacing: -.04em; }
+  .fw-hero-title {
+    font-size: 2.55rem;
+    line-height: 1;
+    letter-spacing: -.04em;
+  }
+
   .fw-engine-node { gap: .58rem; padding-inline: .65rem; }
   .fw-node-icon { width: 2rem; height: 2rem; }
   .fw-status-chip { font-size: .52rem; letter-spacing: .04em; }
