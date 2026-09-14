@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-09-10T21:46:32.323Z",
+  "chainId": "102031",
+  "previous": {
+    "factory": "0x52C36499AA400F74432Eb327Cd1fB51Be573AeEd",
+    "faucet": null,
+    "factoryDeploymentBlock": null
+  },
+  "destination": {
+    "validator": "0x13Dd030815550080Ef80Ff3499fAE8d971A119f5",
+    "adapter": "0x9bAF94da27d5C71c42b40D25b43070083DE7296E",
+    "wctc": "0x83821c38Ed36F8A57E64dcDFf36841Dc3CBcCB71",
+    "stable": "0x91A964711d4013a8eC7Cd98abbDd249d0C80ae3c",
+    "treasuryCreationCode": {
+      "storeA": "0x1e496f91dA588aaB351f43b4F54AD692B2100Cc3",
+      "storeB": "0x5E5601C06DcaE1826cF9abe386d5c3F47b2f3118",
+      "hash": "0x74a08f82b8271ed2008a6b27b0398ef4d6065536febf6a2850eb4e3a2ab45afc",
+      "size": 24986
+    },
+    "factory": "0x494490bBF748e59a659227F46510535BF3818442",
+    "factoryDeploymentBlock": 5465730,
+    "faucet": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A",
+    "demoReserve": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A",
+    "faucetBalance": {
+      "fwWCTC": "1000000000000000000000",
+      "fwUSD": "5000000000"
+    }
+  },
+  "environmentUpdates": {
+    "FACTORY_ADDRESS": "0x494490bBF748e59a659227F46510535BF3818442",
+    "FACTORY_DEPLOYMENT_BLOCK": "5465730",
+    "VITE_FACTORY_ADDRESS": "0x494490bBF748e59a659227F46510535BF3818442",
+    "VITE_FACTORY_DEPLOYMENT_BLOCK": "5465730",
+    "VITE_DEMO_FAUCET_ADDRESS": "0x477564A6e66966d2fcb5E3CaE33282e8d25dD71A"
+  }
+}
