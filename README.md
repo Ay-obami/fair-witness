@@ -55,7 +55,7 @@ The safety boundary therefore lives elsewhere:
 - rejected proposals create no token approval or asset movement;
 - Supabase is an optional projection/cache and never authorizes execution.
 
-See [`docs/architecture/SECURITY_MODEL.md`](docs/architecture/SECURITY_MODEL.md) for the threat model and [`docs/ADVERSARIAL_TEST_MATRIX.md`](docs/ADVERSARIAL_TEST_MATRIX.md) for the adversarial test evidence.
+See [`docs/ATTESTCOIN_INTEGRATION.md`](docs/ATTESTCOIN_INTEGRATION.md) for the dedicated cross-chain verification walkthrough, [`docs/architecture/SECURITY_MODEL.md`](docs/architecture/SECURITY_MODEL.md) for the threat model, and [`docs/ADVERSARIAL_TEST_MATRIX.md`](docs/ADVERSARIAL_TEST_MATRIX.md) for the adversarial test evidence.
 
 ## Controlled public-testnet demonstration
 
@@ -132,10 +132,12 @@ scripts/     release consistency checks
 
 ## Documentation
 
-Start at [`docs/README.md`](docs/README.md).
+Start with the [`Fair Witness Whitepaper`](docs/WHITEPAPER.md), then use [`docs/README.md`](docs/README.md) as the technical documentation index.
 
 The most useful references are:
 
+- [`docs/WHITEPAPER.md`](docs/WHITEPAPER.md) — product thesis, architecture, evidence, limitations and roadmap
+- [`docs/ATTESTCOIN_INTEGRATION.md`](docs/ATTESTCOIN_INTEGRATION.md) — dedicated Attestcoin SDK → proof → Creditcoin verification walkthrough
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current system architecture and trust boundary
 - [`docs/architecture/SECURITY_MODEL.md`](docs/architecture/SECURITY_MODEL.md) — threats, invariants and residual risks
 - [`docs/architecture/POLICY_MODEL.md`](docs/architecture/POLICY_MODEL.md) — deterministic authorization rules
