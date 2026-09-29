@@ -64,8 +64,9 @@ export default function SignUpDone() {
   async function signer() {
     if (!account) throw new Error("Reconnect through Launch Fair Witness to perform owner actions.");
     if (owner && account.address.toLowerCase() !== owner.toLowerCase()) throw new Error("Connected wallet is not this treasury's owner.");
-    await ensureSponsoredGas(account.address);
-    return ethers6Adapter.signer.toEthers({ client: thirdwebClient, chain: creditcoinTestnet, account });
+    const signer = await ethers6Adapter.signer.toEthers({ client: thirdwebClient, chain: creditcoinTestnet, account });
+    await ensureSponsoredGas(signer);
+    return signer;
   }
 
   async function fundAndLaunch() {

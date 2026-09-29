@@ -86,6 +86,8 @@ The dashboard's live pipeline requires the frontend and agent service to be depl
 
 For browser access to the health/sponsor service, restrict CORS to the intended frontend origins. Do not replace the production allow-list with `*` merely to make preview deployments convenient.
 
+Gas sponsorship requires a fresh, single-use signature from the recipient wallet. The challenge expires after five minutes. The origin allow-list is a browser control, not authentication: direct clients can forge an `Origin` header. Wallet signatures prevent third parties from sponsoring arbitrary recipient addresses, but a person can create many wallets. Keep the sponsor funded with a limited testnet balance and monitor spending; its daily budget and address cooldown are held in process memory and reset on restart. Deploy the frontend and agent together when changing this request protocol.
+
 ## Supabase
 
 Supabase is not an authorization layer. On-chain factory events, treasury ownership and treasury policy remain authoritative.

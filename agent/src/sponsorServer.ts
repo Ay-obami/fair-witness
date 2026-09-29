@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { ethers } from "ethers";
 import { runtimeHealthSnapshot } from "./runtimeHealth.js";
+import { SponsorAuthorization } from "./sponsorAuthorization.js";
 
 const RPC = process.env.CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network";
 const CHAIN_ID = Number(process.env.CREDITCOIN_CHAIN_ID ?? "102031");
@@ -30,6 +31,7 @@ const lastFundedAt = new Map<string, number>();
 let budgetDay = Math.floor(Date.now() / 86_400_000);
 let sponsoredTodayWei = 0n;
 let sponsorSerial: Promise<void> = Promise.resolve();
+const authorization = new SponsorAuthorization(Date.now, CHAIN_ID);
 
 function allowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
@@ -153,6 +155,12 @@ export function startSponsorServer() {
         agent: runtimeHealthSnapshot(),
       });
     }
+    if (req.method === "GET" && req.url?.startsWith("/sponsor-challenge?")) {
+      if (!allowedOrigin(origin)) return json(res, 403, { error: "origin not allowed" });
+      const address = new URL(req.url, "http://localhost").searchParams.get("address");
+      if (!address || !ethers.isAddress(address)) return json(res, 400, { error: "valid address is required" });
+      return json(res, 200, authorization.issue(address));
+    }
     if (req.method !== "POST" || req.url !== "/sponsor-gas") return json(res, 404, { error: "not found" });
     if (!allowedOrigin(origin)) return json(res, 403, { error: "origin not allowed" });
     if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
@@ -162,6 +170,10 @@ export function startSponsorServer() {
       const payload = await body(req);
       if (typeof payload.address !== "string" || !ethers.isAddress(payload.address)) {
         return json(res, 400, { error: "valid address is required" });
+      }
+      if (typeof payload.nonce !== "string" || typeof payload.signature !== "string"
+          || !authorization.consume(payload.address, payload.nonce, payload.signature)) {
+        return json(res, 401, { error: "fresh wallet signature required" });
       }
       const result = await topUp(payload.address);
       return json(res, 200, result);

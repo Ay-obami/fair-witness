@@ -76,8 +76,8 @@ export default function Mandate() {
     const factoryAddress = config.factoryAddress || CONTROLLED_DEMO.destination.factory;
     setBusy(true);
     try {
-      await ensureSponsoredGas(connected.address);
       const signer = await ethers6Adapter.signer.toEthers({client:thirdwebClient, chain:creditcoinTestnet, account:connected});
+      await ensureSponsoredGas(signer);
       const factory = new ethers.Contract(factoryAddress, FAIR_WITNESS_FACTORY_ABI, signer);
       const policies = toContractPolicies(draft);
       await factory.createTreasury.staticCall(connected.address, policies.universal, policies.arbitrage, policies.rebalance, policies.risk);
