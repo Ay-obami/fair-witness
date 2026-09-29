@@ -106,8 +106,8 @@ export default function Dashboard() {
     const readOnly = new ethers.Contract(view.address, LIFECYCLE_WRITE_ABI, new ethers.JsonRpcProvider(config.creditcoinRpcUrl));
     const owner = String(await readOnly.owner());
     if (owner.toLowerCase() !== account.address.toLowerCase()) throw new Error("This connected wallet is not the owner of this treasury. Reconnect with the wallet that created it.");
-    await ensureSponsoredGas(account.address);
     const signer = await ethers6Adapter.signer.toEthers({ client, chain: creditcoinTestnet, account });
+    await ensureSponsoredGas(signer);
     return new ethers.Contract(view.address, [...FAIR_WITNESS_TREASURY_ABI, ...LIFECYCLE_WRITE_ABI], signer);
   }
 
