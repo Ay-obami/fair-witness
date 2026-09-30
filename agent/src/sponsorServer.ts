@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { ethers } from "ethers";
 import { runtimeHealthSnapshot } from "./runtimeHealth.js";
+import { SponsorBudget } from "./sponsorBudget.js";
 import { SponsorAuthorization } from "./sponsorAuthorization.js";
 
 const RPC = process.env.CREDITCOIN_RPC_URL ?? "https://rpc.cc3-testnet.creditcoin.network";
@@ -11,7 +12,10 @@ const TARGET_WEI = BigInt(process.env.GAS_SPONSOR_TARGET_WEI ?? "250000000000000
 const MIN_BALANCE_WEI = BigInt(process.env.GAS_SPONSOR_MIN_BALANCE_WEI ?? "50000000000000000"); // 0.05 CTC
 const MAX_TOPUP_WEI = BigInt(process.env.GAS_SPONSOR_MAX_TOPUP_WEI ?? TARGET_WEI.toString());
 const DAILY_BUDGET_WEI = BigInt(process.env.GAS_SPONSOR_DAILY_BUDGET_WEI ?? (TARGET_WEI * 10n).toString());
-const ADDRESS_COOLDOWN_MS = Math.max(0, Number(process.env.GAS_SPONSOR_ADDRESS_COOLDOWN_MS ?? "86400000"));
+const ADDRESS_COOLDOWN_MS = Number(process.env.GAS_SPONSOR_ADDRESS_COOLDOWN_MS ?? "86400000");
+if (!Number.isSafeInteger(ADDRESS_COOLDOWN_MS) || ADDRESS_COOLDOWN_MS < 0 || ADDRESS_COOLDOWN_MS > 30 * 86_400_000) {
+  throw new Error("gas sponsor cooldown must be an integer between zero and 30 days");
+}
 const ALLOWED_ORIGINS = (process.env.SPONSOR_ALLOWED_ORIGINS ?? "https://fair-witness.vercel.app")
   .split(",")
   .map((value) => value.trim())
@@ -27,9 +31,10 @@ if (TARGET_WEI <= 0n || MAX_TOPUP_WEI <= 0n || DAILY_BUDGET_WEI <= 0n) {
 const sponsorKey = process.env.GAS_SPONSOR_PRIVATE_KEY;
 const provider = new ethers.JsonRpcProvider(RPC, CHAIN_ID, { staticNetwork: true });
 const sponsor = sponsorKey ? new ethers.Wallet(sponsorKey, provider) : null;
-const lastFundedAt = new Map<string, number>();
-let budgetDay = Math.floor(Date.now() / 86_400_000);
-let sponsoredTodayWei = 0n;
+const ledgerPath = process.env.GAS_SPONSOR_LEDGER_PATH;
+if (sponsor && !ledgerPath) throw new Error("GAS_SPONSOR_LEDGER_PATH must point to durable storage when sponsorship is configured");
+const budget = sponsor && ledgerPath ? new SponsorBudget(ledgerPath, `${CHAIN_ID}:${sponsor.address.toLowerCase()}`) : null;
+budget?.snapshot(Date.now());
 let sponsorSerial: Promise<void> = Promise.resolve();
 const authorization = new SponsorAuthorization(Date.now, CHAIN_ID);
 
@@ -63,20 +68,10 @@ async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
   return parsed as Record<string, unknown>;
 }
 
-function refreshDailyBudget() {
-  const currentDay = Math.floor(Date.now() / 86_400_000);
-  if (currentDay !== budgetDay) {
-    budgetDay = currentDay;
-    sponsoredTodayWei = 0n;
-  }
-}
-
 async function topUpUnlocked(address: string) {
   if (!sponsor) throw new Error("GAS_SPONSOR_PRIVATE_KEY is not configured");
-  refreshDailyBudget();
 
   const recipient = ethers.getAddress(address);
-  const key = recipient.toLowerCase();
   const current = await provider.getBalance(recipient);
 
   // A previously sponsored wallet should be able to perform many lifecycle writes
@@ -92,20 +87,14 @@ async function topUpUnlocked(address: string) {
     };
   }
 
-  const last = lastFundedAt.get(key);
-  if (last && Date.now() - last < ADDRESS_COOLDOWN_MS) {
-    throw new Error("address sponsorship cooldown is still active");
-  }
-
   const amount = TARGET_WEI - current;
   if (amount > MAX_TOPUP_WEI) throw new Error("requested top-up exceeds sponsor ceiling");
-  if (sponsoredTodayWei + amount > DAILY_BUDGET_WEI) throw new Error("daily sponsor budget exhausted");
+  // Persist before broadcast: RPC failure/timeout must never refund a possibly sent transaction.
+  budget!.reserve(recipient, amount, DAILY_BUDGET_WEI, ADDRESS_COOLDOWN_MS, Date.now());
 
   const tx = await sponsor.sendTransaction({ to: recipient, value: amount });
   const receipt = await tx.wait();
   if (!receipt || receipt.status !== 1) throw new Error("sponsor transaction was not confirmed successfully");
-  sponsoredTodayWei += amount;
-  lastFundedAt.set(key, Date.now());
   return {
     address: recipient,
     funded: true,
@@ -138,7 +127,9 @@ export function startSponsorServer() {
       return res.end();
     }
     if (req.method === "GET" && req.url === "/health") {
-      refreshDailyBudget();
+      let sponsoredTodayWei: bigint;
+      try { sponsoredTodayWei = budget?.snapshot(Date.now()).spentWei ?? 0n; }
+      catch { return json(res, 503, { ok: false, error: "sponsor budget ledger unavailable" }); }
       return json(res, 200, {
         ok: true,
         sponsorConfigured: Boolean(sponsor),

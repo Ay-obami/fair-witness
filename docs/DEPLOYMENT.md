@@ -86,7 +86,7 @@ The dashboard's live pipeline requires the frontend and agent service to be depl
 
 For browser access to the health/sponsor service, restrict CORS to the intended frontend origins. Do not replace the production allow-list with `*` merely to make preview deployments convenient.
 
-Gas sponsorship requires a fresh, single-use signature from the recipient wallet. The challenge expires after five minutes. The origin allow-list is a browser control, not authentication: direct clients can forge an `Origin` header. Wallet signatures prevent third parties from sponsoring arbitrary recipient addresses, but a person can create many wallets. Keep the sponsor funded with a limited testnet balance and monitor spending; its daily budget and address cooldown are held in process memory and reset on restart. Deploy the frontend and agent together when changing this request protocol.
+Gas sponsorship requires a fresh, single-use signature from the recipient wallet. The challenge expires after five minutes. The origin allow-list is a browser control, not authentication: direct clients can forge an `Origin` header. Wallet signatures prevent third parties from sponsoring arbitrary recipient addresses, but a person can create many wallets. Keep the sponsor funded with a limited testnet balance and monitor spending; its daily principal budget and address cooldown persist in the sponsor reservation ledger described below. Deploy the frontend and agent together when changing this request protocol.
 
 ## Supabase
 
@@ -138,3 +138,18 @@ After deploying both frontend and agent:
 ## Secrets
 
 Never commit private `.env` files, private keys, API keys, OTPs or service-role credentials. Treat a secret pasted into an untrusted channel or shell history as compromised and rotate it.
+
+
+## Durable sponsor accounting
+
+Set `GAS_SPONSOR_LEDGER_PATH` when configuring the sponsor private key. The service refuses to start without it. Pre-create its parent directory on a persistent local filesystem supporting exclusive file creation, atomic rename and file/directory fsync. The ledger binds the chain ID and sponsor address. Keep it out of version control and preserve it across restarts, deploys and backup restores; deleting it or restoring an older snapshot resets protection. A writable ephemeral container directory is insufficient.
+
+Every process spending from the same sponsor wallet must use the same ledger path and filesystem. Independent volumes, uncoordinated workers and manual transactions are outside this accounting boundary. A lock rejects simultaneous reservations rather than waiting. In-memory serialization still protects this process's transaction submissions; run one sender process per sponsor wallet to avoid nonce races. Horizontal scaling needs a transactional shared ledger and nonce coordinator.
+
+Principal and the recipient cooldown are reserved durably **before** broadcasting. A failed send, reverted transaction or ambiguous RPC timeout keeps its reservation: spending may be lower than the displayed `sponsoredTodayWei`, which now means reserved principal. The budget excludes transaction fees. Clock rollback does not reset the UTC-day budget; cooldown must be an integer between zero and 30 days. Keep time synchronized.
+
+Filesystem failure or an interrupted reservation can leave `<ledger>.lock` and `<ledger>.tmp`. Stop every sponsor process, reconcile the ledger and sponsor's confirmed/pending transactions, conservatively account for any potentially broadcast top-ups, and back up the reconciled ledger before removing a stale lock or temporary file. Never remove the ledger to recover service. If its contents or durability are uncertain, keep sponsorship disabled until the spending boundary is restored. On first adoption after the old memory-only service, wait until a fresh UTC day with the prior recipient cooldown expired, or seed the ledger with reconciled prior spending and recipient timestamps before enabling it.
+
+Wallet signatures authenticate control of a wallet, not a unique person or eligibility for sponsorship. Anyone can create and sign for many wallets and exhaust the configured public demo budget. Restrictive browser origins do not prevent direct HTTP clients. Limit the sponsor balance and budget; non-public sponsorship needs a separate eligibility/admission policy. No claim of Sybil resistance is made.
+
+`/health` reports process/ledger-read health, not guaranteed sponsorship availability. It can return `ok: true` while a stale reservation lock, exhausted budget, cooldown, insufficient sponsor balance or RPC failure blocks a top-up. Monitor top-up failures and the reservation lock separately; a successful health response is not authorization to remove a lock.
